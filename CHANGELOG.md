@@ -2,10 +2,13 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 1.4.1 — 2026-10-19
+
+Documentation and release tooling only; the plugin code is unchanged from 1.4.0.
 
 ### Changed
-- Releases publish to npm through npm trusted publishing (GitHub Actions OIDC) with automatic provenance; no npm token is stored. The release workflow can also be run by hand for an existing tag and skips steps that are already done.
+- `README.md` is now Chinese (the default on GitHub and npm), with the English version in `README.en.md`. Both are rewritten: a quick start, four verified ways to install (DSH **Plugins** page, the DSH agent, `dsh plugin add`, GitHub / offline package), upgrading and uninstalling, and a FAQ. Images and links use absolute URLs so they also render on npmjs.com.
+- Releases publish to npm through npm trusted publishing (GitHub Actions OIDC) with an automatic provenance statement; no npm token is stored anywhere. The release workflow can also be run by hand for an existing tag and skips steps that are already done.
 
 ## 1.4.0 — 2026-10-19
 

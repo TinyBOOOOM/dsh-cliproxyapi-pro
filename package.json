@@ -1,6 +1,6 @@
 {
   "name": "dsh-cliproxyapi-pro",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Auto-discovery CLIProxyAPI provider and management UI for DeepSeek Harness — multiple accounts, dynamic model sync, capability detection, and visual settings.",
   "keywords": [
     "dsh",
@@ -41,7 +41,7 @@
     "cordis.patch.yml",
     "icon.svg",
     "README.md",
-    "README.zh.md",
+    "README.en.md",
     "CHANGELOG.md",
     "LICENSE"
   ],

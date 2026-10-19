@@ -16,7 +16,7 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) bund
 | Slash commands | `/cpa-status`, `/cpa-refresh` |
 | HTTP routes | `/api/dsh-cliproxyapi/{status,refresh,save,accounts/add,accounts/remove}` |
 | Tests | `tests/plugin.test.mjs` (`node:test`) |
-| User docs | `README.md` (English) and `README.zh.md` (中文) — keep both in sync |
+| User docs | `README.md` (中文, default) and `README.en.md` (English) — keep both in sync |
 | CI / release | `.github/workflows/ci.yml`, `.github/workflows/release.yml` |
 
 Repository: <https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro> (default branch `main`).
@@ -57,7 +57,7 @@ Repository: <https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro> (default branch 
 
 ## Adding an account setting
 
-Update, in order: `ACCOUNT_FIELDS` and `resolveConfig()` → `pickAccount()` → `accountPatchFromInput()` (tool + HTTP) → tool `parameters` schema and description → client draft state, the draft-loading `useEffect`, `onSave` payload and form control (with `zh`/`en` strings) → the tool/API tables in **both** `README.md` and `README.zh.md` → a test. Global (all-account) settings go in `GLOBAL_FIELDS` instead.
+Update, in order: `ACCOUNT_FIELDS` and `resolveConfig()` → `pickAccount()` → `accountPatchFromInput()` (tool + HTTP) → tool `parameters` schema and description → client draft state, the draft-loading `useEffect`, `onSave` payload and form control (with `zh`/`en` strings) → the tool/API tables in **both** `README.md` and `README.en.md` → a test. Global (all-account) settings go in `GLOBAL_FIELDS` instead.
 
 ## Commands
 
@@ -79,7 +79,9 @@ Tests fake `fetch`, settings and credentials; they never touch the network or th
 
 ## Documentation
 
-- User-facing docs exist in two languages: `README.md` (English, the npm/GitHub landing page) and `README.zh.md` (中文). Any change to one — features, tables, examples, install targets, version in the title — goes into the other in the same commit. Each starts with the `English | 中文` switcher.
+- User-facing docs exist in two languages: `README.md` (中文 — the default, shown on GitHub and npmjs.com) and `README.en.md` (English). Any change to one — features, tables, examples, install steps, versions — goes into the other in the same commit. Each starts with the `中文 | English` switcher.
+- Both READMEs are rendered on npmjs.com too, so images and file links use absolute `https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/...` / `https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/...` URLs, never relative paths.
+- Install instructions describe only verified paths: the DSH **Plugins → Add plugin** dialog (package name, optional `@version`), the agent's `plugin_manager install_bundle` with target `dsh-cliproxyapi-pro`, `dsh plugin --profile <name> add dsh-cliproxyapi-pro` (installs from npm and adds the bundle to `dsh.profile.bundles` in one step), and Git / tarball / local-path targets. Re-verify after DSH changes its plugin manager.
 - `AGENTS.md` and `CHANGELOG.md` are English only.
 - Describe only behavior the code has; the community plugin list checks descriptions against the source.
 - Screenshots live in `assets/screenshots/` and are referenced by both READMEs and by `screenshots.json` (1–8 relative paths, read by plugin storefronts such as dsh-market). They are not shipped in the npm package. When the panel changes visibly, retake them, keep them free of real keys, server URLs and private data, and keep the captions in both READMEs accurate.
@@ -92,8 +94,8 @@ Tests fake `fetch`, settings and credentials; they never touch the network or th
 
 ## Release checklist
 
-1. Bump `version` in `package.json`, the title of both READMEs and the `#v<version>` install target in both READMEs' install tables; turn the pending notes into a `## <version> — <date>` section of `CHANGELOG.md` (the release workflow publishes exactly that section as the Release notes).
-2. `npm run check` passes; `npm run pack:check` lists exactly `lib/index.js`, `lib/client.js`, `locale/*.json`, `cordis.patch.yml`, `icon.svg`, `README.md`, `README.zh.md`, `CHANGELOG.md`, `LICENSE`, `package.json`.
+1. Bump `version` in `package.json`, and the pinned versions in both READMEs (`dsh-cliproxyapi-pro@<version>` and the `#v<version>` Git target); turn the pending notes into a `## <version> — <date>` section of `CHANGELOG.md` (the release workflow publishes exactly that section as the Release notes).
+2. `npm run check` passes; `npm run pack:check` lists exactly `lib/index.js`, `lib/client.js`, `locale/*.json`, `cordis.patch.yml`, `icon.svg`, `README.md`, `README.en.md`, `CHANGELOG.md`, `LICENSE`, `package.json`.
 3. `locale/*.json` `meta` text still describes the plugin; `icon.svg` renders (≤ 256 KiB).
 4. Reload in a live Harness, check the Settings panel in both languages and the tool output.
 5. Commit (`type: summary`, e.g. `feat: multi-account support`, `fix: …`, `docs: …`), push `main`, wait for CI, then `git tag v<version>` and `git push origin v<version>` to trigger the release.
