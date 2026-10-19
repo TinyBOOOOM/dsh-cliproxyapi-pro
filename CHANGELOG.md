@@ -2,9 +2,7 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
-## Unreleased
-
-These changes are not yet published; the package version and existing README installation pins remain unchanged.
+## 1.5.0 — 2026-10-19
 
 ### Added
 - **Plugin update card**, independent of account forms and drafts, with Chinese/English strings, localized errors, current/latest versions, Stable / Beta / Dev channels, Auto / Global / Mainland China regions, automatic checks and optional automatic downloads. The card is collapsed by default to a single compact row (title, current version, short update status) and expands on click; polling and saves never reset that choice.
