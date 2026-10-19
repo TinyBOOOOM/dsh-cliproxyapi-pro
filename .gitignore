@@ -1,0 +1,20 @@
+# Dependencies (the plugin has none at runtime; keep stray installs out)
+node_modules/
+
+# Packed bundles
+*.tgz
+
+# Local state, secrets and scratch files
+.dsh-cliproxyapi/
+state*.json
+.env
+.env.*
+*.log
+*.tmp
+_staging/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

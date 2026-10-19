@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "CLIProxyAPI 接入与同步",
+    "description": "接入一个或多个 CLIProxyAPI 账号（可分别启用或停用），实时同步模型与推理能力，并提供可视化配置与模型过滤面板。"
+  }
+}

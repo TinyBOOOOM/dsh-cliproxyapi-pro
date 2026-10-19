@@ -1,0 +1,61 @@
+{
+  "name": "dsh-cliproxyapi-pro",
+  "version": "1.4.0",
+  "description": "Auto-discovery CLIProxyAPI provider and management UI for DeepSeek Harness — multiple accounts, dynamic model sync, capability detection, and visual settings.",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-plugin",
+    "cliproxyapi",
+    "llm-provider"
+  ],
+  "author": "bowen (https://github.com/TinyBOOOOM)",
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "icon": "./icon.svg",
+  "engines": {
+    "dsh": ">=0.2.0-rc.1",
+    "node": ">=20.3"
+  },
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "locale/*.json",
+    "cordis.patch.yml",
+    "icon.svg",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-settings-plugins",
+        "@deepseek-ai/dsh-client-ui-plugin-manager",
+        "@deepseek-ai/dsh-client-ui-theme",
+        "@deepseek-ai/dsh-client-ui-renderer"
+      ]
+    }
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check": "node --check lib/index.js && node --check lib/client.js && node --test tests/*.test.mjs",
+    "pack:check": "npm pack --dry-run"
+  }
+}

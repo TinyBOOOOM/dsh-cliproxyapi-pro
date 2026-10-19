@@ -1,0 +1,4 @@
+# DSH bundle patch: mounts the CLIProxyAPI auto-discovery & sync plugin.
+- insert:
+    - id: dsh-cliproxyapi-pro
+      name: 'dsh-cliproxyapi-pro'
