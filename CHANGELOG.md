@@ -2,6 +2,11 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Changed
+- Releases publish to npm through npm trusted publishing (GitHub Actions OIDC) with automatic provenance; no npm token is stored. The release workflow can also be run by hand for an existing tag and skips steps that are already done.
+
 ## 1.4.0 — 2026-10-19
 
 First public release.

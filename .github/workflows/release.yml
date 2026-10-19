@@ -3,8 +3,11 @@
 #   2. create a GitHub Release with the packed bundle attached twice:
 #      `dsh-cliproxyapi-pro-<version>.tgz` and the version-free
 #      `dsh-cliproxyapi-pro.tgz` (stable `releases/latest/download/` URL),
-#   3. publish to npm with provenance — only when the `NPM_TOKEN`
-#      repository secret is set; otherwise the step is skipped.
+#   3. publish to npm through npm trusted publishing (OIDC): no npm token is
+#      stored anywhere, and npm attaches a provenance statement automatically.
+#      npmjs.com → dsh-cliproxyapi-pro → Settings → Trusted publishing must
+#      name GitHub user `TinyBOOOOM`, repository `dsh-cliproxyapi-pro`,
+#      workflow `release.yml`, no environment, with `npm publish` allowed.
 #
 # Runs on a pushed tag, or by hand (Actions → Release → Run workflow, or
 # `gh workflow run release.yml -f tag=v1.4.0`) to finish an existing tag.
@@ -23,8 +26,8 @@ on:
         type: string
 
 permissions:
-  contents: write
-  id-token: write
+  contents: write  # create the GitHub Release
+  id-token: write  # OIDC token for npm trusted publishing and provenance
 
 jobs:
   release:
@@ -48,6 +51,14 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false  # never use caching in release builds
+
+      - name: npm must support trusted publishing (>= 11.5.1)
+        run: |
+          if ! node -e "const [a,b,c]=process.argv[1].split('.').map(Number); process.exit(a>11||(a===11&&(b>5||(b===5&&c>=1)))?0:1)" "$(npm --version)"; then
+            npm install -g npm@^11.5.1
+          fi
+          npm --version
 
       - name: Tag must match package.json version
         run: |
@@ -84,19 +95,17 @@ jobs:
 
       - name: Decide npm publish
         id: npm
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          if [ -z "$NPM_TOKEN" ]; then
-            echo "NPM_TOKEN not set; skipping npm publish"
-          elif npm view "${PACKAGE}@${VERSION}" version > /dev/null 2>&1; then
+          if npm view "${PACKAGE}@${VERSION}" version > /dev/null 2>&1; then
             echo "${PACKAGE}@${VERSION} is already on npm; skipping"
           else
             echo "publish=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Publish to npm
+      - name: Publish to npm (trusted publishing)
         if: steps.npm.outputs.publish == 'true'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --provenance --access public
+        run: |
+          if ! npm publish --access public; then
+            echo "::error::npm publish failed. Check npmjs.com → ${PACKAGE} → Settings → Trusted publishing: user TinyBOOOOM, repository dsh-cliproxyapi-pro, workflow release.yml, no environment, 'npm publish' allowed; and that package.json repository.url matches this repository."
+            exit 1
+          fi
