@@ -52,6 +52,7 @@ Repository: <https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro> (default branch 
 - An explicit `baseURL` is the only candidate (`autoDiscover: false`); fallbacks (existing route URL, `CLIPROXYAPI_BASE_URL`, local `:8317`) apply only when `baseURL` is empty.
 - Account ids are stable; renaming `provider` releases the old keys on the next sync. Removing an account tears down its runtime and unsets its routes but keeps its stored credential.
 - Re-syncing unchanged data performs **zero** settings writes (diff via `sameJson`). User-set fields on managed routes (e.g. `retryPolicy`) survive; only `MANAGED_ROUTE_FIELDS` are replaced.
+- `selectedModels` absent means "never chosen": the first successful probe seeds `recommendModels()` (newest per family, from that server's catalog) exactly once via `seedSelection`. `[]` is an explicit choice meaning "all models". Never ship hard-coded model ids as defaults — catalogs differ between servers.
 - `state.json` is re-read on every access so hand edits apply; always write the normalized shape (`version: 2`). Format changes need a migration in `normalizeState()` plus a test, and must keep a v1 file loading losslessly.
 
 ## Adding an account setting

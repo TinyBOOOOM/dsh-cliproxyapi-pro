@@ -30,7 +30,7 @@ A [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) provider for **Dee
 ## Features
 
 1. **Auto-discovery.** Enter a remote or local URL (suffixes such as `/v1`, `/v1/chat/completions` and `/v1/messages` are stripped), or leave it empty to try the existing route URL, the `CLIPROXYAPI_BASE_URL` environment variable, and local `127.0.0.1:8317` in turn. The enriched catalog comes from `/v1/models?client_version=pi` (OpenAI `data[]` catalogs work too); `owned_by` from `/v1/models` identifies each model's family.
-2. **Model filter.** Search, family chips, All / Checked / Unchecked tabs and bulk selection. **Only checked models appear in the conversation model picker.** An empty selection means no filter; include / exclude keyword rules apply on top.
+2. **Model filter.** Search, family chips, All / Checked / Unchecked tabs and bulk selection. **Only checked models appear in the conversation model picker.** An empty selection means no filter; include / exclude keyword rules apply on top. An account that has never saved a selection starts with the newest model of each family in its own server's catalog (at most 12); **Reset to Recommended** restores that set.
 3. **Per-model overrides.** Context window, max output, image input, thinking levels (`off` … `max`) and request protocol, each resettable to the discovered value.
 4. **Native protocol per model family** (default). See [Protocol routing](#protocol-routing).
 5. **Multiple accounts.** Each account has its own URL, key, routes, protocol, selection and overrides, and can be enabled or disabled on its own. See [Multiple accounts](#multiple-accounts).

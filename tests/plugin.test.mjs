@@ -16,6 +16,7 @@ import {
   newAccountDefaults,
   accountConflicts,
   createCpaController,
+  recommendModels,
   apply,
 } from "../lib/index.js";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
@@ -502,6 +503,70 @@ describe("multi-account", () => {
     const payload = await h.controller.statusPayload();
     assert.equal(payload.accounts[1].status.state, "error");
     assert.ok(h.providers["cli-proxy-messages"], "the disabled duplicate must not remove the first account's routes");
+  });
+
+  it("recommends the newest model of each family from the catalog itself", () => {
+    const m = (id, name) => ({ id, ...(name ? { name } : {}), inputModalities: ["text"], reasoning: false, reasoningLevels: [] });
+    const ids = recommendModels([
+      m("gpt-5.5"),
+      m("vendor/gpt-6.1", "GPT 6.1"),
+      m("gpt-6.1"),
+      m("claude-sonnet-4-6"),
+      m("claude-opus-5-5"),
+      m("gemini-3-flash"),
+      m("kimi-k3"),
+    ]);
+    assert.deepEqual(ids, ["gpt-6.1", "claude-opus-5-5", "gemini-3-flash", "kimi-k3"]);
+    assert.deepEqual(recommendModels([]), []);
+    const many = Array.from({ length: 30 }, (_, i) => m(`fam${String.fromCharCode(97 + (i % 26))}${i}-1`));
+    assert.equal(recommendModels(many).length, 12);
+  });
+
+  it("seeds a first-run selection from the server's catalog instead of fixed ids", async () => {
+    // No selectedModels saved anywhere: a fresh install talking to an arbitrary CPA.
+    const h = harness({ accounts: [{ id: "default", baseURL: "http://b.test" }] }, {
+      "b.test": {
+        models: [
+          { slug: "gemini-4-argon", owned_by: "google" },
+          { slug: "gemini-3-flash", owned_by: "google" },
+          { slug: "gpt-6-astra", owned_by: "openai" },
+          { slug: "gpt-5", owned_by: "openai" },
+        ],
+      },
+    });
+    await h.controller.refreshAll();
+    let payload = await h.controller.statusPayload();
+    const [account] = payload.accounts;
+    assert.equal(account.status.state, "connected", account.status.error);
+    assert.deepEqual(h.state().accounts[0].selectedModels, ["gemini-4-argon", "gpt-6-astra"]);
+    assert.deepEqual(h.providers["cli-proxy"].models.map((x) => x.id), ["gemini-4-argon"]);
+    assert.deepEqual(h.providers["cli-proxy-responses"].models.map((x) => x.id), ["gpt-6-astra"]);
+    assert.deepEqual(account.recommendedModels, ["gemini-4-argon", "gpt-6-astra"]);
+
+    // Seeding happens once: a later explicit choice is kept, even an empty one ("all").
+    await h.controller.updateAccount("default", { selectedModels: [] });
+    await h.controller.refreshAll();
+    assert.deepEqual(h.state().accounts[0].selectedModels, []);
+    assert.equal(h.providers["cli-proxy"].models.length, 2);
+
+    // A saved selection the server does not offer reports a clear error but keeps the catalog visible.
+    await h.controller.updateAccount("default", { selectedModels: ["not-on-this-server"] });
+    payload = await h.controller.statusPayload();
+    assert.equal(payload.accounts[0].status.state, "error");
+    assert.match(payload.accounts[0].status.error, /none of the selected models/);
+    assert.equal(payload.accounts[0].status.allModels.length, 4);
+  });
+
+  it("seeds a new disabled account on its first probe and keeps an unset selection on save", async () => {
+    const h = harness({ accounts: [{ id: "default", baseURL: "http://a.test", selectedModels: [] }] }, SERVERS);
+    const added = await h.controller.addAccount({ displayName: "No URL yet" });
+    const id = added.createdId;
+    assert.equal(h.state().accounts[1].selectedModels, undefined);
+    assert.equal(added.accounts[1].config.selectionSaved, false);
+    // Saving other fields before any catalog was seen leaves it unset.
+    await h.controller.updateAccount(id, { baseURL: "http://b.test", apiKey: "key-b" });
+    assert.deepEqual(h.state().accounts[1].selectedModels, ["gemini-4-argon", "gpt-6-astra"]);
+    assert.equal(h.providers["cli-proxy-2"], undefined, "still disabled");
   });
 
   it("apply() migrates the legacy state file and serves tool, commands and routes", async () => {

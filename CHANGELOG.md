@@ -9,6 +9,12 @@ All notable changes to this plugin. Versions follow [Semantic Versioning](https:
 - GitHub Actions: CI (Ubuntu + Windows, Node 22 / 24) and a tag-triggered release that attaches the packed bundle and optionally publishes to npm.
 - Settings panel screenshots with captions in both READMEs, and `screenshots.json` for plugin storefronts.
 
+### Fixed
+- **First-run selection no longer uses hard-coded model ids.** An account without a saved selection is seeded once, on its first successful probe, with the newest model of each family from its own server's catalog (at most 12). Previously a fresh install pre-selected 7 fixed ids that most servers do not offer, so nothing reached the picker.
+- **Reset to Recommended** uses the same catalog-derived list (with its count) instead of the fixed 7.
+- Saving a new account before its catalog was ever probed no longer stores an empty selection.
+- When a saved selection matches nothing on the server, the error names the server and the discovered models stay visible in the panel.
+
 ### Changed
 - `engines.node` is now `>=22` (the versions CI tests).
 - `author` no longer carries an e-mail address.
