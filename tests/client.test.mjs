@@ -126,14 +126,29 @@ describe("plugin update client", () => {
       assert.ok(text.includes(h.zh[key]), `${state.errorCode} -> ${key}: ${text}`);
     }
 
-    // A missing status endpoint (host plugin not reloaded) is not a network error.
-    const h = clientHarness({ fetch: async () => new Response(JSON.stringify({ error: "not found" }), { status: 404 }) });
-    h.render();
+    // A missing status endpoint (host plugin not reloaded) is neither a network
+    // error nor bad registry metadata: it must say the service is unavailable.
+    for (const body of [JSON.stringify({ error: "not found" }), "<!doctype html>404"]) {
+      const h = clientHarness({ fetch: async () => new Response(body, { status: 404 }) });
+      h.render();
+      await flushClient();
+      const tree = h.render();
+      const text = content(tree);
+      assert.ok(text.includes(h.zh.updateCompactStatusUnavailable), text);
+      assert.equal(text.includes(h.zh.updateCompactError), false);
+      assert.ok(text.includes(h.zh.updateStatusUnavailableHint), text);
+      assert.equal(text.includes(h.zh.updateMetadataError), false, "a missing route is not invalid metadata");
+      assert.ok(text.includes(h.zh.updateServiceUnavailableError), text);
+    }
+
+    // The same 404 must not be reported as an invalid registry payload either.
+    const check = clientHarness({ update, loading: false, fetch: async () => new Response(JSON.stringify({ error: "not found" }), { status: 404 }) });
+    check.render("zh", false);
+    await button(check.render(), check.zh.updateCheckBtn).props.onClick();
     await flushClient();
-    const tree = h.render();
-    assert.ok(content(tree).includes(h.zh.updateCompactStatusUnavailable), content(tree));
-    assert.equal(content(tree).includes(h.zh.updateCompactError), false);
-    assert.ok(content(tree).includes(h.zh.updateStatusUnavailableHint));
+    const checkText = content(check.render());
+    assert.ok(checkText.includes(check.zh.updateServiceUnavailableError), checkText);
+    assert.equal(checkText.includes(check.zh.updateMetadataError), false);
   });
 
   it("aborts requests and ignores late results after unmount", async () => {

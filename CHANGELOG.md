@@ -2,6 +2,11 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.5.1 — 2026-10-19
+
+### Fixed
+- A missing update endpoint (page updated but DSH still running the previous host code) is no longer reported as "invalid version information": 404/405/501 answers now map to a dedicated "update service unavailable" message that names the real cause and says DSH must be restarted, not merely refreshed.
+
 ## 1.5.0 — 2026-10-19
 
 ### Added

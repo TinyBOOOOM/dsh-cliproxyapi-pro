@@ -49,7 +49,7 @@
    dsh-cliproxyapi-pro
    ```
 
-   需要固定版本时可以写成 `dsh-cliproxyapi-pro@1.5.0`。
+   需要固定版本时可以写成 `dsh-cliproxyapi-pro@1.5.1`。
 4. 点击 **安装**，完成后点击 **立即启用**。
 
 > 在中国大陆下载慢，可以点输入框旁的 **安装源**，切换到 **中国大陆镜像源**。
@@ -78,7 +78,7 @@ dsh plugin --profile <profile 名称> add dsh-cliproxyapi-pro
 
 | 来源 | 填写内容 |
 |---|---|
-| 某个发布版本 | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v1.5.0` |
+| 某个发布版本 | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v1.5.1` |
 | 最新开发版 | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#main` |
 | 离线安装包 | 下载 [`dsh-cliproxyapi-pro.tgz`](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/releases/latest/download/dsh-cliproxyapi-pro.tgz)（始终是最新版），填写它的本地绝对路径 |
 | 本地源码（开发用） | 克隆后的仓库目录绝对路径；以链接方式安装，改代码后重载插件即生效 |
@@ -325,7 +325,7 @@ DSH 使用的 pnpm 可能设置了新版本发布后的等待期（`minimumRelea
 只有维护者发布对应 npm dist-tag 后才可使用；插件不会把稳定版伪装成 Beta / 开发版。若通道版本不高于当前版本，也不会提供降级下载。
 
 **更新卡片显示「更新服务未就绪」或「网络异常」？**
-收起状态会直接给出原因：**更新服务未就绪** 表示页面是新版但宿主插件代码尚未重载（升级或修改后需在插件页停用再启用本插件，然后刷新页面）；**网络异常** 表示本机到 npm 官方源或国内镜像的请求失败，可切换下载区域、检查代理/防火墙后重试；**通道未发布** 则表示该通道还没有对应版本。展开卡片可看到对应说明。
+收起状态会直接给出原因：**更新服务未就绪** 表示页面已是新版，但运行中的插件宿主代码仍是旧版——安装或升级后必须**重启 DSH**（只刷新页面或重载插件不够）；**网络异常** 表示本机到 npm 官方源或国内镜像的请求失败，可切换下载区域、检查代理/防火墙后重试；**通道未发布** 则表示该通道还没有对应版本。展开卡片可看到对应说明。
 
 **已经下载，重启后为什么版本没变？**
 下载和校验并不安装。应先退出 DSH、执行卡片提供的升级命令，再启动；本地链接安装不提供该命令，保留链接方式需手动更新源码。若重载插件后下载提示消失，离线包仍在 profile 的 `updates` 目录里。

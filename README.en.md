@@ -49,7 +49,7 @@ The plugin is published on npm as [`dsh-cliproxyapi-pro`](https://www.npmjs.com/
    dsh-cliproxyapi-pro
    ```
 
-   To pin a version, write `dsh-cliproxyapi-pro@1.5.0`.
+   To pin a version, write `dsh-cliproxyapi-pro@1.5.1`.
 4. Click **Install**. When it finishes, the dialog offers to enable the plugin right away — accept it.
 
 > If downloads are slow in mainland China, open **Registry** next to the input and choose **the mainland China mirror**.
@@ -78,7 +78,7 @@ In **Add plugin**, or as the `plugin_manager` `target`, you can also enter:
 
 | Source | What to enter |
 |---|---|
-| A released version | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v1.5.0` |
+| A released version | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v1.5.1` |
 | Latest development version | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#main` |
 | Offline package | Download [`dsh-cliproxyapi-pro.tgz`](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/releases/latest/download/dsh-cliproxyapi-pro.tgz) (always the latest release) and enter its absolute local path |
 | Local source (development) | Absolute path of a cloned repository; installed as a link, so code changes go live when the plugin reloads |
@@ -327,7 +327,7 @@ Current DSH versions reject replacing an installed plugin while running. To avoi
 A channel is usable only after the maintainer publishes its npm dist-tag. Stable is never presented as an unpublished Beta / Dev build. A channel version no newer than the running version does not offer a downgrade download either.
 
 **The update card says "update service unavailable" or "network error"?**
-The collapsed row names the actual cause. **Update service unavailable** means the page runs newer client code than the host plugin (disable and re-enable this plugin on the Plugins page, then refresh the page). **Network error** means requests to npmjs or the Mainland China mirror failed; switch the download region and check proxies/firewalls. **Channel unpublished** means that channel has no matching release yet. Expand the card for the matching explanation.
+The collapsed row names the actual cause. **Update service unavailable** means the page runs newer client code than the running host plugin: after installing or upgrading, **restart DSH** (refreshing the page or reloading the plugin is not enough). **Network error** means requests to npmjs or the Mainland China mirror failed; switch the download region and check proxies/firewalls. **Channel unpublished** means that channel has no matching release yet. Expand the card for the matching explanation.
 
 **Downloaded the update and restarted, but the version did not change?**
 Downloading and verification do not install anything. Exit DSH, run the card's upgrade command, then start it again. Linked installations do not receive that command; update their source manually to keep the link. If a plugin reload clears the download notice, the offline file remains in the profile's `updates` directory.
