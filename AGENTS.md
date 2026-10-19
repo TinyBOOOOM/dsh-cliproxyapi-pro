@@ -91,7 +91,7 @@ Tests fake `fetch`, settings and credentials; they never touch the network or th
 
 ## Release checklist
 
-1. Bump `version` in `package.json` and the title of both READMEs; add a `## <version> — <date>` section to `CHANGELOG.md`.
+1. Bump `version` in `package.json`, the title of both READMEs and the `#v<version>` install target in both READMEs' install tables; turn the pending notes into a `## <version> — <date>` section of `CHANGELOG.md` (the release workflow publishes exactly that section as the Release notes).
 2. `npm run check` passes; `npm run pack:check` lists exactly `lib/index.js`, `lib/client.js`, `locale/*.json`, `cordis.patch.yml`, `icon.svg`, `README.md`, `README.zh.md`, `CHANGELOG.md`, `LICENSE`, `package.json`.
 3. `locale/*.json` `meta` text still describes the plugin; `icon.svg` renders (≤ 256 KiB).
 4. Reload in a live Harness, check the Settings panel in both languages and the tool output.

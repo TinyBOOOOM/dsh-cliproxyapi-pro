@@ -59,8 +59,8 @@
 | 来源 | `target` |
 |---|---|
 | GitHub 最新 `main` | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#main` |
-| GitHub 某个版本标签 | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v<版本号>`（见 [Releases](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/releases)） |
-| GitHub Release 的 `.tgz` | 下载 Release 中的 `dsh-cliproxyapi-pro.tgz`，填写它的绝对路径 |
+| GitHub 某个版本标签 | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v1.4.0`（见 [Releases](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/releases)） |
+| GitHub Release 的 `.tgz` | 下载 [`dsh-cliproxyapi-pro.tgz`](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/releases/latest/download/dsh-cliproxyapi-pro.tgz)（始终是最新版本），填写它的绝对路径 |
 | 本地目录（开发用，链接安装） | 克隆后的仓库目录绝对路径 |
 | npm（发布后） | `dsh-cliproxyapi-pro` |
 

@@ -59,8 +59,8 @@ Ask the agent in a DSH conversation to install it with `plugin_manager`, using o
 | Source | `target` |
 |---|---|
 | GitHub, latest `main` | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#main` |
-| GitHub, a release tag | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v<version>` (see [Releases](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/releases)) |
-| GitHub Release `.tgz` | Download `dsh-cliproxyapi-pro.tgz` from a release and pass its absolute path |
+| GitHub, a release tag | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v1.4.0` (see [Releases](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/releases)) |
+| GitHub Release `.tgz` | Download [`dsh-cliproxyapi-pro.tgz`](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/releases/latest/download/dsh-cliproxyapi-pro.tgz) (always the latest release) and pass its absolute path |
 | Local checkout (development, linked) | Absolute path of the cloned repository |
 | npm (once published) | `dsh-cliproxyapi-pro` |
 

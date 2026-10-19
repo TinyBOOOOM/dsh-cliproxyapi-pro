@@ -2,24 +2,9 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
-## Unreleased
-
-### Added
-- Open-source repository on GitHub: `repository`, `homepage` and `bugs` metadata; English `README.md` and Chinese `README.zh.md`.
-- GitHub Actions: CI (Ubuntu + Windows, Node 22 / 24) and a tag-triggered release that attaches the packed bundle and optionally publishes to npm.
-- Settings panel screenshots with captions in both READMEs, and `screenshots.json` for plugin storefronts.
-
-### Fixed
-- **First-run selection no longer uses hard-coded model ids.** An account without a saved selection is seeded once, on its first successful probe, with the newest model of each family from its own server's catalog (at most 12). Previously a fresh install pre-selected 7 fixed ids that most servers do not offer, so nothing reached the picker.
-- **Reset to Recommended** uses the same catalog-derived list (with its count) instead of the fixed 7.
-- Saving a new account before its catalog was ever probed no longer stores an empty selection.
-- When a saved selection matches nothing on the server, the error names the server and the discovered models stay visible in the panel.
-
-### Changed
-- `engines.node` is now `>=22` (the versions CI tests).
-- `author` no longer carries an e-mail address.
-
 ## 1.4.0 — 2026-10-19
+
+First public release.
 
 ### Added
 - **Multiple CLIProxyAPI accounts.** Each account has its own base URL, API key (own credential ref), provider route ID, protocol mode, model selection and per-model overrides, and synchronizes into its own `llm-pi-ai` routes (`cli-proxy-2`, `cli-proxy-2-responses`, `cli-proxy-2-messages`, …).
@@ -27,7 +12,8 @@ All notable changes to this plugin. Versions follow [Semantic Versioning](https:
 - Settings panel account bar: switch accounts, **+ Add Account**, **Delete Account**, credential-ref field.
 - `cliproxyapi` tool: `add_account` and `remove_account` actions, `account`, `enabled` and `apiKeyEnv` parameters; output lists every account.
 - HTTP routes `POST /api/dsh-cliproxyapi/accounts/add` and `/accounts/remove`; `refresh` and `save` accept `accountId`.
-- `LICENSE`, `AGENTS.md`, `CHANGELOG.md`, `.gitignore`, `.gitattributes`.
+- English `README.md` and Chinese `README.zh.md` with captioned screenshots; `screenshots.json` for plugin storefronts; `LICENSE`, `AGENTS.md`, `CHANGELOG.md`.
+- GitHub Actions: CI (Ubuntu + Windows, Node 22 / 24) and a tag-triggered release that attaches the packed bundle and optionally publishes to npm.
 
 ### Changed
 - `state.json` is now `{ version: 2, refreshIntervalSeconds, probeTimeoutMs, accounts: [...] }`. A v1 single-account file migrates automatically into account `default` with the same routes, key and selection; the original is kept as `state.v1.json`.
@@ -36,6 +22,13 @@ All notable changes to this plugin. Versions follow [Semantic Versioning](https:
 - Settings writes from concurrent account syncs are serialized.
 - `/cpa-status` and `/cpa-refresh` cover every account.
 - The DSH version requirement moved to top-level `engines.dsh`, where DSH reads it; `./icon` is exported.
+- `engines.node` is now `>=22` (the versions CI tests).
+
+### Fixed
+- **First-run selection no longer uses hard-coded model ids.** An account without a saved selection is seeded once, on its first successful probe, with the newest model of each family from its own server's catalog (at most 12). Previously a fresh install pre-selected 7 fixed ids that most servers do not offer, so nothing reached the picker.
+- **Reset to Recommended** uses the same catalog-derived list (with its count) instead of the fixed 7.
+- Saving a new account before its catalog was ever probed no longer stores an empty selection.
+- When a saved selection matches nothing on the server, the error names the server and the discovered models stay visible in the panel.
 
 ## 1.3.0
 
