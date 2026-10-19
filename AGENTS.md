@@ -87,7 +87,8 @@ Tests fake `fetch`, settings and credentials; they never touch the network or th
 ## CI and release
 
 - `ci.yml` runs `npm run check` and `npm pack --dry-run` on Ubuntu and Windows with Node 22 and 24 for pushes to `main` and pull requests. Keep `npm run check` green before pushing.
-- `release.yml` runs on a pushed tag `v<version>`: it fails unless the tag equals `package.json` `version`, runs the checks, creates a GitHub Release whose notes are that version's `CHANGELOG.md` section, attaches `dsh-cliproxyapi-pro-<version>.tgz` and the version-free `dsh-cliproxyapi-pro.tgz`, and runs `npm publish --provenance` only when the `NPM_TOKEN` repository secret exists.
+- `release.yml` runs on a pushed tag `v<version>`, or by hand for an existing tag (`gh workflow run release.yml -f tag=v<version>`): it fails unless the tag equals `package.json` `version`, runs the checks, creates a GitHub Release whose notes are that version's `CHANGELOG.md` section, attaches `dsh-cliproxyapi-pro-<version>.tgz` and the version-free `dsh-cliproxyapi-pro.tgz`, and runs `npm publish --provenance` only when the `NPM_TOKEN` repository secret exists. Each step is idempotent (an existing Release or an already-published npm version is skipped), so re-running finishes a partial release.
+- `NPM_TOKEN` must be an npm granular token with read and write access to `dsh-cliproxyapi-pro` — unscoped, so a token limited to an `@scope` cannot publish it. Set it with `gh secret set NPM_TOKEN` in a terminal; never paste tokens into chats, files or commits.
 
 ## Release checklist
 
