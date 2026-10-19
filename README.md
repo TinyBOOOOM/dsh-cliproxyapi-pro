@@ -14,6 +14,7 @@
 - **开箱即用**：首次连接时按该服务自己的模型目录，为每个模型家族勾选最新的一个（最多 12 个），模型选择器不会被上百个模型淹没。
 - **原生协议**：Claude 走 Anthropic Messages，GPT / Codex / Grok 走 OpenAI Responses，其余走 OpenAI Chat，减少 CPA 的协议转换。
 - **可视化管理**：设置面板里勾选模型、编辑单个模型的参数；也可以让 DSH 的 Agent 通过 `cliproxyapi` 工具帮你配置。
+- **插件更新**：自动检查稳定 / Beta / 开发通道，可选择全球 / 中国大陆下载源并自动下载校验离线包；关闭 DSH 后手动升级，不会自动安装或重启。
 - **安全**：API Key 只保存在 DSH 凭证服务里，不写入任何配置文件。
 - **零依赖**：不依赖任何 npm 包，无需构建，安装几秒完成。
 
@@ -25,6 +26,7 @@
 - [快速上手](#快速上手)
 - [截图](#截图)
 - [功能详解](#功能详解)
+- [插件自身更新](#插件自身更新)
 - [Agent 工具与斜杠命令](#agent-工具与斜杠命令)
 - [存储与配置](#存储与配置)
 - [升级与卸载](#升级与卸载)
@@ -106,6 +108,12 @@ CPA 就在本机默认端口 `8317` 且没有设置密钥时，什么都不用�
 
 ![未启用账号的连接设置，使用独立的密钥引用名](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/connection.png)
 
+**4. 插件更新卡片（默认收起）。** 使用真实组件与虚构的更新状态离线渲染：默认只占一行，显示当前版本与更新状态；点击后展开通道、下载区域和自动更新开关。不是正在运行的 GUI 截图，也不代表实际发布版本。
+
+![插件更新卡片默认收起：一行显示当前版本与新版本提示](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/updates.png)
+
+![展开后的插件更新设置：通道、下载区域与自动开关](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/updates-expanded.png)
+
 ## 功能详解
 
 ### 自动发现与同步
@@ -149,6 +157,41 @@ CPA 对每个模型同时提供 OpenAI Chat、OpenAI Responses、Anthropic Messa
 - Claude 4.6+ / 5.x / Fable 使用自适应思考（`effort`），更早的 Claude 使用 token 预算。
 - 可以改为「统一使用」某一种协议，或在单个模型的「编辑参数」里指定。
 - 你在路由上手动加的其他字段（如 `retryPolicy`）会被保留。
+
+## 插件自身更新
+
+设置面板顶部的 **插件更新** 卡片默认收起为一行，只显示当前版本和更新状态，点击才会展开通道、下载区域与自动更新设置；后台检查仍按保存的开关运行，展开状态不会被轮询重置。它只管理 `dsh-cliproxyapi-pro` 自身，不会更新 CPA 服务或 DSH 宿主，也不改变 CPA 请求的路由、账号或模型勾选。更新设置修改后立即保存；卡片独立轮询状态，不会重载未保存的账号表单。
+
+> **下载不等于安装。** 当前 DSH 不允许在运行中替换已安装的插件。本插件只检查版本、下载并校验离线包：不会自动安装、卸载插件、覆盖源码或重启 DSH。升级须在关闭 DSH 后手动执行，再启动生效。
+
+### 通道、区域与自动开关
+
+| 设置 | 默认值 | 行为 |
+|---|---|---|
+| 更新通道 | 稳定（`stable`） | 稳定 / Beta / 开发分别读取 npm 的 `latest` / `beta` / `dev` dist-tag。Beta / 开发通道尚未发布时明确报错，不悄悄回退稳定版。 |
+| 下载区域 | 自动（`auto`） | 自动模式同时请求全球 npmjs 与中国大陆 npmmirror，选择最先返回**有效版本元数据**的源；全球（`global`）只使用 `https://registry.npmjs.org`，中国大陆（`cn`）使用 `https://registry.npmmirror.com` 及其官方 `cdn.npmmirror.com` 包下载域名。离线包从本次检查选中的源下载，至多跟随 3 次经过白名单与精确包名／版本路径校验的 HTTPS 跳转，不跨区域回退。 |
+| 自动检查更新 | 开启 | 插件启动或更新设置重新调度后约 3 秒检查，之后每 6 小时检查所选通道；关闭后仍可手动点 **检查更新**。 |
+| 自动下载更新 | 关闭 | 仅在**自动检查**发现新版本时，自动下载并校验离线包；不会自动安装或重启。仅开启此项而关闭自动检查，不会触发后台下载。 |
+
+- 检查使用严格 SemVer 比较：只有所选通道版本高于当前运行版本时才提供下载，不自动降级。自动区域选择也不会跨通道回退。
+- 区域只影响本插件的更新元数据与安装包下载，**不影响 CPA 的连接、模型请求或其他插件的安装源**。
+- 切换通道或区域后，请重新检查更新。打开卡片、轮询或重新读取状态本身只读取内存状态，不主动访问更新源；后台自动检查由上述开关控制。
+- 失败时卡片显示本地化提示，例如通道未发布、网络异常、包完整性校验失败或磁盘写入失败，不显示后端堆栈。
+
+### 下载、校验与离线升级
+
+1. 点击 **检查更新**；有更高版本时，点 **下载更新** 并确认版本号，或等待已启用的自动检查 / 自动下载。
+2. 下载先通过 npm 元数据中的 **SHA-512** 完整性校验，再验证 gzip / tar、预期文件与目录、包名和版本；拒绝路径穿越、链接等特殊条目、依赖和安装生命周期脚本。只保存离线包，不解压到安装目录，也不执行包内代码。
+3. 校验成功后，卡片显示安装包的绝对路径与适用的升级命令。包保存在 `<Profile 目录>/.dsh-cliproxyapi/updates/dsh-cliproxyapi-pro-<version>.tgz`。
+4. **先保存工作并完全关闭 DSH**，再在终端执行卡片提供的命令。示意如下，以卡片里的实际 profile 名称和绝对路径为准：
+
+   ```bash
+   dsh plugin --profile 'desktop' add '/absolute/path/dsh-cliproxyapi-pro-<version>.tgz'
+   ```
+
+5. 重新启动 DSH 后新版本生效。检查结果和已下载提示不跨插件重载持久化；离线包仍保留在磁盘，可按需要自行清理，插件不会自动删除历史下载。
+
+**本地链接安装（`link:`）** 可以检查并下载包，但不会提供升级命令，也不会覆盖链接的源码目录。若要保留源码开发方式，请在合适时机手动更新 Git 源码，再重启 DSH；通过离线包重新安装会将插件的安装来源从链接切换到离线包。
 
 ## Agent 工具与斜杠命令
 
@@ -208,6 +251,14 @@ DSH 的 Agent 可以用这个工具查看和配置插件，你只需用自然语
 | POST | `/api/dsh-cliproxyapi/save` | `{ accountId?, …账号字段, apiKey?, clearApiKey?, refreshIntervalSeconds?, probeTimeoutMs? }` | 保存账号（缺省为第一个）；只有全局字段时只保存全局设置 |
 | POST | `/api/dsh-cliproxyapi/accounts/add` | 账号字段（可选） | 新增账号，默认停用；返回 `createdId` |
 | POST | `/api/dsh-cliproxyapi/accounts/remove` | `{ accountId }` | 删除账号及其路由 |
+| GET | `/api/dsh-cliproxyapi/updates/status` | — | 只读更新状态，不主动联网检查 |
+| POST | `/api/dsh-cliproxyapi/updates/check` | `{}` | 主动检查所选通道与区域；手动检查不触发自动下载 |
+| POST | `/api/dsh-cliproxyapi/updates/save` | `{ autoCheck?, autoDownload?, channel?, region? }` | 只保存四项更新设置，与账号配置独立 |
+| POST | `/api/dsh-cliproxyapi/updates/download` | `{ version }` | 下载最近一次检查确认的新版本，完成校验后保存离线包；不安装 |
+
+更新接口的操作响应采用 `{ ok, update }`，状态包含 `currentVersion`、`latestVersion`、`available`、`channel`、`region`、`effectiveRegion`、`autoCheck`、`autoDownload`、`checking`、`downloading`、`lastCheckedAt`、`error` / `errorCode`、`blockedReason`、`downloadedVersion`、`downloadPath` 与 `upgradeCommand`。未检查或未下载的相关字段为 `null`。`channel` 为 `stable` / `beta` / `dev`，`region` 为 `auto` / `global` / `cn`；`effectiveRegion` 为本次成功检查使用的 `global` / `cn`（此前为 `null`）。
+
+失败用顶层 `errorCode` 或 `update.errorCode` 表达，不能只凭 HTTP 状态或 `ok` 判断操作成功；常见值包括 `network-error`、`invalid-metadata`、`channel-unavailable`、`integrity-error`、`invalid-package`、`storage-error`、`busy`、`stale-version` 与 `disposed`。更新 POST 在宿主鉴权和可信主机策略之外，**必须带与当前连接协议和 Host 完全匹配的显式 `Origin`**；缺失或不匹配会拒绝，不沿用账号接口对缺省 `Origin` 的兼容行为。普通未认证 `curl` 不能调用这些接口。协议判断使用实际连接，不信任任意 `Forwarded` / `X-Forwarded-*` 声明；需要端到端一致的 `Origin`。若反向代理在 HTTPS 终止后以 HTTP 连接 DSH，更新 POST 会被拒绝，请先从运行 DSH 机器上的本机 DSH 页面操作，不要假定所有反代部署都兼容。
 
 ## 存储与配置
 
@@ -231,13 +282,26 @@ DSH 的 Agent 可以用这个工具查看和配置插件，你只需用自然语
 
   文件每次读取都会重新加载，手动修改后点「立即探测刷新」即可生效。旧版（1.3.x 及以前）的单账号文件会自动迁移为 id 为 `default` 的账号，路由、密钥和勾选保持不变，原文件备份为 `state.v1.json`。
 
+- **更新设置**：独立保存在 `<Profile 目录>/.dsh-cliproxyapi/update-settings.json`，不扩展或改写账号的 `state.json` v2，也不接触凭证。首次没有此文件时采用下列默认值：
+
+  ```json
+  {
+    "version": 1,
+    "autoCheck": true,
+    "autoDownload": false,
+    "channel": "stable",
+    "region": "auto"
+  }
+  ```
+
+  设置通过面板保存后立即应用。手动编辑此文件后需重载插件或重启 DSH 才会重新读取；文件损坏、结构 / 字段无效或无法读取时采用关闭自动联网检查的安全默认值。版本检查结果、候选版本、下载完成提示与命令只在内存中，插件重载后重新检查；下载包仍位于独立的 `updates` 子目录，由用户按需清理。
 - **密钥**：通过 DSH 的 `credentials` 服务按引用名存取；凭证服务里没有时，回退读取同名环境变量。
 - **环境变量**：`CLIPROXYAPI_BASE_URL` 只用于服务地址留空的账号的自动发现。
 - **插件行配置**：`cordis.patch.yml` 中本插件行的 `config` 会在启动时叠加到状态文件上：包含 `accounts` 时替换账号列表，否则其中的字段作用于第一个账号。一般保持 `{}`，用面板或工具配置即可。
 
 ## 升级与卸载
 
-- **升级**：在 **插件** 页卸载后重新安装即可；命令行可以运行 `dsh plugin --profile <profile 名称> add dsh-cliproxyapi-pro@latest`。账号、勾选和参数保存在 profile 目录里，密钥保存在凭证服务里，重装不会丢失。
+- **升级**：优先使用上方插件更新卡片下载校验后的离线包，保存工作并关闭 DSH，再执行卡片的 `dsh plugin --profile '名称' add '离线包绝对路径'` 命令，最后重新启动；无需先卸载。也可在关闭 DSH 后运行 `dsh plugin --profile <profile 名称> add dsh-cliproxyapi-pro@latest` 从 npm 升级。账号、勾选和参数仍保存在原 profile 目录里，密钥仍在凭证服务里；更新下载功能不会改写这些数据。本地链接安装要保留源码方式时应自行更新源码，而不是从离线包重装。
 - **卸载**：在 **插件** 页卸载。已同步的模型路由保存在 DSH 设置里，卸载插件不会自动删除它们；想让这些模型一并从选择器消失，请在卸载前把各账号停用或删除。
 
 ## 常见问题
@@ -253,6 +317,18 @@ DSH 的 Agent 可以用这个工具查看和配置插件，你只需用自然语
 
 **刚发布的新版本装不上？**
 DSH 使用的 pnpm 可能设置了新版本发布后的等待期（`minimumReleaseAge`），安装界面会说明实际装到的版本。稍后再装，或明确写出版本号。
+
+**为什么只有自动下载，没有自动安装？**
+当前 DSH 不允许覆盖运行中的已装插件。为避免中断正在使用本插件路由的会话，更新器不会尝试卸载、覆盖文件或重启，只准备离线包供关闭 DSH 后升级。
+
+**Beta / 开发通道提示暂无版本？**
+只有维护者发布对应 npm dist-tag 后才可使用；插件不会把稳定版伪装成 Beta / 开发版。若通道版本不高于当前版本，也不会提供降级下载。
+
+**更新卡片显示「更新服务未就绪」或「网络异常」？**
+收起状态会直接给出原因：**更新服务未就绪** 表示页面是新版但宿主插件代码尚未重载（升级或修改后需在插件页停用再启用本插件，然后刷新页面）；**网络异常** 表示本机到 npm 官方源或国内镜像的请求失败，可切换下载区域、检查代理/防火墙后重试；**通道未发布** 则表示该通道还没有对应版本。展开卡片可看到对应说明。
+
+**已经下载，重启后为什么版本没变？**
+下载和校验并不安装。应先退出 DSH、执行卡片提供的升级命令，再启动；本地链接安装不提供该命令，保留链接方式需手动更新源码。若重载插件后下载提示消失，离线包仍在 profile 的 `updates` 目录里。
 
 ## 给 AI Agent 的安装指南
 
@@ -271,7 +347,8 @@ DSH 使用的 pnpm 可能设置了新版本发布后的等待期（`minimumRelea
 
 ```text
 lib/index.js        Host 插件（发现、同步、多账号控制器、工具、命令、HTTP 接口）
-lib/client.js       Web 设置面板（ModuleLoader 格式，手写，无需构建）
+lib/client.js       Web 设置面板（ModuleLoader 格式，独立更新卡片与账号表单，无需构建）
+lib/updater.js      更新设置、SemVer/通道、区域竞速、SHA-512/包结构检查与离线包存储
 locale/*.json       插件管理器中显示的标题与描述
 cordis.patch.yml    Bundle patch，插入 dsh-cliproxyapi-pro 行
 tests/              node:test 单元与集成测试
@@ -288,7 +365,9 @@ npm run check        # 语法检查 + 测试
 npm run pack:check   # 查看打包文件列表
 ```
 
-发版只需推送 `v<版本号>` 标签：GitHub Actions 会运行测试、创建 GitHub Release 并附上安装包，再通过 npm 受信任发布（不使用任何 token）上传到 npm，并附带来源证明。
+`npm run check` 会语法检查三个 `lib/*.js` 模块并运行全部测试。更新相关离线测试为 `tests/updater.test.mjs`（设置、SemVer、区域、下载完整性与包结构）、`tests/update-routes.test.mjs`（HTTP 鉴权与同源）和 `tests/client.test.mjs`（更新卡片与请求生命周期）；它们不访问真实网络或真实 profile。`npm run pack:check` 的文件列表应包含 `lib/updater.js`，且仍不包含测试或截图，无需安装任何运行时依赖。
+
+发版只需推送 `v<版本号>` 标签：GitHub Actions 会运行测试、创建 GitHub Release 并附上安装包，再通过 npm 受信任发布（不使用任何 token）上传到 npm，并附带来源证明。稳定版本发布到 npm `latest`；Beta / 开发预发布分别进入 `beta` / `dev`，对应 GitHub Release 标记为预发布，不覆盖稳定通道。更新器只核对 registry 提供的 SHA-512 完整性与包结构，不验证发行者签名或 npm provenance。
 
 修改代码前请阅读 [AGENTS.md](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/AGENTS.md)；变更记录见 [CHANGELOG.md](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/CHANGELOG.md)。欢迎提交 Issue 和 Pull Request，修改说明文档时请同时更新中英文两份。
 

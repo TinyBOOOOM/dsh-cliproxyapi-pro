@@ -69,6 +69,15 @@ jobs:
           fi
           echo "VERSION=${version}" >> "$GITHUB_ENV"
           echo "PACKAGE=$(node -p "require('./package.json').name")" >> "$GITHUB_ENV"
+          # Pre-releases must never move npm latest or GitHub's latest release.
+          case "$version" in
+            *-beta.*) channel=beta; prerelease=true ;;
+            *-dev.*) channel=dev; prerelease=true ;;
+            *-*) echo "::error::Use a beta.N or dev.N prerelease version"; exit 1 ;;
+            *) channel=latest; prerelease=false ;;
+          esac
+          echo "NPM_TAG=${channel}" >> "$GITHUB_ENV"
+          echo "PRERELEASE=${prerelease}" >> "$GITHUB_ENV"
 
       - name: Syntax check and tests
         run: npm run check
@@ -87,11 +96,16 @@ jobs:
             exit 0
           fi
           notes="$(awk -v v="## ${VERSION}" 'index($0, v) == 1 {f=1; next} /^## / {f=0} f' CHANGELOG.md)"
+          release_flags=()
+          if [ "$PRERELEASE" = true ]; then
+            release_flags+=(--prerelease --latest=false)
+          fi
           gh release create "${TAG}" \
             "${PACKAGE}-${VERSION}.tgz" \
             "${PACKAGE}.tgz" \
             --title "${TAG}" \
-            --notes "${notes:-See CHANGELOG.md}"
+            --notes "${notes:-See CHANGELOG.md}" \
+            "${release_flags[@]}"
 
       - name: Decide npm publish
         id: npm
@@ -105,7 +119,7 @@ jobs:
       - name: Publish to npm (trusted publishing)
         if: steps.npm.outputs.publish == 'true'
         run: |
-          if ! npm publish --access public; then
+          if ! npm publish --access public --tag "$NPM_TAG"; then
             echo "::error::npm publish failed. Check npmjs.com → ${PACKAGE} → Settings → Trusted publishing: user TinyBOOOOM, repository dsh-cliproxyapi-pro, workflow release.yml, no environment, 'npm publish' allowed; and that package.json repository.url matches this repository."
             exit 1
           fi

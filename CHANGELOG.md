@@ -2,6 +2,25 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+These changes are not yet published; the package version and existing README installation pins remain unchanged.
+
+### Added
+- **Plugin update card**, independent of account forms and drafts, with Chinese/English strings, localized errors, current/latest versions, Stable / Beta / Dev channels, Auto / Global / Mainland China regions, automatic checks and optional automatic downloads. The card is collapsed by default to a single compact row (title, current version, short update status) and expands on click; polling and saves never reset that choice.
+- Automatic checks enabled by default about 3 seconds after startup or rescheduling preferences, then every 6 hours; automatic downloads are off by default and run only after an automatic check finds a newer version. No automatic installation, uninstall, source overwrite or restart.
+- Strict SemVer channel checks using npm `latest` / `beta` / `dev`, explicit errors for unpublished channels, and no cross-channel fallback or downgrade. Auto region races npmjs and npmmirror for the first valid metadata; explicit regions stay on their selected registry and do not affect CPA traffic.
+- Mainland China downloads follow npmmirror's official CDN redirects through an exact host/package/version allowlist, with at most three HTTPS hops and the original metadata integrity preserved. External, local, cross-region and downgrade redirects are refused.
+- Verified offline package preparation: registry-provided SHA-512 integrity plus bounded gzip/tar, package identity/version and file-structure checks. Reject traversal, links/special entries, unexpected files, dependencies and installation lifecycle scripts; never extract or execute an update. These checks are not publisher-signature or npm provenance verification.
+- Packages saved atomically under the profile's `.dsh-cliproxyapi/updates/` directory, with a version-specific download confirmation and an offline `dsh plugin --profile 'name' add 'absolute.tgz'` command for use after DSH is closed, followed by a restart. Linked local installations can check/download but receive no command, protecting the source-based installation.
+- Separate versioned `update-settings.json` preferences; invalid or unreadable files disable automatic network checks, while a missing file uses first-run defaults. Existing v2 account state and credentials remain untouched. Check results and download notices are in-memory only; downloaded files remain for user-managed cleanup.
+- Authenticated update HTTP routes: read-only `GET /api/dsh-cliproxyapi/updates/status` and `POST` operations `/check`, `/save`, `/download`. Update POSTs require an explicit exact same-origin header matching the actual connection scheme and Host, without trusting forwarded-protocol claims.
+- Offline updater, HTTP and dependency-free VM/Hook client tests; actual-component offline previews (collapsed and expanded) with clearly labeled example versions.
+
+### Changed
+- Release automation publishes stable versions to npm `latest` and Beta / Dev prereleases to `beta` / `dev`, marking the corresponding GitHub Releases as prereleases without replacing stable.
+- Both READMEs and the architecture guide explain download-versus-install behavior, linked-source protection, storage, API admission and the manual closed-DSH upgrade workflow. The packed zero-dependency bundle now includes the internal `lib/updater.js` module.
+
 ## 1.4.1 — 2026-10-19
 
 Documentation and release tooling only; the plugin code is unchanged from 1.4.0.
