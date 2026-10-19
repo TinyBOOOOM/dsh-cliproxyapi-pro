@@ -1,0 +1,67 @@
+# Push a tag `v<version>` matching package.json to:
+#   1. run the checks,
+#   2. create a GitHub Release with the packed bundle attached twice:
+#      `dsh-cliproxyapi-pro-<version>.tgz` and the version-free
+#      `dsh-cliproxyapi-pro.tgz` (stable `releases/latest/download/` URL),
+#   3. publish to npm with provenance — only when the `NPM_TOKEN`
+#      repository secret is set; otherwise the step is skipped.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Tag must match package.json version
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match package.json version ${version}"
+            exit 1
+          fi
+          echo "VERSION=${version}" >> "$GITHUB_ENV"
+
+      - name: Syntax check and tests
+        run: npm run check
+
+      - name: Pack
+        run: |
+          npm pack
+          cp "dsh-cliproxyapi-pro-${VERSION}.tgz" dsh-cliproxyapi-pro.tgz
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="$(awk -v v="## ${VERSION}" 'index($0, v) == 1 {f=1; next} /^## / {f=0} f' CHANGELOG.md)"
+          gh release create "${GITHUB_REF_NAME}" \
+            "dsh-cliproxyapi-pro-${VERSION}.tgz" \
+            dsh-cliproxyapi-pro.tgz \
+            --title "${GITHUB_REF_NAME}" \
+            --notes "${notes:-See CHANGELOG.md}"
+
+      - name: Check for npm token
+        id: npm
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "$NPM_TOKEN" ]; then echo "publish=true" >> "$GITHUB_OUTPUT"; else echo "NPM_TOKEN not set; skipping npm publish"; fi
+
+      - name: Publish to npm
+        if: steps.npm.outputs.publish == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance

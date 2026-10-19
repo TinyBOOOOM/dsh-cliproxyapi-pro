@@ -11,12 +11,20 @@
   ],
   "author": "bowen (https://github.com/TinyBOOOOM)",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git"
+  },
+  "homepage": "https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro#readme",
+  "bugs": {
+    "url": "https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/issues"
+  },
   "type": "module",
   "main": "lib/index.js",
   "icon": "./icon.svg",
   "engines": {
     "dsh": ">=0.2.0-rc.1",
-    "node": ">=20.3"
+    "node": ">=22"
   },
   "exports": {
     ".": "./lib/index.js",
@@ -33,6 +41,7 @@
     "cordis.patch.yml",
     "icon.svg",
     "README.md",
+    "README.zh.md",
     "CHANGELOG.md",
     "LICENSE"
   ],

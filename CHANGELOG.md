@@ -2,6 +2,16 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Added
+- Open-source repository on GitHub: `repository`, `homepage` and `bugs` metadata; English `README.md` and Chinese `README.zh.md`.
+- GitHub Actions: CI (Ubuntu + Windows, Node 22 / 24) and a tag-triggered release that attaches the packed bundle and optionally publishes to npm.
+
+### Changed
+- `engines.node` is now `>=22` (the versions CI tests).
+- `author` no longer carries an e-mail address.
+
 ## 1.4.0 — 2026-10-19
 
 ### Added

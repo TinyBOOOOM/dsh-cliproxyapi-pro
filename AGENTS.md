@@ -16,6 +16,10 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) bund
 | Slash commands | `/cpa-status`, `/cpa-refresh` |
 | HTTP routes | `/api/dsh-cliproxyapi/{status,refresh,save,accounts/add,accounts/remove}` |
 | Tests | `tests/plugin.test.mjs` (`node:test`) |
+| User docs | `README.md` (English) and `README.zh.md` (中文) — keep both in sync |
+| CI / release | `.github/workflows/ci.yml`, `.github/workflows/release.yml` |
+
+Repository: <https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro> (default branch `main`).
 
 ## Hard constraints
 
@@ -52,7 +56,7 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) bund
 
 ## Adding an account setting
 
-Update, in order: `ACCOUNT_FIELDS` and `resolveConfig()` → `pickAccount()` → `accountPatchFromInput()` (tool + HTTP) → tool `parameters` schema and description → client draft state, the draft-loading `useEffect`, `onSave` payload and form control (with `zh`/`en` strings) → README tool/API tables → a test. Global (all-account) settings go in `GLOBAL_FIELDS` instead.
+Update, in order: `ACCOUNT_FIELDS` and `resolveConfig()` → `pickAccount()` → `accountPatchFromInput()` (tool + HTTP) → tool `parameters` schema and description → client draft state, the draft-loading `useEffect`, `onSave` payload and form control (with `zh`/`en` strings) → the tool/API tables in **both** `README.md` and `README.zh.md` → a test. Global (all-account) settings go in `GLOBAL_FIELDS` instead.
 
 ## Commands
 
@@ -72,10 +76,21 @@ Tests fake `fetch`, settings and credentials; they never touch the network or th
 - Verify through the `cliproxyapi` tool (`status` / `refresh`) or `/cpa-status`; the HTTP routes require the Web session's auth and return 401 to plain `curl`.
 - Restore any account, selection or route you changed while testing.
 
+## Documentation
+
+- User-facing docs exist in two languages: `README.md` (English, the npm/GitHub landing page) and `README.zh.md` (中文). Any change to one — features, tables, examples, install targets, version in the title — goes into the other in the same commit. Each starts with the `English | 中文` switcher.
+- `AGENTS.md` and `CHANGELOG.md` are English only.
+- Describe only behavior the code has; the community plugin list checks descriptions against the source.
+
+## CI and release
+
+- `ci.yml` runs `npm run check` and `npm pack --dry-run` on Ubuntu and Windows with Node 22 and 24 for pushes to `main` and pull requests. Keep `npm run check` green before pushing.
+- `release.yml` runs on a pushed tag `v<version>`: it fails unless the tag equals `package.json` `version`, runs the checks, creates a GitHub Release whose notes are that version's `CHANGELOG.md` section, attaches `dsh-cliproxyapi-pro-<version>.tgz` and the version-free `dsh-cliproxyapi-pro.tgz`, and runs `npm publish --provenance` only when the `NPM_TOKEN` repository secret exists.
+
 ## Release checklist
 
-1. Bump `version` in `package.json` and the README title; add a `CHANGELOG.md` entry.
-2. `npm run check` passes; `npm run pack:check` lists exactly `lib/index.js`, `lib/client.js`, `locale/*.json`, `cordis.patch.yml`, `icon.svg`, `README.md`, `CHANGELOG.md`, `LICENSE`, `package.json`.
+1. Bump `version` in `package.json` and the title of both READMEs; add a `## <version> — <date>` section to `CHANGELOG.md`.
+2. `npm run check` passes; `npm run pack:check` lists exactly `lib/index.js`, `lib/client.js`, `locale/*.json`, `cordis.patch.yml`, `icon.svg`, `README.md`, `README.zh.md`, `CHANGELOG.md`, `LICENSE`, `package.json`.
 3. `locale/*.json` `meta` text still describes the plugin; `icon.svg` renders (≤ 256 KiB).
 4. Reload in a live Harness, check the Settings panel in both languages and the tool output.
-5. Commit (`type: summary`, e.g. `feat: multi-account support`, `fix: …`, `docs: …`), tag `v<version>`, `npm pack` for a `.tgz`.
+5. Commit (`type: summary`, e.g. `feat: multi-account support`, `fix: …`, `docs: …`), push `main`, wait for CI, then `git tag v<version>` and `git push origin v<version>` to trigger the release.

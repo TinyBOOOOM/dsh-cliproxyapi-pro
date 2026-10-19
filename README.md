@@ -1,150 +1,161 @@
 # dsh-cliproxyapi-pro (v1.4.0)
 
-[CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) 接入插件，适用于 **DeepSeek Harness（DSH `>=0.2.0-rc.1`）**：自动发现 CPA 服务、同步模型目录与能力（上下文、视觉、推理档位）到 DSH 模型选择器，支持**多个账号**分别启用/停用、可视化勾选模型与单模型参数覆盖。
+English | [中文](README.zh.md)
 
-- 零运行时依赖，无需构建；仅使用 Node.js 内置模块与 DSH（Cordis）上下文服务。
-- 密钥只存放在 DSH 凭证服务中，不会写入配置文件。
+[![CI](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/actions/workflows/ci.yml/badge.svg)](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## 目录
+A [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) provider for **DeepSeek Harness (DSH `>=0.2.0-rc.1`)**. It discovers CPA servers, synchronizes their model catalogs and capabilities (context window, image input, reasoning levels) into the DSH model picker, and supports **multiple accounts** that can each be enabled or disabled, with a visual model filter and per-model parameter overrides.
 
-- [功能](#功能)
-- [安装](#安装)
-- [使用](#使用)
-  - [设置面板](#设置面板)
-  - [多账号](#多账号)
-  - [Agent 工具 `cliproxyapi`](#agent-工具-cliproxyapi)
-  - [斜杠命令](#斜杠命令)
-  - [HTTP 接口](#http-接口)
-- [协议路由](#协议路由)
-- [存储与配置](#存储与配置)
-- [AI Agent 安装与配置指南](#ai-agent-安装与配置指南-ai-installation-protocol)
-- [开发](#开发)
-- [许可证](#许可证)
+- No runtime dependencies and no build step; only Node.js built-ins and DSH (Cordis) context services.
+- API keys are stored only in the DSH credentials service, never in configuration files.
 
-## 功能
+## Contents
 
-1. **自动发现**：可填写远程/本地地址（自动剥离 `/v1`、`/v1/chat/completions`、`/v1/messages` 等后缀），留空则依次尝试已有路由地址、环境变量 `CLIPROXYAPI_BASE_URL` 与本地 `127.0.0.1:8317`。读取 `/v1/models?client_version=pi` 富元数据目录（兼容 OpenAI `data[]` 格式），并用 `/v1/models` 的 `owned_by` 判断模型家族。
-2. **模型勾选筛选**：搜索、家族标签、全部/已勾选/未勾选切换、批量勾选；**只有勾选的模型会出现在对话框模型选择器中**。勾选为空表示不过滤；另可用包含/排除关键词规则。
-3. **单模型参数覆盖**：上下文窗口、最大输出、图片输入、思考等级（`off`…`max`）、请求协议，可一键恢复自动探测值。
-4. **按模型家族走原生协议**（默认）：见[协议路由](#协议路由)。
-5. **多账号**：每个账号独立的服务地址、密钥、路由、协议、勾选与覆盖，可单独启用/停用。见[多账号](#多账号)。
-6. **自动刷新**：所有账号按统一间隔（默认 300 秒）刷新；数据无变化时不写入任何设置。
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Settings panel](#settings-panel)
+  - [Multiple accounts](#multiple-accounts)
+  - [Agent tool `cliproxyapi`](#agent-tool-cliproxyapi)
+  - [Slash commands](#slash-commands)
+  - [HTTP API](#http-api)
+- [Protocol routing](#protocol-routing)
+- [Storage and configuration](#storage-and-configuration)
+- [AI installation protocol](#ai-installation-protocol)
+- [Development](#development)
+- [License](#license)
 
-## 安装
+## Features
 
-**方式一：在 DSH 中让 Agent 安装**（推荐）。把本目录或打包好的 `.tgz` 的绝对路径告诉 Agent，它会调用 `plugin_manager`：
+1. **Auto-discovery.** Enter a remote or local URL (suffixes such as `/v1`, `/v1/chat/completions` and `/v1/messages` are stripped), or leave it empty to try the existing route URL, the `CLIPROXYAPI_BASE_URL` environment variable, and local `127.0.0.1:8317` in turn. The enriched catalog comes from `/v1/models?client_version=pi` (OpenAI `data[]` catalogs work too); `owned_by` from `/v1/models` identifies each model's family.
+2. **Model filter.** Search, family chips, All / Checked / Unchecked tabs and bulk selection. **Only checked models appear in the conversation model picker.** An empty selection means no filter; include / exclude keyword rules apply on top.
+3. **Per-model overrides.** Context window, max output, image input, thinking levels (`off` … `max`) and request protocol, each resettable to the discovered value.
+4. **Native protocol per model family** (default). See [Protocol routing](#protocol-routing).
+5. **Multiple accounts.** Each account has its own URL, key, routes, protocol, selection and overrides, and can be enabled or disabled on its own. See [Multiple accounts](#multiple-accounts).
+6. **Automatic refresh.** All accounts refresh on a shared interval (300 s by default); an unchanged catalog writes no settings.
+
+## Installation
+
+Ask the agent in a DSH conversation to install it with `plugin_manager`, using one of these targets:
+
+| Source | `target` |
+|---|---|
+| GitHub, latest `main` | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#main` |
+| GitHub, a release tag | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v<version>` (see [Releases](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/releases)) |
+| GitHub Release `.tgz` | Download `dsh-cliproxyapi-pro.tgz` from a release and pass its absolute path |
+| Local checkout (development, linked) | Absolute path of the cloned repository |
+| npm (once published) | `dsh-cliproxyapi-pro` |
 
 ```json
-{ "action": "install_bundle", "target": "<本目录或 .tgz 的绝对路径>", "enabled": true }
+{ "action": "install_bundle", "target": "<target from the table>", "enabled": true }
 ```
 
-- 安装目录时为链接安装（`source: link:<目录>`），修改本目录后重载插件即生效，适合开发。
-- 安装 `.tgz` 时为复制安装，适合分发。打包：`npm pack`。
-- 已安装旧版本时可直接重新安装；替换已安装的包后需要重启 DSH 才能加载新代码。
+- Installing a directory links it (`source: link:<dir>`); code changes go live when the plugin reloads.
+- Reinstalling over an older version is fine; replacing an installed package needs a DSH restart to load the new code.
+- If the result's `application` is `restart-required`, restart DSH.
 
-**方式二：插件市场 / 插件管理器**：在 DSH 左侧栏「插件」中安装本地包。
+After installation, open:
 
-安装后入口：
+- Sidebar → **Plugins** → **CLIProxyAPI**
+- **Settings** → **Plugins** → **CLIProxyAPI**
 
-- 左侧栏 → **插件** → **CLIProxyAPI**
-- **设置** → **插件** → **CLIProxyAPI**
+## Usage
 
-## 使用
+### Settings panel
 
-### 设置面板
+The **account bar** at the top switches between accounts (the dot shows each account's state; disabled accounts carry an **Off** badge), and **+ Add Account** creates one. Below it, for the selected account:
 
-面板顶部是**账号栏**：点击切换账号（圆点表示状态，未启用的账号带「未启用」标记），「+ 添加账号」新增账号。下方针对当前账号：
-
-| 区块 | 内容 |
+| Section | Contents |
 |---|---|
-| 状态卡片 | 连接状态、当前节点、选择器中的模型数 / 发现总数；「立即探测刷新」「保存设置并应用」 |
-| 模型显示筛选 | 勾选模型、编辑单模型参数；修改后点「保存模型勾选」 |
-| 连接与认证 | 「启用此账号」开关、服务地址、API Key（可清除）、接口协议、账号名称 |
-| 高级 | 包含/排除关键词、路由 ID、密钥引用名、自动刷新间隔（所有账号共用）；「删除此账号」 |
+| Status card | Connection state, active endpoint, models in the picker / discovered; **Probe & Refresh**, **Save & Apply** |
+| Model Picker Filter | Check models and edit per-model parameters; click **Apply Selected Models** to save |
+| Connection & Authentication | **Enable This Account** switch, base URL, API key (clearable), wire protocol, account name |
+| Advanced Routing & Keyword Rules | Include / exclude keywords, provider route ID, credential ref, refresh interval (shared by all accounts); **Delete Account** |
 
-### 多账号
+### Multiple accounts
 
-- 每个账号写入自己的一组 `llm-pi-ai` 路由：首个账号为 `cli-proxy` / `cli-proxy-responses` / `cli-proxy-messages`，新增账号依次为 `cli-proxy-2*`、`cli-proxy-3*`……；密钥引用名依次为 `CLI_PROXY_API_KEY`、`CLI_PROXY_API_KEY_2`……。模型选择器中按账号名称分组。
-- **路由 ID 不能重叠**（例如另一个账号不能使用 `cli-proxy-messages`），保存时会拒绝。
-- **停用**账号：保留全部配置，但删除它的路由，模型从选择器中消失；其他账号不受影响。
-- **新增**账号默认停用。填写地址与密钥后可先「立即探测刷新」预览模型并勾选，再打开「启用此账号」保存。
-- 填写了服务地址的账号**只探测该地址**，连不上就报错，不会回退到本地 `:8317`，避免多个账号指向同一服务。
-- **删除**账号会移除它的路由，但保留凭证服务中的密钥。
+- Each account writes its own set of `llm-pi-ai` routes: the first account uses `cli-proxy` / `cli-proxy-responses` / `cli-proxy-messages`, later ones `cli-proxy-2*`, `cli-proxy-3*`, …; credential refs are `CLI_PROXY_API_KEY`, `CLI_PROXY_API_KEY_2`, …. The model picker groups models by account name.
+- **Provider route IDs must not overlap** (for example, another account cannot use `cli-proxy-messages`); saving such a change is rejected.
+- **Disabling** an account keeps its settings but removes its routes, so its models leave the picker; other accounts are unaffected.
+- **New** accounts start disabled. Fill in the URL and key, click **Probe & Refresh** to preview and check models, then turn on **Enable This Account** and save.
+- An account with a base URL **only probes that URL** and reports an error when it is unreachable; it never falls back to local `:8317`, so two accounts cannot silently point at the same server.
+- **Deleting** an account removes its routes but keeps its key in the credentials service.
 
-### Agent 工具 `cliproxyapi`
+### Agent tool `cliproxyapi`
 
-| `action` | 作用 |
+| `action` | Effect |
 |---|---|
-| `status` | 查看所有账号（或 `account` 指定的账号）状态与模型 |
-| `refresh` | 立即探测并同步；不带 `account` 时刷新全部账号 |
-| `configure` | 修改一个账号（默认第一个）；同时保存后立即刷新 |
-| `add_account` | 新增账号；给了 `baseURL` 时默认启用，否则停用 |
-| `remove_account` | 删除 `account` 及其路由 |
+| `status` | Show every account (or only `account`) with its state and models |
+| `refresh` | Probe and sync now; without `account`, all accounts |
+| `configure` | Update one account (the first by default), then refresh it |
+| `add_account` | Create an account; enabled when `baseURL` is given, otherwise disabled |
+| `remove_account` | Delete `account` and its routes |
 
-参数（除 `action` 外均可选）：
+Parameters (all optional except `action`):
 
-| 参数 | 说明 |
+| Parameter | Meaning |
 |---|---|
-| `account` | 账号 id（如 `default`、`account-2`），也可用路由 ID 或账号名称 |
-| `enabled` | 启用 / 停用该账号 |
-| `baseURL` | CPA 地址，如 `http://127.0.0.1:8317`；空字符串表示自动发现 |
-| `apiKey` | Bearer 密钥，保存到该账号的 `apiKeyEnv` 引用名下 |
-| `apiKeyEnv` | 密钥引用名（`[A-Za-z_][A-Za-z0-9_]*`） |
-| `provider` | `llm-pi-ai` 路由 ID，每个账号唯一 |
-| `displayName` | 账号名称 / 模型选择器分组名 |
-| `protocolMode` | `auto`（按家族原生协议，默认）或 `fixed` |
-| `protocol` | `fixed` 时使用的协议：`openai-completions` / `openai-responses` / `anthropic-messages` |
-| `selectedModels` | 显示在选择器中的模型 id 列表；`[]` 表示全部 |
-| `includePrefix` / `excludePrefix` | 逗号分隔的模型 id 关键词 |
-| `modelOverrides` | `{ [modelId]: { contextWindow?, maxTokens?, image?, reasoningLevels?, protocol? } }`，整体替换 |
+| `account` | Account id (e.g. `default`, `account-2`), or its provider route ID or display name |
+| `enabled` | Enable or disable the account |
+| `baseURL` | CPA URL such as `http://127.0.0.1:8317`; an empty string means auto-discover |
+| `apiKey` | Bearer key, stored under the account's `apiKeyEnv` ref |
+| `apiKeyEnv` | Credential ref name (`[A-Za-z_][A-Za-z0-9_]*`) |
+| `provider` | `llm-pi-ai` provider route ID, unique per account |
+| `displayName` | Account name / model picker group title |
+| `protocolMode` | `auto` (native protocol per family, default) or `fixed` |
+| `protocol` | Protocol used in `fixed` mode: `openai-completions` / `openai-responses` / `anthropic-messages` |
+| `selectedModels` | Model ids shown in the picker; `[]` shows all |
+| `includePrefix` / `excludePrefix` | Comma-separated model id keywords |
+| `modelOverrides` | `{ [modelId]: { contextWindow?, maxTokens?, image?, reasoningLevels?, protocol? } }`, replacing the whole map |
 
-示例：
+Examples:
 
 ```json
-{ "action": "configure", "baseURL": "http://127.0.0.1:8317", "apiKey": "sk-...", "selectedModels": ["gpt-6.1-sol", "devin/claude-opus-5-5"] }
+{ "action": "configure", "baseURL": "http://127.0.0.1:8317", "apiKey": "sk-...", "selectedModels": ["gpt-6.1-sol", "claude-opus-5-5"] }
 { "action": "add_account", "displayName": "Backup CPA", "baseURL": "https://other-cpa:8317", "apiKey": "sk-...", "selectedModels": ["gpt-6-astra"] }
 { "action": "configure", "account": "account-2", "enabled": false }
 { "action": "remove_account", "account": "account-2" }
 ```
 
-输出包含 `accounts[]`（每个账号的 `id`、`displayName`、`provider`、`enabled`、`state`、`endpoint`、`modelCount`、`totalDiscovered`、`error`）与文字摘要 `summary`。`state` 取值：`idle`、`probing`、`connected`、`disabled`、`error`。
+The output has `accounts[]` (each with `id`, `displayName`, `provider`, `enabled`, `state`, `endpoint`, `modelCount`, `totalDiscovered`, `error`) and a text `summary`. `state` is one of `idle`, `probing`, `connected`, `disabled`, `error`.
 
-### 斜杠命令
+### Slash commands
 
-- `/cpa-status`：显示所有账号的状态。
-- `/cpa-refresh`：立即刷新所有账号（包括探测停用账号的模型列表）。
+- `/cpa-status` — show every account's status.
+- `/cpa-refresh` — refresh every account now, including a catalog probe of disabled ones.
 
-### HTTP 接口
+### HTTP API
 
-供设置面板使用，需要 DSH Web 会话认证；POST 仅接受本机/受信任主机的同源请求。
+Used by the settings panel. Requires the DSH Web session's authentication; POST accepts only same-origin requests from loopback or trusted hosts.
 
-| 方法 | 路径 | 请求体 | 说明 |
+| Method | Path | Body | Meaning |
 |---|---|---|---|
 | GET | `/api/dsh-cliproxyapi/status` | — | `{ ok, global, accounts[] }` |
-| POST | `/api/dsh-cliproxyapi/refresh` | `{ accountId? }` | 刷新一个或全部账号 |
-| POST | `/api/dsh-cliproxyapi/save` | `{ accountId?, …账号字段, apiKey?, clearApiKey?, refreshIntervalSeconds?, probeTimeoutMs? }` | 保存账号（缺省为第一个）；只有全局字段时只保存全局设置 |
-| POST | `/api/dsh-cliproxyapi/accounts/add` | 账号字段（可选） | 新增账号，默认停用；返回 `createdId` |
-| POST | `/api/dsh-cliproxyapi/accounts/remove` | `{ accountId }` | 删除账号及其路由 |
+| POST | `/api/dsh-cliproxyapi/refresh` | `{ accountId? }` | Refresh one or all accounts |
+| POST | `/api/dsh-cliproxyapi/save` | `{ accountId?, …account fields, apiKey?, clearApiKey?, refreshIntervalSeconds?, probeTimeoutMs? }` | Save an account (the first by default); a body with only global fields saves just the globals |
+| POST | `/api/dsh-cliproxyapi/accounts/add` | Optional account fields | Create a disabled account; returns `createdId` |
+| POST | `/api/dsh-cliproxyapi/accounts/remove` | `{ accountId }` | Delete an account and its routes |
 
-## 协议路由
+## Protocol routing
 
-CLIProxyAPI 对每个模型同时提供 OpenAI Chat、OpenAI Responses、Anthropic Messages 三种入口，入口协议与上游不一致时会做转换。自动模式（`protocolMode: "auto"`）让每个模型直接使用上游协议：
+CLIProxyAPI serves every model on OpenAI Chat, OpenAI Responses and Anthropic Messages, translating when the entry protocol differs from the upstream one. Auto mode (`protocolMode: "auto"`) sends each model over its upstream's own protocol:
 
-| 模型家族（依据 `owned_by` 与模型 id） | 协议 | 路由（以 `cli-proxy` 为例） |
+| Model family (from `owned_by` and the model id) | Protocol | Route (for `cli-proxy`) |
 |---|---|---|
-| Claude（含 `devin/claude-*`、Antigravity Claude） | Anthropic Messages `/v1/messages` | `cli-proxy-messages` |
-| OpenAI / Codex / GPT、xAI Grok | OpenAI Responses `/v1/responses` | `cli-proxy-responses` |
-| Gemini、DeepSeek、Kimi、GLM、SWE、gpt-oss 等 | OpenAI Chat `/v1/chat/completions` | `cli-proxy` |
+| Claude (including `devin/claude-*`, Antigravity Claude) | Anthropic Messages `/v1/messages` | `cli-proxy-messages` |
+| OpenAI / Codex / GPT, xAI Grok | OpenAI Responses `/v1/responses` | `cli-proxy-responses` |
+| Gemini, DeepSeek, Kimi, GLM, SWE, gpt-oss, … | OpenAI Chat `/v1/chat/completions` | `cli-proxy` |
 
-- DSH 自定义路由不支持 Gemini 原生 `generateContent`，Gemini 走 OpenAI Chat。
-- DSH 每条路由只有一种协议，模型按协议拆入三条路由；没有模型的路由会被移除。默认模型因此换路由时，`agent-default-model` 自动跟随。
-- Claude 4.6+ / 5.x / Fable 使用自适应思考（`effort`），更早的 Claude 使用 token 预算。
-- 可改为「统一使用」某一协议（`fixed`），或在单个模型的「编辑参数」中指定协议。
-- 路由上你手动添加的其他字段（如 `retryPolicy`）会被保留。
+- DSH custom routes cannot speak Gemini's native `generateContent`, so Gemini uses OpenAI Chat.
+- A DSH route has a single protocol, so models are split across the three routes; a route left without models is removed. When the default model moves to another route, `agent-default-model` follows it.
+- Claude 4.6+ / 5.x / Fable use adaptive thinking (`effort`); older Claude models use a token budget.
+- Switch to one protocol for every model (`fixed`), or set a protocol per model under **Edit Parameters**.
+- Other fields you add to a managed route by hand (such as `retryPolicy`) are kept.
 
-## 存储与配置
+## Storage and configuration
 
-- **状态文件**：`<Profile 目录>/.dsh-cliproxyapi/state.json`
+- **State file**: `<profile dir>/.dsh-cliproxyapi/state.json`
 
   ```json
   {
@@ -162,44 +173,47 @@ CLIProxyAPI 对每个模型同时提供 OpenAI Chat、OpenAI Responses、Anthrop
   }
   ```
 
-  文件每次读取时都会重新加载，手动修改后点「立即探测刷新」即可生效。v1 单账号文件会自动迁移为 id `default` 的账号（路由、密钥、勾选不变），原文件备份为 `state.v1.json`。
+  The file is re-read on every access; after a manual edit, click **Probe & Refresh**. A v1 single-account file migrates automatically into account `default` (same routes, key and selection), and the original is kept as `state.v1.json`.
 
-- **密钥**：通过 DSH `credentials` 服务按引用名存取；未存储时回退读取同名环境变量。本地免密的 CPA 可以不填密钥。
-- **环境变量**：`CLIPROXYAPI_BASE_URL` 仅用于服务地址留空的账号的自动发现。
-- **Bundle 行配置**：`cordis.patch.yml` 中插件行的 `config` 会在启动时叠加到状态文件上：含 `accounts` 时替换账号列表，否则平铺字段作用于第一个账号。通常保持 `{}`，使用面板或工具配置即可。
+- **Keys**: stored and resolved by ref through the DSH `credentials` service, falling back to an environment variable of the same name. A local CPA without authentication needs no key.
+- **Environment**: `CLIPROXYAPI_BASE_URL` is used only for auto-discovery of accounts without a base URL.
+- **Bundle row config**: the plugin row's `config` in `cordis.patch.yml` is overlaid on the state file at startup: `accounts` replaces the account list, flat fields apply to the first account. Normally keep it `{}` and configure through the panel or the tool.
 
-## AI Agent 安装与配置指南 (AI Installation Protocol)
+## AI installation protocol
 
-> **Instructions for DeepSeek Harness (DSH) AI Agent**: when the user asks you to install or configure this plugin, follow these steps. The package has no npm dependencies and no build scripts.
+> **For the AI agent in DeepSeek Harness**: when the user asks you to install or configure this plugin, follow these steps. The package has no npm dependencies and no build scripts.
 
-1. **Install**: call `plugin_manager` with `{"action": "install_bundle", "target": "<ABSOLUTE_PATH_TO_TGZ_OR_DIRECTORY>", "enabled": true}`. Read `application` and `warnings` in the result; `restart-required` means DSH must restart before the new code runs.
+1. **Install**: call `plugin_manager` with `{"action": "install_bundle", "target": "<see Installation>", "enabled": true}`. Read `application` and `warnings` in the result; `restart-required` means DSH must restart before the new code runs.
 2. **Configure** with the `cliproxyapi` tool:
-   - Local CPA on `http://127.0.0.1:8317` without auth: no configuration needed; call `{"action": "refresh"}`.
-   - Remote URL or key: `{"action": "configure", "baseURL": "...", "apiKey": "..."}` (first account), or `{"action": "add_account", ...}` for an additional account. Pass `"account": "<id>"` to target a specific account.
+   - Local CPA on `http://127.0.0.1:8317` without auth: nothing to configure; call `{"action": "refresh"}`.
+   - Remote URL or key: `{"action": "configure", "baseURL": "...", "apiKey": "..."}` (first account), or `{"action": "add_account", ...}` for another account. Pass `"account": "<id>"` to target a specific account.
    - Narrow the picker with `selectedModels` (exact ids from the `status` output).
-3. **Verify**: `{"action": "status"}` shows `state: "connected"` and `modelCount > 0` for each enabled account. Tell the user the models are in the DSH model picker under the account's display name, and that they can manage accounts in **Sidebar → Plugins → CLIProxyAPI** or **Settings → Plugins → CLIProxyAPI**.
+3. **Verify**: `{"action": "status"}` shows `state: "connected"` and `modelCount > 0` for each enabled account. Tell the user the models are in the DSH model picker under the account's name, and that accounts are managed in **Sidebar → Plugins → CLIProxyAPI** or **Settings → Plugins → CLIProxyAPI**.
 
-Never echo API keys back to the user or into files.
+Never echo API keys back to the user or write them into files.
 
-## 开发
+## Development
 
 ```text
-lib/index.js        Host 插件（发现、同步、多账号控制器、工具、命令、HTTP 接口）
-lib/client.js       Web 设置面板（ModuleLoader 格式，手写，无需构建）
-locale/*.json       插件管理器中显示的标题与描述
-cordis.patch.yml    Bundle patch，插入 dsh-cliproxyapi-pro 行
-tests/              node:test 单元与集成测试
-AGENTS.md           给编码 Agent 的开发约定、架构与不变量
+lib/index.js        Host plugin (discovery, sync, multi-account controller, tool, commands, HTTP API)
+lib/client.js       Web settings panel (hand-written ModuleLoader module, no build)
+locale/*.json       Title and description shown by the plugin manager
+cordis.patch.yml    Bundle patch inserting the dsh-cliproxyapi-pro row
+tests/              node:test unit and integration tests
+.github/workflows/  CI (tests) and release (.tgz asset, optional npm publish)
+AGENTS.md           Conventions, architecture and invariants for coding agents
 ```
 
-```powershell
-npm test             # 运行测试
-npm run check        # 语法检查 + 测试
-npm run pack:check   # 查看打包文件列表
+```bash
+git clone https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git
+cd dsh-cliproxyapi-pro
+npm test             # run the tests
+npm run check        # syntax check + tests
+npm run pack:check   # list the files a packed bundle contains
 ```
 
-修改代码前请阅读 [AGENTS.md](AGENTS.md)；变更记录见 [CHANGELOG.md](CHANGELOG.md)。
+Read [AGENTS.md](AGENTS.md) before changing code; see [CHANGELOG.md](CHANGELOG.md) for history. Issues and pull requests are welcome — when you change the documentation, update both the English and the Chinese README.
 
-## 许可证
+## License
 
 [MIT](LICENSE)
