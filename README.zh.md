@@ -13,6 +13,7 @@
 ## 目录
 
 - [功能](#功能)
+- [截图](#截图)
 - [安装](#安装)
 - [使用](#使用)
   - [设置面板](#设置面板)
@@ -34,6 +35,22 @@
 4. **按模型家族走原生协议**（默认）：见[协议路由](#协议路由)。
 5. **多账号**：每个账号独立的服务地址、密钥、路由、协议、勾选与覆盖，可单独启用/停用。见[多账号](#多账号)。
 6. **自动刷新**：所有账号按统一间隔（默认 300 秒）刷新；数据无变化时不写入任何设置。
+
+## 截图
+
+面板位于 **设置 → 内置插件 → CLIProxyAPI** 标签页，界面语言跟随 DSH 设置。
+
+**1. 账号栏与账号状态。** 顶部账号栏列出所有账号：绿点表示已连接，灰点加「未启用」标记表示已停用。图中刚用「+ 添加账号」新增了第二个账号「CLI Proxy API 2」：它默认停用，拥有独立的路由 `cli-proxy-2`；由于还没填写服务地址，探测提示本地没有找到 CPA 服务。
+
+![账号栏：一个已连接账号和一个刚添加、未启用的账号](assets/screenshots/accounts.png)
+
+**2. 模型显示筛选。** 从 CPA 服务发现的全部 168 个模型，支持全部发现 / 已勾选 / 未勾选切换、家族标签（GPT、CLAUDE、GEMINI、GROK……）、搜索与批量操作。只有勾选的模型会同步到 DSH 模型选择器；每个模型显示将使用的协议（图中为 OpenAI Responses）、图片输入、推理档位与上下文长度，「编辑参数」可打开单模型参数覆盖。
+
+![模型筛选：家族标签、已勾选模型、协议与能力标记](assets/screenshots/model-filter.png)
+
+**3. 连接与认证配置。** 每个账号独立的设置：「启用此账号」开关、服务地址、保存在该账号独立引用名（`CLI_PROXY_API_KEY_2`）下的 API Key、接口协议、账号名称、可折叠的高级设置，以及「保存设置并应用」与「删除此账号」。
+
+![未启用账号的连接设置，使用独立的密钥引用名](assets/screenshots/connection.png)
 
 ## 安装
 
@@ -58,7 +75,7 @@
 安装后入口：
 
 - 左侧栏 → **插件** → **CLIProxyAPI**
-- **设置** → **插件** → **CLIProxyAPI**
+- **设置** → **内置插件** → **CLIProxyAPI** 标签页
 
 ## 使用
 
@@ -188,7 +205,7 @@ CLIProxyAPI 对每个模型同时提供 OpenAI Chat、OpenAI Responses、Anthrop
    - 本地 `http://127.0.0.1:8317` 且无鉴权：无需配置，调用 `{"action": "refresh"}`。
    - 远程地址或密钥：`{"action": "configure", "baseURL": "...", "apiKey": "..."}`（第一个账号），额外账号用 `{"action": "add_account", ...}`；指定账号时传 `"account": "<id>"`。
    - 用 `selectedModels`（取自 `status` 输出的精确 id）精简模型选择器。
-3. **验证**：`{"action": "status"}` 中每个启用的账号 `state` 为 `connected` 且 `modelCount > 0`。告诉用户模型已出现在 DSH 模型选择器中（以账号名称分组），可在 **左侧栏 → 插件 → CLIProxyAPI** 或 **设置 → 插件 → CLIProxyAPI** 管理账号。
+3. **验证**：`{"action": "status"}` 中每个启用的账号 `state` 为 `connected` 且 `modelCount > 0`。告诉用户模型已出现在 DSH 模型选择器中（以账号名称分组），可在 **左侧栏 → 插件 → CLIProxyAPI** 或 **设置 → 内置插件 → CLIProxyAPI** 管理账号。
 
 不要把 API Key 回显给用户或写入任何文件。
 
@@ -201,6 +218,7 @@ locale/*.json       插件管理器中显示的标题与描述
 cordis.patch.yml    Bundle patch，插入 dsh-cliproxyapi-pro 行
 tests/              node:test 单元与集成测试
 .github/workflows/  CI（测试）与发版（Release .tgz，可选 npm 发布）
+assets/screenshots/ README 截图（同时登记在 screenshots.json 中供插件市场展示）
 AGENTS.md           给编码 Agent 的开发约定、架构与不变量
 ```
 

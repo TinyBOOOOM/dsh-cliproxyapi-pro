@@ -81,6 +81,7 @@ Tests fake `fetch`, settings and credentials; they never touch the network or th
 - User-facing docs exist in two languages: `README.md` (English, the npm/GitHub landing page) and `README.zh.md` (中文). Any change to one — features, tables, examples, install targets, version in the title — goes into the other in the same commit. Each starts with the `English | 中文` switcher.
 - `AGENTS.md` and `CHANGELOG.md` are English only.
 - Describe only behavior the code has; the community plugin list checks descriptions against the source.
+- Screenshots live in `assets/screenshots/` and are referenced by both READMEs and by `screenshots.json` (1–8 relative paths, read by plugin storefronts such as dsh-market). They are not shipped in the npm package. When the panel changes visibly, retake them, keep them free of real keys, server URLs and private data, and keep the captions in both READMEs accurate.
 
 ## CI and release
 

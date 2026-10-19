@@ -13,6 +13,7 @@ A [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) provider for **Dee
 ## Contents
 
 - [Features](#features)
+- [Screenshots](#screenshots)
 - [Installation](#installation)
 - [Usage](#usage)
   - [Settings panel](#settings-panel)
@@ -34,6 +35,22 @@ A [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) provider for **Dee
 4. **Native protocol per model family** (default). See [Protocol routing](#protocol-routing).
 5. **Multiple accounts.** Each account has its own URL, key, routes, protocol, selection and overrides, and can be enabled or disabled on its own. See [Multiple accounts](#multiple-accounts).
 6. **Automatic refresh.** All accounts refresh on a shared interval (300 s by default); an unchanged catalog writes no settings.
+
+## Screenshots
+
+The panel lives in the **Settings → Built-in plugins → CLIProxyAPI** tab and follows the DSH display language; the screenshots show the Chinese UI.
+
+**1. Account bar and account status.** The bar at the top lists every account: a green dot means connected, a grey dot plus the **Off** badge means disabled. Here a second account, *CLI Proxy API 2*, was just added with **+ Add Account**: it starts disabled, gets its own provider route `cli-proxy-2`, and — since no base URL is set yet — the probe reports that no local CPA was found.
+
+![Account bar with one connected and one newly added, disabled account](assets/screenshots/accounts.png)
+
+**2. Model picker filter.** All 168 models discovered from the CPA server, with All / Checked / Unchecked tabs, family chips (GPT, CLAUDE, GEMINI, GROK, …), search and bulk actions. Checked models are the only ones synchronized into the DSH model picker; each shows the protocol it will use (here OpenAI Responses), image input, reasoning levels and context window, and **Edit Parameters** opens its per-model overrides.
+
+![Model filter with family chips, checked models, protocol and capability badges](assets/screenshots/model-filter.png)
+
+**3. Connection & Authentication.** Per-account settings: the **Enable This Account** switch, base URL, API key stored under the account's own credential ref (`CLI_PROXY_API_KEY_2`), wire protocol, account name, the collapsible advanced section, **Save & Apply** and **Delete Account**.
+
+![Connection settings of a disabled account with its own credential ref](assets/screenshots/connection.png)
 
 ## Installation
 
@@ -58,7 +75,7 @@ Ask the agent in a DSH conversation to install it with `plugin_manager`, using o
 After installation, open:
 
 - Sidebar → **Plugins** → **CLIProxyAPI**
-- **Settings** → **Plugins** → **CLIProxyAPI**
+- **Settings** → **Built-in plugins** → **CLIProxyAPI** tab
 
 ## Usage
 
@@ -188,7 +205,7 @@ CLIProxyAPI serves every model on OpenAI Chat, OpenAI Responses and Anthropic Me
    - Local CPA on `http://127.0.0.1:8317` without auth: nothing to configure; call `{"action": "refresh"}`.
    - Remote URL or key: `{"action": "configure", "baseURL": "...", "apiKey": "..."}` (first account), or `{"action": "add_account", ...}` for another account. Pass `"account": "<id>"` to target a specific account.
    - Narrow the picker with `selectedModels` (exact ids from the `status` output).
-3. **Verify**: `{"action": "status"}` shows `state: "connected"` and `modelCount > 0` for each enabled account. Tell the user the models are in the DSH model picker under the account's name, and that accounts are managed in **Sidebar → Plugins → CLIProxyAPI** or **Settings → Plugins → CLIProxyAPI**.
+3. **Verify**: `{"action": "status"}` shows `state: "connected"` and `modelCount > 0` for each enabled account. Tell the user the models are in the DSH model picker under the account's name, and that accounts are managed in **Sidebar → Plugins → CLIProxyAPI** or **Settings → Built-in plugins → CLIProxyAPI**.
 
 Never echo API keys back to the user or write them into files.
 
@@ -201,6 +218,7 @@ locale/*.json       Title and description shown by the plugin manager
 cordis.patch.yml    Bundle patch inserting the dsh-cliproxyapi-pro row
 tests/              node:test unit and integration tests
 .github/workflows/  CI (tests) and release (.tgz asset, optional npm publish)
+assets/screenshots/ README screenshots (listed in screenshots.json for plugin storefronts)
 AGENTS.md           Conventions, architecture and invariants for coding agents
 ```
 
