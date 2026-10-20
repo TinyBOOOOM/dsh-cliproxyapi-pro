@@ -96,9 +96,11 @@ CPA 就在本机默认端口 `8317` 且没有设置密钥时，什么都不用�
 
 ## 截图
 
-**1. 账号栏与账号状态。** 顶部账号栏列出所有账号：绿点表示已连接，灰点加「未启用」标记表示已停用。图中刚用「+ 添加账号」新增了第二个账号「CLI Proxy API 2」：它默认停用，拥有独立的路由 `cli-proxy-2`；由于还没填写服务地址，探测提示本地没有找到 CPA 服务。
+以下均为 1.6.0 在 DSH 桌面版中的实际截图。
 
-![账号栏：一个已连接账号和一个刚添加、未启用的账号](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/accounts.png)
+**1. 设置左侧的 CLIProxyAPI 页与账号栏。** 账号与模型设置位于 **设置** 左侧导航的 **CLIProxyAPI** 页。顶部账号栏列出所有账号：绿点表示已连接，灰点加「未启用」标记表示已停用。图中刚用「+ 添加账号」新增了第二个账号「CLI Proxy API 2」：它默认停用，拥有独立的路由 `cli-proxy-2`；由于还没填写服务地址，探测提示本地没有找到 CPA 服务。
+
+![设置左侧的 CLIProxyAPI 页：一个已连接账号和一个刚添加、未启用的账号](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/accounts.png)
 
 **2. 模型显示筛选。** 从 CPA 服务发现的全部 168 个模型，支持全部发现 / 已勾选 / 未勾选切换、家族标签（GPT、CLAUDE、GEMINI、GROK……）、搜索与批量操作。只有勾选的模型会同步到 DSH 模型选择器；每个模型显示将使用的协议（图中为 OpenAI Responses）、图片输入、推理档位与上下文长度，「编辑参数」可打开单模型参数覆盖。
 
@@ -108,11 +110,9 @@ CPA 就在本机默认端口 `8317` 且没有设置密钥时，什么都不用�
 
 ![未启用账号的连接设置，使用独立的密钥引用名](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/connection.png)
 
-**4. 插件更新卡片。** 使用真实组件与虚构的更新状态离线渲染（拍摄于更新卡片仍位于账号页顶部、默认收起的版本）：一行显示当前版本与更新状态，展开后是通道、下载区域和自动更新开关。现在它单独位于插件页，并默认展开。不是正在运行的 GUI 截图，也不代表实际发布版本。
+**4. 内置插件里的插件更新页。** **设置** → **内置插件** → **CLIProxyAPI** 标签页只有插件更新：检查更新与离线下载、检测到 DSH 插件市场后的「立即更新」、更新通道、下载区域，以及自动检查 / 自动下载 / 自动安装开关。图中已是稳定通道最新版本，所以「立即更新」不可用。
 
-![插件更新卡片默认收起：一行显示当前版本与新版本提示](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/updates.png)
-
-![展开后的插件更新设置：通道、下载区域与自动开关](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/updates-expanded.png)
+![内置插件中的 CLIProxyAPI 更新页：版本状态、插件市场更新、通道、区域与自动开关](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/updates.png)
 
 ## 功能详解
 

@@ -96,11 +96,11 @@ If CPA runs on this machine on the default port `8317` without a key, there is n
 
 ## Screenshots
 
-The panel follows the DSH display language; the screenshots show the Chinese UI.
+The panel follows the DSH display language; the screenshots are actual captures of 1.6.0 in the DSH desktop app with the Chinese UI.
 
-**1. Account bar and account status.** The bar at the top lists every account: a green dot means connected, a grey dot plus the **Off** badge means disabled. Here a second account, *CLI Proxy API 2*, was just added with **+ Add Account**: it starts disabled, gets its own provider route `cli-proxy-2`, and — since no base URL is set yet — the probe reports that no local CPA was found.
+**1. The CLIProxyAPI page in Settings and its account bar.** Accounts and models live on the **CLIProxyAPI** page in the Settings dialog's left navigation. The bar at the top lists every account: a green dot means connected, a grey dot plus the **Off** badge means disabled. Here a second account, *CLI Proxy API 2*, was just added with **+ Add Account**: it starts disabled, gets its own provider route `cli-proxy-2`, and — since no base URL is set yet — the probe reports that no local CPA was found.
 
-![Account bar with one connected and one newly added, disabled account](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/accounts.png)
+![The CLIProxyAPI page in Settings with one connected and one newly added, disabled account](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/accounts.png)
 
 **2. Model picker filter.** All 168 models discovered from the CPA server, with All / Checked / Unchecked tabs, family chips (GPT, CLAUDE, GEMINI, GROK, …), search and bulk actions. Checked models are the only ones synchronized into the DSH model picker; each shows the protocol it will use (here OpenAI Responses), image input, reasoning levels and context window, and **Edit Parameters** opens its per-model overrides.
 
@@ -110,11 +110,9 @@ The panel follows the DSH display language; the screenshots show the Chinese UI.
 
 ![Connection settings of a disabled account with its own credential ref](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/connection.png)
 
-**4. Plugin update card.** The real component is rendered offline with fictional update state (captured when the card still sat collapsed at the top of the account page): a single row shows the current version and update status, and expanding it reveals channels, download regions and automatic-update switches. It now lives alone on the plugin page and starts expanded there. This is not a live GUI screenshot and does not indicate an actual published version.
+**4. The plugin update page under Built-in plugins.** **Settings** → **Built-in plugins** → the **CLIProxyAPI** tab holds only plugin updates: checking and offline download, **Update Now** once the DSH plugin market is detected, the update channel, the download region, and the automatic check / download / install switches. Here the plugin is already the latest Stable version, so **Update Now** is disabled.
 
-![Collapsed plugin update row showing the current version and an available update](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/updates.png)
-
-![Expanded plugin update settings: channels, download regions and automatic switches](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/updates-expanded.png)
+![The CLIProxyAPI update page under Built-in plugins: version status, plugin-market update, channel, region and automatic switches](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/updates.png)
 
 ## Features in detail
 
