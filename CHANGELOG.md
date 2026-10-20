@@ -2,6 +2,18 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.6.0 — 2026-10-20
+
+### Changed
+- **Accounts and models moved to the Settings dialog's left navigation.** The account/model page is now its own `settings.section` entry ("CLIProxyAPI"), like the dshmarket "Market" section. The plugin's bundle page (Sidebar → Plugins) and its Built-in plugins tab now contain only plugin updates: a pointer to the new section plus the update card, expanded by default there.
+
+### Fixed
+- **"Check for Updates" always failed on the DSH desktop app.** The desktop shell strips the `Origin` header when it forwards page requests to the Host, and update POSTs (`check`, `save`, `download`) required an explicit exact `Origin`, so every one was refused with `forbidden-origin`. Update POSTs now follow the host connection fence: a missing `Origin` relies on the host session authentication, while a present `Origin` must still be this listener's own authority (compared under its own `http(s)` scheme). A refused origin now has its own localized message.
+
+### Added
+- **One-click updates through the DSH plugin market.** When dshmarket's public Update API v1 is detected (`GET /dsh-market/api/v1/capabilities`), the update card offers **Update Now**: after a version confirmation it submits the update to the market, follows the operation's progress, reports the version actually installed (and warns when it is below the checked target), and shows restart/refresh guidance from the market's outcome, with a restart button only when the market owns restarts. Market failure codes are localized; **Install Anyway** is offered only after a release-age wait or unresolved version. Linked installs are never installed through the market. This plugin still never runs a package manager itself.
+- **Automatic installation (opt-in, `autoInstall`, default off).** With automatic checks on and dshmarket present, a version found by the Host's automatic check is installed through the market while a DSH page is open; each version is tried at most once every 6 hours and never again once installed, and automatic mode never forces. Stored as an optional field of the v1 `update-settings.json`; older files load as off.
+
 ## 1.5.1 — 2026-10-19
 
 ### Fixed

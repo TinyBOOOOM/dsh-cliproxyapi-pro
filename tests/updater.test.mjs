@@ -132,31 +132,34 @@ function assertSafeRequest(call) {
 // TESTS
 describe("independent update settings and atomic offline storage", () => {
   test("explicit defaults; normalization never copies account secrets or unknown fields", () => {
-    assert.deepEqual(DEFAULT_UPDATE_SETTINGS, { autoCheck: true, autoDownload: false, channel: "stable", region: "auto" });
+    assert.deepEqual(DEFAULT_UPDATE_SETTINGS, { autoCheck: true, autoDownload: false, autoInstall: false, channel: "stable", region: "auto" });
     assert.ok(Object.isFrozen(DEFAULT_UPDATE_SETTINGS));
     assert.deepEqual(UPDATE_TAGS, { stable: "latest", beta: "beta", dev: "dev" });
     assert.equal(UPDATE_INTERVAL_MS, 6 * 60 * 60 * 1000);
-    for (const raw of [undefined, null, false, [], "bad", { autoCheck: "false", autoDownload: 1, channel: "latest", region: "nearby" }]) assert.deepEqual(normalizeUpdateSettings(raw), DEFAULT_UPDATE_SETTINGS);
-    assert.deepEqual(normalizeUpdateSettings({ autoCheck: false, autoDownload: true, channel: "dev", region: "cn", apiKey: "fake-secret", accounts: [{}] }), { autoCheck: false, autoDownload: true, channel: "dev", region: "cn" });
+    for (const raw of [undefined, null, false, [], "bad", { autoCheck: "false", autoDownload: 1, autoInstall: "yes", channel: "latest", region: "nearby" }]) assert.deepEqual(normalizeUpdateSettings(raw), DEFAULT_UPDATE_SETTINGS);
+    assert.deepEqual(normalizeUpdateSettings({ autoCheck: false, autoDownload: true, autoInstall: true, channel: "dev", region: "cn", apiKey: "fake-secret", accounts: [{}] }), { autoCheck: false, autoDownload: true, autoInstall: true, channel: "dev", region: "cn" });
     assert.deepEqual(normalizeUpdateSettings({ channel: "toString", region: "GLOBAL" }), DEFAULT_UPDATE_SETTINGS);
   });
   test("missing settings default on; corrupt, unreadable and invalid persisted shapes default off", (t) => {
     const root = temporaryDirectory(t), file = join(root, "updates.json");
     assert.deepEqual(loadUpdateSettings(file), DEFAULT_UPDATE_SETTINGS);
     assert.deepEqual(loadUpdateSettings(root), { ...DEFAULT_UPDATE_SETTINGS, autoCheck: false });
-    for (const raw of ["{bad", "null", "[]", "false", '"bad"', "{}", '{"version":2}', ...[{ autoCheck: "false" }, { autoDownload: 1 }, { channel: "latest" }, { region: "nearby" }].map((patch) => JSON.stringify({ version: 1, ...patch }))]) {
+    for (const raw of ["{bad", "null", "[]", "false", '"bad"', "{}", '{"version":2}', ...[{ autoCheck: "false" }, { autoDownload: 1 }, { autoInstall: "true" }, { channel: "latest" }, { region: "nearby" }].map((patch) => JSON.stringify({ version: 1, ...patch }))]) {
       writeFileSync(file, raw);
       assert.deepEqual(loadUpdateSettings(file), { ...DEFAULT_UPDATE_SETTINGS, autoCheck: false }, raw);
     }
     writeFileSync(file, JSON.stringify({ version: 1, autoCheck: false, channel: "beta", region: "cn", autoDownload: true }));
-    assert.deepEqual(loadUpdateSettings(file), { autoCheck: false, autoDownload: true, channel: "beta", region: "cn" });
+    assert.deepEqual(loadUpdateSettings(file), { autoCheck: false, autoDownload: true, autoInstall: false, channel: "beta", region: "cn" });
+    // v1 files written before autoInstall existed stay valid; the new flag loads as written.
+    writeFileSync(file, JSON.stringify({ version: 1, autoInstall: true }));
+    assert.deepEqual(loadUpdateSettings(file), { ...DEFAULT_UPDATE_SETTINGS, autoInstall: true });
   });
   test("atomic save writes only versioned updater settings and preserves fake sibling account state", (t) => {
     const root = temporaryDirectory(t), account = join(root, "state.json"), file = join(root, "updates", "settings.json");
     const accountBytes = '{"version":2,"accounts":[{"id":"fake","apiKeyRef":"TEST_ONLY"}]}\n';
     writeFileSync(account, accountBytes);
     saveUpdateSettings(file, { autoCheck: false, autoDownload: true, channel: "beta", region: "cn", apiKey: "never-persist" });
-    assert.deepEqual(JSON.parse(readFileSync(file, "utf8")), { version: 1, autoCheck: false, autoDownload: true, channel: "beta", region: "cn" });
+    assert.deepEqual(JSON.parse(readFileSync(file, "utf8")), { version: 1, autoCheck: false, autoDownload: true, autoInstall: false, channel: "beta", region: "cn" });
     assert.equal(readFileSync(account, "utf8"), accountBytes);
     assert.deepEqual(readdirSync(dirname(file)), ["settings.json"]);
     if (process.platform !== "win32") assert.equal(statSync(file).mode & 0o777, 0o600);
@@ -334,10 +337,10 @@ describe("fake-fetch checks, source races, single flight and settings", () => {
   });
   test("save rejects malformed/unknown fields and persists only independent updater options", async (t) => {
     const h = harness(t);
-    for (const patch of [null, [], "bad", { channel: "latest" }, { channel: "toString" }, { region: "elsewhere" }, { autoCheck: "false" }, { autoDownload: 1 }, { accounts: [{}] }, { apiKey: "not-written" }]) await assert.rejects(h.updater.save(patch), hasCode("invalid-settings"));
+    for (const patch of [null, [], "bad", { channel: "latest" }, { channel: "toString" }, { region: "elsewhere" }, { autoCheck: "false" }, { autoDownload: 1 }, { autoInstall: "on" }, { accounts: [{}] }, { apiKey: "not-written" }]) await assert.rejects(h.updater.save(patch), hasCode("invalid-settings"));
     assert.equal(h.writes.length, 0);
-    const status = await h.updater.save({ autoCheck: false, autoDownload: true, channel: "beta", region: "cn" });
-    assert.deepEqual(h.writes, [{ autoCheck: false, autoDownload: true, channel: "beta", region: "cn" }]);
+    const status = await h.updater.save({ autoCheck: false, autoDownload: true, autoInstall: true, channel: "beta", region: "cn" });
+    assert.deepEqual(h.writes, [{ autoCheck: false, autoDownload: true, autoInstall: true, channel: "beta", region: "cn" }]);
     assert.deepEqual(h.changes, h.writes); assert.equal(status.channel, "beta"); assert.equal(h.calls.length, 0);
     const snapshot = h.updater.status(); snapshot.channel = "dev";
     assert.equal(h.updater.status().channel, "beta");

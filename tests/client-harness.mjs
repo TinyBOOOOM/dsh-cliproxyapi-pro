@@ -3,7 +3,7 @@
 import vm from "node:vm";
 import { readFileSync } from "node:fs";
 
-export function clientHarness({ update = null, loading = true, fetch = async () => { throw new Error("fake fetch required"); } } = {}) {
+export function clientHarness({ update = null, loading = true, withMarket = false, fetch = async () => { throw new Error("fake fetch required"); } } = {}) {
   const slots = [], effects = [], timers = new Map();
   let cursor = 0, active = true, afterUnmountWrites = 0, nextTimer = 0;
   const sameDeps = (a, b) => a && b && a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
@@ -41,16 +41,22 @@ export function clientHarness({ update = null, loading = true, fetch = async () 
     setTimeout(fn, ms) { const id = ++nextTimer; timers.set(id, { fn, ms }); return id; },
     clearTimeout(id) { timers.delete(id); },
   };
-  const source = readFileSync(new URL("../lib/client.js", import.meta.url), "utf8").replace("return module.exports;", "exports.__test = {PluginUpdatePanel, CpaSettingsPanel, CSS, zh, en}; return module.exports;");
+  const source = readFileSync(new URL("../lib/client.js", import.meta.url), "utf8").replace("return module.exports;", "exports.__test = {PluginUpdatePanel, PluginUpdatePage, CpaSettingsPanel, apply, CSS, zh, en, createMarketUpdater, startAutoInstall, compareVersions}; return module.exports;");
   vm.runInNewContext(source, context, { filename: "client.js" });
+  // One shared market client per harness, using the fake fetch and timers.
+  const market = withMarket ? exports.__test.createMarketUpdater() : null;
   return {
-    ...exports.__test, timers,
+    ...exports.__test, timers, market,
     render(language = "zh", mountEffects = true) {
       cursor = 0;
       const dictionary = exports.__test[language];
-      const tree = exports.__test.PluginUpdatePanel({ t: (key) => dictionary[key] ?? key });
+      const tree = exports.__test.PluginUpdatePanel({ t: (key) => dictionary[key] ?? key, market });
       if (mountEffects) for (const effect of effects.splice(0)) effect();
       return tree;
+    },
+    renderPage() {
+      cursor = 0;
+      return exports.__test.PluginUpdatePage({ t: (key) => exports.__test.zh[key] ?? key });
     },
     renderContainer() {
       cursor = 0;

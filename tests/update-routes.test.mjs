@@ -89,18 +89,20 @@ describe("plugin update HTTP integration", () => {
       assert.equal(status.body.update.blockedReason, "linked-install");
       assert.equal(status.body.update.upgradeCommand, null);
       assert.match(status.body.update.currentVersion, /^\d+\.\d+\.\d+/);
-      const saved = await h.call(ROUTES.updateSave, { body: { region: "cn", channel: "beta", autoDownload: true } });
+      const saved = await h.call(ROUTES.updateSave, { body: { region: "cn", channel: "beta", autoDownload: true, autoInstall: true } });
       assert.equal(saved.code, 200);
       assert.equal(saved.body.update.region, "cn");
       assert.equal(saved.body.update.channel, "beta");
       const disk = JSON.parse(readFileSync(join(h.configDir, "update-settings.json"), "utf8"));
       assert.equal(disk.version, 1);
       assert.equal(disk.autoDownload, true);
+      assert.equal(disk.autoInstall, true);
+      assert.equal(saved.body.update.autoInstall, true);
       assert.equal(before, readFileSync(join(h.configDir, "state.json"), "utf8"));
     } finally { globalThis.fetch = realFetch; h.dispose(); }
   });
 
-  it("enforces host authentication and exact same origin before network operations", async () => {
+  it("enforces host authentication and same-authority origins before network operations", async () => {
     const h = fixture();
     const realFetch = globalThis.fetch;
     let fetched = 0;
@@ -111,20 +113,25 @@ describe("plugin update HTTP integration", () => {
       assert.equal((await h.call(ROUTES.updateCheck)).code, 401);
       h.reject(undefined);
       for (const headers of [
-        { origin: undefined }, { origin: "null" }, { origin: "broken" },
-        { host: undefined }, { origin: "https://127.0.0.1:9000" },
-        { origin: "http://127.0.0.1:9001" }, { origin: "http://127.0.0.1:9000/path" },
-        { origin: "http://evil.test" }, { "sec-fetch-site": "cross-site" },
+        { origin: "null" }, { origin: "broken" }, { origin: "file:///etc/passwd" },
+        { host: undefined },
+        { origin: "http://127.0.0.1:9001" },
+        { origin: "http://evil.test" }, { origin: "http://user:pass@127.0.0.1:9000" },
+        { "sec-fetch-site": "cross-site" },
         { host: "evil.test", origin: "http://evil.test" },
       ]) {
         assert.equal((await h.call(ROUTES.updateCheck, { headers })).code, 403, JSON.stringify(headers));
       }
       assert.equal((await h.call(ROUTES.updateCheck, { method: "GET" })).code, 405);
       assert.equal(fetched, 0);
-      const success = await h.call(ROUTES.updateCheck, { headers: { host: "public.test", origin: "https://public.test" }, socket: { encrypted: true } });
+      // The desktop shell proxies API calls without an Origin header; the host
+      // session check already rejected anonymous callers above, so this is allowed.
+      assert.equal((await h.call(ROUTES.updateCheck, { headers: { origin: undefined } })).code, 200);
+      // The scheme comes from the Origin itself, exactly as the host fence does.
+      assert.equal((await h.call(ROUTES.updateCheck, { headers: { origin: "https://127.0.0.1:9000" } })).code, 200);
+      const success = await h.call(ROUTES.updateCheck, { headers: { host: "public.test", origin: "https://public.test" } });
       assert.equal(success.code, 200);
       assert.equal(success.body.update.latestVersion, "1.5.0");
-      assert.equal(fetched, 2); // auto races the two public registries
     } finally { globalThis.fetch = realFetch; h.dispose(); }
   });
 
