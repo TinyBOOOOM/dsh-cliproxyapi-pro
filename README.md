@@ -88,29 +88,37 @@ dsh plugin --profile <profile 名称> add dsh-cliproxyapi-pro
 ## 快速上手
 
 1. **打开设置面板**：**设置** → 左侧导航的 **CLIProxyAPI** 页（账号、模型与协议都在这里）。插件自身的更新在左侧栏 **插件** → **CLIProxyAPI**，或 **设置** → **内置插件** → **CLIProxyAPI** 标签页，这两处只有更新功能。
-2. **填写连接信息**：在「连接与认证配置」里填 **CLIProxyAPI 服务地址**（如 `http://127.0.0.1:8317`，不用加 `/v1`）和 **API Key**（本地免密的 CPA 可留空），点 **保存设置并应用**。
-3. **选择模型**：连接成功后，「模型显示筛选」会列出 CPA 上的全部模型，并已为每个家族勾好最新的一个。按需增减后点 **保存模型勾选**。
+2. **添加账号**：点 **+ 添加账号**，填账号名称、**服务地址**（如 `http://127.0.0.1:8317`，不用加 `/v1`）和 **API Key**（本地免密的 CPA 可留空），点 **连接**。连接成功即创建并启用账号；失败时会显示原因，可修正后重试，或选「仍然添加（不启用）」。
+3. **选择模型**：在账号的 **模型** 标签里，CPA 上的全部模型已列出，并已为每个家族勾好最新的一个。按需增减后点底部的 **保存并应用**。
 4. **开始使用**：回到对话框，打开模型选择器，就能在以账号名称命名的分组里看到这些模型。
 
 CPA 就在本机默认端口 `8317` 且没有设置密钥时，什么都不用填，插件会自动发现它。
 
 ## 截图
 
-以下均为 1.6.0 在 DSH 桌面版中的实际截图。
+图 1–5 是离线组件渲染：用本插件的真实界面代码加示例数据（`example.com` 地址、虚构账号）在浏览器中渲染，配色按 DSH 深色主题近似，实际颜色跟随你的 DSH 主题。图 6 是 1.6.0 在 DSH 桌面版中的实际截图。
 
-**1. 设置左侧的 CLIProxyAPI 页与账号栏。** 账号与模型设置位于 **设置** 左侧导航的 **CLIProxyAPI** 页。顶部账号栏列出所有账号：绿点表示已连接，灰点加「未启用」标记表示已停用。图中刚用「+ 添加账号」新增了第二个账号「CLI Proxy API 2」：它默认停用，拥有独立的路由 `cli-proxy-2`；由于还没填写服务地址，探测提示本地没有找到 CPA 服务。
+**1. 账号与连接。** 设置左侧导航的 **CLIProxyAPI** 页：顶部账号栏三个标签共用；账号标题下是连接状态、地址和模型数，右侧「启用」开关立即生效，「⋯」菜单里是「立即探测刷新」和「删除此账号」。「连接」标签里每项一行，地址旁可「测试连接」（用正在编辑的值，不保存），次要说明在 ⓘ 里。
 
-![设置左侧的 CLIProxyAPI 页：一个已连接账号和一个刚添加、未启用的账号](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/accounts.png)
+![账号栏、账号标题与连接标签（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/connection.png)
 
-**2. 模型显示筛选。** 从 CPA 服务发现的全部 168 个模型，支持全部发现 / 已勾选 / 未勾选切换、家族标签（GPT、CLAUDE、GEMINI、GROK……）、搜索与批量操作。只有勾选的模型会同步到 DSH 模型选择器；每个模型显示将使用的协议（图中为 OpenAI Responses）、图片输入、推理档位与上下文长度，「编辑参数」可打开单模型参数覆盖。
+**2. 模型与统一保存。** 「模型」标签列出该 CPA 上的全部模型：全部 / 已勾选 / 未勾选、家族筛选、搜索、批量操作与「恢复推荐精选」；勾选的模型显示将使用的协议，可「编辑参数」。连接和模型的改动统一记录，底部出现「有未保存的更改 · 放弃更改 / 保存并应用」。
 
-![模型筛选：家族标签、已勾选模型、协议与能力标记](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/model-filter.png)
+![模型标签与底部保存栏（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/model-filter.png)
 
-**3. 连接与认证配置。** 每个账号独立的设置：「启用此账号」开关、服务地址、保存在该账号独立引用名（`CLI_PROXY_API_KEY_2`）下的 API Key、接口协议、账号名称、可折叠的高级设置，以及「保存设置并应用」与「删除此账号」。
+**3. 额度。** 「额度」标签：管理密钥、额度数据与刷新、凭证分布条，按渠道分组的凭证（套餐、前缀、状态、5 小时 / 每周等额度条与重置时间；没有额度接口的渠道如 Devin 只显示状态与近期请求），以及可展开的「模型 → 渠道」表。标签上显示该账号可用凭证中最低的剩余额度。
 
-![未启用账号的连接设置，使用独立的密钥引用名](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/connection.png)
+![额度标签：分布条与按渠道分组的凭证额度（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/quota.png)
 
-**4. 内置插件里的插件更新页。** **设置** → **内置插件** → **CLIProxyAPI** 标签页只有插件更新：检查更新与离线下载、检测到 DSH 插件市场后的「立即更新」、更新通道、下载区域，以及自动检查 / 自动下载 / 自动安装开关。图中已是稳定通道最新版本，所以「立即更新」不可用。
+**4. 对话框里的额度。** 模型选择器左侧的徽标显示当前模型可用凭证中最充足的剩余额度；点击后列出服务该模型的每个凭证及其额度窗口。只对本插件同步、且所属账号已填写管理密钥的模型显示。
+
+![模型选择器旁的额度徽标与弹出列表（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/quota-badge.png)
+
+**5. 添加账号。** 填名称、地址和 API Key 后点「连接」：先测试，成功才创建并启用账号；失败时显示原因，可选「仍然添加（不启用）」。
+
+![添加账号表单（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/add-account.png)
+
+**6. 内置插件里的插件更新页**（1.6.0 实际截图）。**设置** → **内置插件** → **CLIProxyAPI** 标签页只有插件更新：检查更新与离线下载、检测到 DSH 插件市场后的「立即更新」、更新通道、下载区域，以及自动检查 / 自动下载 / 自动安装开关。图中已是稳定通道最新版本，所以「立即更新」不可用。
 
 ![内置插件中的 CLIProxyAPI 更新页：版本状态、插件市场更新、通道、区域与自动开关](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/updates.png)
 
@@ -137,7 +145,10 @@ CPA 就在本机默认端口 `8317` 且没有设置密钥时，什么都不用�
 
 - 每个账号写入自己的一组路由：第一个账号为 `cli-proxy` / `cli-proxy-responses` / `cli-proxy-messages`，之后依次为 `cli-proxy-2*`、`cli-proxy-3*`……；密钥引用名依次为 `CLI_PROXY_API_KEY`、`CLI_PROXY_API_KEY_2`……。模型选择器按账号名称分组。
 - **停用**账号：保留全部配置，但移除它的路由，模型从选择器中消失；其他账号不受影响。
-- **新增**账号默认停用。可先填好地址和密钥，点「立即探测刷新」预览模型并勾选，再打开「启用此账号」保存。
+- **新增**账号：「+ 添加账号」先用填写的地址和密钥测试连接，成功才创建并启用；也可以选择「仍然添加（不启用）」。
+- 每个账号的页面分 **连接 / 模型 / 额度** 三个标签，顶部账号栏对三个标签共用。账号标题旁的「启用」开关立即生效；「⋯」菜单里是「立即探测刷新」和「删除此账号」。
+- 连接和模型的改动统一记录，底部出现「有未保存的更改 · 放弃更改 / 保存并应用」；切换账号前会提醒未保存的更改。「测试连接」用正在编辑的地址和密钥探测，不保存任何内容。
+- 次要说明收进标签旁的 ⓘ 提示（悬停、键盘聚焦或点击打开）。
 - 填写了服务地址的账号**只连接该地址**，连不上就报错，不会悄悄改连本地 `:8317`，避免两个账号指向同一个服务。
 - 不同账号的路由 ID 不能重叠，冲突的修改会被拒绝。
 - **删除**账号会移除它的路由，但保留凭证服务里的密钥。
@@ -160,9 +171,9 @@ CPA 对每个模型同时提供 OpenAI Chat、OpenAI Responses、Anthropic Messa
 
 ### 渠道额度（「额度」标签页与对话框额度徽标）
 
-**设置** → **CLIProxyAPI** 页顶部有两个标签：**设置**（上面介绍的账号与模型）和 **额度**。
+每个账号的 **额度** 标签（与 **连接**、**模型** 并列）显示该账号的渠道额度；标签上显示该账号可用凭证中最低的剩余额度。
 
-- **填写管理密钥**：在「额度」页为每个账号填写 CPA 的管理密钥（CPA 配置里的 `remote-management.secret-key`；远程 CPA 还需开启 `remote-management.allow-remote`）。密钥保存在 DSH 凭证服务中，引用名第一个账号为 `CLI_PROXY_MANAGEMENT_KEY`，其他账号为 `CLI_PROXY_MANAGEMENT_KEY_<账号 ID>`（如 `CLI_PROXY_MANAGEMENT_KEY_ACCOUNT_2`）；不会写入 `state.json`、设置或日志，也不会返回给页面。
+- **填写管理密钥**：在「额度」标签里为每个账号填写 CPA 的管理密钥（CPA 配置里的 `remote-management.secret-key`；远程 CPA 还需开启 `remote-management.allow-remote`）。密钥保存在 DSH 凭证服务中，引用名第一个账号为 `CLI_PROXY_MANAGEMENT_KEY`，其他账号为 `CLI_PROXY_MANAGEMENT_KEY_<账号 ID>`（如 `CLI_PROXY_MANAGEMENT_KEY_ACCOUNT_2`）；不会写入 `state.json`、设置或日志，也不会返回给页面。
 - **由宿主读取**：宿主用管理接口读取该 CPA 的全部凭证（`/v0/management/auth-files`）、每个凭证服务的模型列表，并经 `/v0/management/api-call` 查询上游额度（Codex、Claude、Antigravity、Gemini CLI、Kimi、xAI 等）。没有可查询额度接口的渠道（如 Devin）只显示账号状态与近期请求数。
 - **额度页**：采用 DSH 原生设置页的行式布局：管理密钥、额度数据与刷新、凭证分布条（充足 / 偏低 / 耗尽 / 停用异常），按渠道分组的凭证列表（套餐、前缀、状态、5 小时 / 每周 / 每月 / 每日额度条与重置时间，问题与剩余最少的排在前面）、渠道筛选（凭证较多时可搜索），以及可展开的「模型 → 渠道」表，列出模型选择器中每个模型实际匹配到的凭证。
 - **对话框徽标**：模型选择器左侧的小徽标（信号格 + 百分比）显示当前所选模型可用凭证中最充足的剩余额度，点击可查看每个凭证的额度。只对本插件同步、且所属账号已填写管理密钥的模型显示；没有管理密钥时不显示徽标。
@@ -274,6 +285,7 @@ DSH 的 Agent 可以用这个工具查看和配置插件，你只需用自然语
 | POST | `/api/dsh-cliproxyapi/save` | `{ accountId?, …账号字段, apiKey?, clearApiKey?, refreshIntervalSeconds?, probeTimeoutMs? }` | 保存账号（缺省为第一个）；只有全局字段时只保存全局设置 |
 | POST | `/api/dsh-cliproxyapi/accounts/add` | 账号字段（可选） | 新增账号，默认停用；返回 `createdId` |
 | POST | `/api/dsh-cliproxyapi/accounts/remove` | `{ accountId }` | 删除账号及其路由 |
+| POST | `/api/dsh-cliproxyapi/accounts/test` | `{ accountId?, baseURL?, apiKey? }` | 用未保存的地址和密钥测试连接，不保存、不写路由；`apiKey` 留空时用该账号已保存的密钥；不返回密钥 |
 | GET | `/api/dsh-cliproxyapi/updates/status` | — | 只读更新状态，不主动联网检查 |
 | POST | `/api/dsh-cliproxyapi/updates/check` | `{}` | 主动检查所选通道与区域；手动检查不触发自动下载 |
 | POST | `/api/dsh-cliproxyapi/updates/save` | `{ autoCheck?, autoDownload?, autoInstall?, channel?, region? }` | 只保存这五项更新设置，与账号配置独立 |
@@ -306,7 +318,7 @@ DSH 的 Agent 可以用这个工具查看和配置插件，你只需用自然语
   }
   ```
 
-  文件每次读取都会重新加载，手动修改后点「立即探测刷新」即可生效。旧版（1.3.x 及以前）的单账号文件会自动迁移为 id 为 `default` 的账号，路由、密钥和勾选保持不变，原文件备份为 `state.v1.json`。
+  文件每次读取都会重新加载，手动修改后在账号「⋯」菜单里点「立即探测刷新」即可生效。旧版（1.3.x 及以前）的单账号文件会自动迁移为 id 为 `default` 的账号，路由、密钥和勾选保持不变，原文件备份为 `state.v1.json`。
 
 - **更新设置**：独立保存在 `<Profile 目录>/.dsh-cliproxyapi/update-settings.json`，不扩展或改写账号的 `state.json` v2，也不接触凭证。首次没有此文件时采用下列默认值：
 
@@ -334,7 +346,7 @@ DSH 的 Agent 可以用这个工具查看和配置插件，你只需用自然语
 ## 常见问题
 
 **模型选择器里看不到模型？**
-确认账号已打开「启用此账号」，并且至少勾选了一个模型（或勾选为空，表示全部）。可以运行 `/cpa-status` 查看每个账号的状态。
+确认账号标题旁的「启用」已打开，并且至少勾选了一个模型（或勾选为空，表示全部）。可以运行 `/cpa-status` 查看每个账号的状态。
 
 **提示「none of the selected models matched」？**
 已勾选的模型在这台服务器上都不存在（常见于换了服务器）。面板里仍会列出该服务器的模型，重新勾选，或点「恢复推荐精选」后保存。

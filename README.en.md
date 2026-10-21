@@ -88,29 +88,37 @@ All versions are listed under [Releases](https://github.com/TinyBOOOOM/dsh-clipr
 ## Getting started
 
 1. **Open the settings panel**: **Settings** → the **CLIProxyAPI** page in the left navigation (accounts, models and protocols live there). The plugin's own updates are on sidebar **Plugins** → **CLIProxyAPI** and on **Settings** → **Built-in plugins** → the **CLIProxyAPI** tab; those two places contain only update features.
-2. **Enter the connection**: under **Connection & Authentication**, fill in the **CLIProxyAPI Base URL** (e.g. `http://127.0.0.1:8317`, without `/v1`) and the **API Key** (leave it empty for a local CPA without authentication), then click **Save & Apply**.
-3. **Choose models**: once connected, **Model Picker Filter** lists every model on the server, with the newest model of each family already checked. Adjust the selection and click **Apply Selected Models**.
+2. **Add an account**: click **+ Add Account**, enter an account name, the **Base URL** (e.g. `http://127.0.0.1:8317`, without `/v1`) and the **API Key** (leave it empty for a local CPA without authentication), then click **Connect**. A successful connection creates and enables the account; on failure the reason is shown so you can fix it, or choose **Add Anyway (Disabled)**.
+3. **Choose models**: the account's **Models** tab lists every model on the server, with the newest model of each family already checked. Adjust the selection and click **Save & Apply** at the bottom.
 4. **Use them**: open the model picker in a conversation; the models appear in a group named after the account.
 
 If CPA runs on this machine on the default port `8317` without a key, there is nothing to fill in: the plugin finds it automatically.
 
 ## Screenshots
 
-The panel follows the DSH display language; the screenshots are actual captures of 1.6.0 in the DSH desktop app with the Chinese UI.
+The panel follows the DSH display language; the screenshots show the Chinese UI. Images 1–5 are offline component renders: this plugin's real UI code with sample data (`example.com` addresses, fictional accounts) rendered in a browser, with colors approximating the DSH dark theme; the real colors follow your DSH theme. Image 6 is an actual capture of 1.6.0 in the DSH desktop app.
 
-**1. The CLIProxyAPI page in Settings and its account bar.** Accounts and models live on the **CLIProxyAPI** page in the Settings dialog's left navigation. The bar at the top lists every account: a green dot means connected, a grey dot plus the **Off** badge means disabled. Here a second account, *CLI Proxy API 2*, was just added with **+ Add Account**: it starts disabled, gets its own provider route `cli-proxy-2`, and — since no base URL is set yet — the probe reports that no local CPA was found.
+**1. Accounts and connection.** The **CLIProxyAPI** page in the Settings dialog's left navigation: one account bar for all tabs; under the account title are the connection state, address and model count, with the **Enabled** switch (applies at once) and the **⋯** menu (**Probe & Refresh**, **Delete Account**) on the right. The **Connection** tab has one row per setting, **Test Connection** next to the address (uses the values being edited, saves nothing), and secondary explanations in ⓘ tips.
 
-![The CLIProxyAPI page in Settings with one connected and one newly added, disabled account](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/accounts.png)
+![Account bar, account header and Connection tab (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/connection.png)
 
-**2. Model picker filter.** All 168 models discovered from the CPA server, with All / Checked / Unchecked tabs, family chips (GPT, CLAUDE, GEMINI, GROK, …), search and bulk actions. Checked models are the only ones synchronized into the DSH model picker; each shows the protocol it will use (here OpenAI Responses), image input, reasoning levels and context window, and **Edit Parameters** opens its per-model overrides.
+**2. Models and one save bar.** The **Models** tab lists every model on that CPA: All / Checked / Unchecked, family filter, search, bulk actions and **Reset to Recommended**; checked models show the protocol they will use and can be edited with **Edit Parameters**. Connection and model edits are tracked together, and a bar at the bottom shows **Unsaved changes · Discard / Save & Apply**.
 
-![Model filter with family chips, checked models, protocol and capability badges](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/model-filter.png)
+![Models tab with the save bar (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/model-filter.png)
 
-**3. Connection & Authentication.** Per-account settings: the **Enable This Account** switch, base URL, API key stored under the account's own credential ref (`CLI_PROXY_API_KEY_2`), wire protocol, account name, the collapsible advanced section, **Save & Apply** and **Delete Account**.
+**3. Quota.** The **Quota** tab: management key, quota data and refresh, a distribution bar, credentials grouped by channel (plan, prefix, status, 5-hour / weekly meters with reset times; channels without a quota endpoint such as Devin show status and recent requests only), and an expandable "Model → Channel" table. The tab label shows the lowest remaining quota among the account's usable credentials.
 
-![Connection settings of a disabled account with its own credential ref](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/connection.png)
+![Quota tab: distribution bar and per-channel credential quota (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/quota.png)
 
-**4. The plugin update page under Built-in plugins.** **Settings** → **Built-in plugins** → the **CLIProxyAPI** tab holds only plugin updates: checking and offline download, **Update Now** once the DSH plugin market is detected, the update channel, the download region, and the automatic check / download / install switches. Here the plugin is already the latest Stable version, so **Update Now** is disabled.
+**4. Quota in the composer.** The badge left of the model selector shows the best remaining quota among the usable credentials serving the current model; clicking it lists every such credential with its quota windows. It appears only for models this plugin synchronizes whose account has a management key.
+
+![Quota badge next to the model selector with its peek (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/quota-badge.png)
+
+**5. Adding an account.** Enter a name, address and API key and click **Connect**: it tests first and creates an enabled account only when that works; on failure the reason is shown and **Add Anyway (Disabled)** is offered.
+
+![Add account form (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/add-account.png)
+
+**6. The plugin update page under Built-in plugins** (actual 1.6.0 capture). **Settings** → **Built-in plugins** → the **CLIProxyAPI** tab holds only plugin updates: checking and offline download, **Update Now** once the DSH plugin market is detected, the update channel, the download region, and the automatic check / download / install switches. Here the plugin is already the latest Stable version, so **Update Now** is disabled.
 
 ![The CLIProxyAPI update page under Built-in plugins: version status, plugin-market update, channel, region and automatic switches](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/updates.png)
 
@@ -137,7 +145,10 @@ The panel follows the DSH display language; the screenshots are actual captures 
 
 - Each account writes its own set of routes: the first account uses `cli-proxy` / `cli-proxy-responses` / `cli-proxy-messages`, later ones `cli-proxy-2*`, `cli-proxy-3*`, …; credential refs are `CLI_PROXY_API_KEY`, `CLI_PROXY_API_KEY_2`, …. The model picker groups models by account name.
 - **Disabling** an account keeps its settings but removes its routes, so its models leave the picker; other accounts are unaffected.
-- **New** accounts start disabled. Fill in the URL and key, click **Probe & Refresh** to preview and check models, then turn on **Enable This Account** and save.
+- **New** accounts: **+ Add Account** first tests the entered URL and key and creates an enabled account only when that works; **Add Anyway (Disabled)** is also offered.
+- Each account page has **Connection / Models / Quota** tabs under one shared account bar. The **Enabled** switch next to the account title applies at once; the **⋯** menu holds **Probe & Refresh** and **Delete Account**.
+- Connection and model changes are tracked together; a bar at the bottom shows **Unsaved changes · Discard / Save & Apply**, and switching accounts asks before dropping unsaved changes. **Test Connection** probes the address and key being edited without saving anything.
+- Secondary explanations live in ⓘ tips next to the labels (open on hover, keyboard focus or click).
 - An account with a base URL **only connects to that URL** and reports an error when it is unreachable; it never silently falls back to local `:8317`, so two accounts cannot end up on the same server.
 - Provider route IDs of different accounts must not overlap; conflicting changes are rejected.
 - **Deleting** an account removes its routes but keeps its key in the credentials service.
@@ -160,9 +171,9 @@ CPA serves every model on OpenAI Chat, OpenAI Responses and Anthropic Messages, 
 
 ### Channel quota (the "Quota" tab and the composer badge)
 
-The **Settings** → **CLIProxyAPI** page has two tabs at the top: **Settings** (the accounts and models described above) and **Quota**.
+Each account's **Quota** tab (next to **Connection** and **Models**) shows that account's channel quota; the tab label shows the lowest remaining quota among its usable credentials.
 
-- **Management key**: on the Quota tab, enter each account's CPA management key (`remote-management.secret-key` in the CPA config; a remote CPA also needs `remote-management.allow-remote`). It is stored in the DSH credentials service under `CLI_PROXY_MANAGEMENT_KEY` for the first account and `CLI_PROXY_MANAGEMENT_KEY_<ACCOUNT_ID>` for the others (for example `CLI_PROXY_MANAGEMENT_KEY_ACCOUNT_2`); it is never written to `state.json`, settings or logs, and never sent back to the page.
+- **Management key**: on an account's Quota tab, enter its CPA management key (`remote-management.secret-key` in the CPA config; a remote CPA also needs `remote-management.allow-remote`). It is stored in the DSH credentials service under `CLI_PROXY_MANAGEMENT_KEY` for the first account and `CLI_PROXY_MANAGEMENT_KEY_<ACCOUNT_ID>` for the others (for example `CLI_PROXY_MANAGEMENT_KEY_ACCOUNT_2`); it is never written to `state.json`, settings or logs, and never sent back to the page.
 - **Read by the Host**: the Host reads every credential on that CPA (`/v0/management/auth-files`), the models each credential serves, and the upstream quota through `/v0/management/api-call` (Codex, Claude, Antigravity, Gemini CLI, Kimi, xAI and more). Channels without a known quota endpoint (such as Devin) show their status and recent request counts only.
 - **Quota tab**: laid out as flat rows like the native DSH settings pages: management key, quota data and refresh, a distribution bar (healthy / low / exhausted / off or failing), credentials grouped by channel (plan, prefix, status, 5-hour / weekly / monthly / daily meters with reset times; problems and the least remaining first), channel filter (search when there are many credentials), and an expandable "Model → Channel" table showing which credentials each picker model is matched to.
 - **Composer badge**: a small badge left of the model selector (signal bars + percentage) shows the best remaining quota among the usable credentials serving the selected model; click it for every credential's windows. It appears only for models this plugin synchronizes whose account has a management key; without a key there is no badge.
@@ -274,6 +285,7 @@ Used by the settings panel. Requires the DSH Web session's authentication; POST 
 | POST | `/api/dsh-cliproxyapi/save` | `{ accountId?, …account fields, apiKey?, clearApiKey?, refreshIntervalSeconds?, probeTimeoutMs? }` | Save an account (the first by default); a body with only global fields saves just the globals |
 | POST | `/api/dsh-cliproxyapi/accounts/add` | Optional account fields | Create a disabled account; returns `createdId` |
 | POST | `/api/dsh-cliproxyapi/accounts/remove` | `{ accountId }` | Delete an account and its routes |
+| POST | `/api/dsh-cliproxyapi/accounts/test` | `{ accountId?, baseURL?, apiKey? }` | Test unsaved connection values without saving or writing routes; a blank `apiKey` uses the account's stored key; never returns the key |
 | GET | `/api/dsh-cliproxyapi/updates/status` | — | Read update state without contacting a registry |
 | POST | `/api/dsh-cliproxyapi/updates/check` | `{}` | Check the selected channel and region now; a manual check does not trigger automatic downloading |
 | POST | `/api/dsh-cliproxyapi/updates/save` | `{ autoCheck?, autoDownload?, autoInstall?, channel?, region? }` | Save only these five update preferences, independently of accounts |
@@ -306,7 +318,7 @@ Failures use a top-level `errorCode` or `update.errorCode`; HTTP status or `ok` 
   }
   ```
 
-  The file is re-read on every access; after a manual edit, click **Probe & Refresh**. A single-account file from 1.3.x and earlier migrates automatically into account `default` with the same routes, key and selection, and the original is kept as `state.v1.json`.
+  The file is re-read on every access; after a manual edit, click **Probe & Refresh** in the account's **⋯** menu. A single-account file from 1.3.x and earlier migrates automatically into account `default` with the same routes, key and selection, and the original is kept as `state.v1.json`.
 
 - **Update settings**: stored separately at `<profile dir>/.dsh-cliproxyapi/update-settings.json`. They neither extend nor rewrite the account `state.json` v2 file, nor access credentials. When this file does not yet exist, defaults are:
 
@@ -334,7 +346,7 @@ Failures use a top-level `errorCode` or `update.errorCode`; HTTP status or `ok` 
 ## FAQ
 
 **No models in the model picker?**
-Check that the account has **Enable This Account** on and at least one model checked (or an empty selection, meaning all). Run `/cpa-status` to see every account's state.
+Check that the **Enabled** switch next to the account title is on and at least one model checked (or an empty selection, meaning all). Run `/cpa-status` to see every account's state.
 
 **"none of the selected models matched"?**
 None of the checked models exists on this server (typical after switching servers). The panel still lists the server's models — check new ones, or click **Reset to Recommended**, then save.

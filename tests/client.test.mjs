@@ -546,3 +546,56 @@ describe("quota client", () => {
     store.dispose();
   });
 });
+
+describe("settings page text", () => {
+  it("every key the UI renders exists in both dictionaries", async () => {
+    const { readFileSync } = await import("node:fs");
+    const s = readFileSync(new URL("../lib/client.js", import.meta.url), "utf8");
+    const zs = s.indexOf("    const zh = {"), es = s.indexOf("    const en = {"), cs = s.indexOf("    const CSS = `");
+    const zh = s.slice(zs, es), en = s.slice(es, cs), body = s.slice(cs);
+    const used = new Set([...body.matchAll(/\bt\("([A-Za-z0-9_]+)"\)|fmt\(t, "([A-Za-z0-9_]+)"/g)].map((m) => m[1] || m[2]));
+    const has = (d, k) => new RegExp(`\\n {6}${k}:`).test(d);
+    assert.deepEqual([...used].filter((k) => !has(zh, k) || !has(en, k)), []);
+  });
+});
+
+describe("hot reload", () => {
+  it("keeps the badge and settings entries when the new activation starts before the old one is disposed", () => {
+    const h = clientHarness();
+    // Mirrors DSH SlotCore: one entry per name + id/key + priority; the lowest priority renders.
+    const live = new Map();
+    const registry = {
+      inject(_name, fn) { return fn(); },
+      register(meta, render) {
+        const key = `${meta.name}#${meta.id ?? meta.key}#${meta.priority ?? 0}`;
+        if (live.has(key)) throw new Error(`slot "${meta.name}" already has an entry with id "${meta.id ?? meta.key}" at priority ${meta.priority ?? 0}`);
+        live.set(key, { meta, render });
+        return () => live.delete(key);
+      },
+    };
+    const activation = () => {
+      const disposers = [];
+      const ctx = {
+        effect(fn) { const off = fn(); if (typeof off === "function") disposers.push(off); return off; },
+        locale: { register: () => () => {}, bind: () => (key) => h.zh[key] ?? key },
+        slots: {
+          inject: (name, fn) => { const off = registry.inject(name, fn); if (typeof off === "function") disposers.push(off); },
+          register: registry.register,
+        },
+        inject(_names, fn) { fn({ slots: ctx.slots, modelDirectories: { directoryFor: () => ({ store: null }) } }); },
+      };
+      h.apply(ctx);
+      return () => { for (const off of disposers.splice(0).reverse()) off(); };
+    };
+    const disposeOld = activation();
+    const disposeNew = activation(); // overlaps: the old entries still hold the stable ids
+    disposeOld();
+    const names = [...live.values()].map((e) => e.meta.name).sort();
+    assert.deepEqual(names, ["conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section"]);
+    const badge = [...live.values()].find((e) => e.meta.name === "conversation.input.right");
+    assert.equal(badge.meta.id, "dsh-cliproxyapi-pro:quota", "the id stays stable");
+    assert.equal(badge.meta.priority, 1, "the reloaded entry shadows one priority lower");
+    disposeNew();
+    assert.equal(live.size, 0);
+  });
+});
