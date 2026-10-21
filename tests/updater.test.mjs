@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 import {
   DEFAULT_UPDATE_SETTINGS, UPDATE_INTERVAL_MS, UPDATE_PACKAGE, UPDATE_REGISTRIES, UPDATE_TAGS,
@@ -41,8 +42,9 @@ function temporaryDirectory(t) {
   });
   return root;
 }
+const SHIPPED_FILES = ["lib/index.js", "lib/client.js", "lib/updater.js", "lib/quota.js", "locale/*.json", "cordis.patch.yml", "icon.svg", "README.md", "README.en.md", "CHANGELOG.md", "LICENSE"];
 function manifest(version = VERSION, patch = {}) {
-  return { name: UPDATE_PACKAGE, version, type: "module", dsh: { bundle: { patch: "./cordis.patch.yml" } }, ...patch };
+  return { name: UPDATE_PACKAGE, version, type: "module", files: SHIPPED_FILES, dsh: { bundle: { patch: "./cordis.patch.yml" } }, ...patch };
 }
 function packageEntries(version = VERSION, patch = {}) {
   return [
@@ -101,7 +103,7 @@ function pendingFetch(signal, gate) {
   });
 }
 function harness(t, options = {}) {
-  const calls = [], writes = [], stored = [], changes = [];
+  const calls = [], writes = [], stored = [], changes = [], warnings = [];
   let savedSettings = { region: "global", ...options.settings };
   let handler = options.fetch ?? ((url) => url.endsWith(".tgz") ? bytesResponse(goodPackage.bytes) : jsonResponse(metadata()));
   const updater = createPluginUpdater({
@@ -117,9 +119,10 @@ function harness(t, options = {}) {
     }),
     now: () => CHECKED_AT,
     onSettingsChanged: (next) => changes.push({ ...next }),
+    logger: { warn: (message) => warnings.push(message) },
   });
   t.after(() => updater.dispose());
-  return { updater, calls, writes, stored, changes, setFetch: (next) => { handler = next; } };
+  return { updater, calls, writes, stored, changes, warnings, setFetch: (next) => { handler = next; } };
 }
 function assertSafeRequest(call) {
   assert.equal(call.init.redirect, new URL(call.url).pathname.endsWith(".tgz") ? "manual" : "error");
@@ -435,6 +438,50 @@ describe("SRI, gzip and restricted tar verification without extraction", () => {
       assert.throws(() => verifyUpdatePackage(pkg.bytes, pkg.expected), hasCode("invalid-package"));
     }
   });
+  test("new files declared in the package's own files field verify without an updater change", () => {
+    const files = [...SHIPPED_FILES, "lib/*.js", "CHANGELOG.en.md", "assets", "docs/**/*.md"];
+    const extra = ["CHANGELOG.en.md", "locale/ja.json", "assets/logo.png", "assets/icons/small.svg", "docs/guide.md", "docs/zh/guide.md", "lib/extra.js", "NOTICE"];
+    const pkg = fixture({ entries: [...packageEntries(VERSION, { files }), { name: "package/assets/", type: "5" }, ...extra.map((name) => ({ name: `package/${name}`, data: "inert" }))] });
+    assert.equal(verifyUpdatePackage(pkg.bytes, pkg.expected).version, VERSION);
+    // Long paths use the ustar prefix field.
+    const deep = fixture({ entries: [...packageEntries(VERSION, { files: [...SHIPPED_FILES, "assets"] }), { prefix: "package/assets/a", name: "b/c.png", data: "inert" }] });
+    assert.equal(verifyUpdatePackage(deep.bytes, deep.expected).version, VERSION);
+  });
+  test("files missing from the files field are rejected with a logged reason, not a hard-coded list", () => {
+    for (const [name, files] of [["CHANGELOG.en.md", SHIPPED_FILES], ["lib/extra.mjs", SHIPPED_FILES], ["docs/guide.txt", [...SHIPPED_FILES, "docs/*.md"]], ["secret.md", [...SHIPPED_FILES, "!secret.md"]]]) {
+      const pkg = fixture({ entries: [...packageEntries(VERSION, { files }), { name: `package/${name}`, data: "inert" }] });
+      assert.throws(() => verifyUpdatePackage(pkg.bytes, pkg.expected), (error) => hasCode("invalid-package")(error) && error.detail.includes(name));
+    }
+  });
+  test("a broad files pattern never admits dotfiles, node_modules, deep or unusual names", () => {
+    for (const name of ["package/.npmrc", "package/lib/.hidden.js", "package/node_modules/evil/index.js", "package/a/b/c/d/e/f/g.js", "package/lib/evil file.js", "package/lib/é.js", "package/lib/$(x).js"]) {
+      const pkg = fixture({ entries: [...packageEntries(VERSION, { files: ["*", "**"] }), { name, data: "inert" }] });
+      assert.throws(() => verifyUpdatePackage(pkg.bytes, pkg.expected), hasCode("invalid-package"), name);
+    }
+  });
+  test("files field must be a usable list; traversing or absolute patterns never match", () => {
+    for (const files of [undefined, [], "lib", [1], Array(201).fill("lib")]) {
+      const pkg = fixture({ patch: { files } });
+      assert.throws(() => verifyUpdatePackage(pkg.bytes, pkg.expected), hasCode("invalid-package"));
+    }
+    const pkg = fixture({ entries: [...packageEntries(VERSION, { files: [...SHIPPED_FILES, "../outside", "/abs", "./docs/"] }), { name: "package/docs/a.md", data: "x" }] });
+    assert.equal(verifyUpdatePackage(pkg.bytes, pkg.expected).version, VERSION);
+    const outside = fixture({ entries: [...packageEntries(VERSION, { files: [...SHIPPED_FILES, "../outside", "/abs"] }), { name: "package/abs", data: "x" }] });
+    assert.throws(() => verifyUpdatePackage(outside.bytes, outside.expected), hasCode("invalid-package"));
+  });
+  test("the repository's real package.json and shipped files pass verification", () => {
+    const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+    const real = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+    const shipped = new Set(["package.json"]);
+    for (const pattern of real.files) {
+      if (!pattern.includes("*")) { shipped.add(pattern); continue; }
+      const dir = dirname(pattern), suffix = basename(pattern).replace("*", "");
+      for (const name of readdirSync(join(root, dir))) if (name.endsWith(suffix)) shipped.add(`${dir}/${name}`);
+    }
+    const entries = [...shipped].map((name) => ({ name: `package/${name}`, data: readFileSync(join(root, name)) }));
+    const pkg = fixture({ version: real.version, entries });
+    assert.equal(verifyUpdatePackage(pkg.bytes, pkg.expected).version, real.version);
+  });
   for (const field of ["dependencies", "optionalDependencies", "bundledDependencies", "bundleDependencies"]) test(`rejects runtime dependency field ${field}`, () => {
     const pkg = fixture({ patch: { [field]: field.includes("bundl") ? ["evil"] : { evil: "1.0.0" } } });
     assert.throws(() => verifyUpdatePackage(pkg.bytes, pkg.expected), hasCode("invalid-package"));
@@ -496,6 +543,14 @@ describe("verified download, opt-in automation and disposal", () => {
     const h = harness(t, { fetch: (url) => url.endsWith(".tgz") ? bytesResponse(bytes) : jsonResponse(metadata(VERSION, { sri: integrity(bytes) })) });
     await h.updater.check();
     assert.equal((await h.updater.download(VERSION)).errorCode, "invalid-package"); assert.equal(h.stored.length, 0);
+  });
+  test("a rejected package logs the concrete reason while the page keeps only the code", async (t) => {
+    const bad = fixture({ entries: [...packageEntries(), { name: "package/undeclared.md", data: "x" }] });
+    const h = harness(t, { fetch: (url) => url.endsWith(".tgz") ? bytesResponse(bad.bytes) : jsonResponse(metadata(VERSION, { sri: bad.expected.integrity })) });
+    await h.updater.check(); const status = await h.updater.download(VERSION);
+    assert.equal(status.errorCode, "invalid-package"); assert.equal(status.error, "invalid-package");
+    assert.ok(!JSON.stringify(status).includes("undeclared.md"));
+    assert.equal(h.warnings.length, 1); assert.match(h.warnings[0], /invalid-package: file not declared .*undeclared\.md/);
   });
   test("storage failure is sanitized storage-error, not successful downloaded state", async (t) => {
     const h = harness(t, { storePackage: async () => { throw Error("fake-private-disk-path"); } });

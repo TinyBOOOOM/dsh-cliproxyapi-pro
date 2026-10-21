@@ -215,7 +215,7 @@ CPA 对每个模型同时提供 OpenAI Chat、OpenAI Responses、Anthropic Messa
 没有插件市场或需要离线升级时使用：
 
 1. 点击 **检查更新**；有更高版本时，点 **下载更新** 并确认版本号，或等待已启用的自动检查 / 自动下载。
-2. 下载先通过 npm 元数据中的 **SHA-512** 完整性校验，再验证 gzip / tar、预期文件与目录、包名和版本；拒绝路径穿越、链接等特殊条目、依赖和安装生命周期脚本。只保存离线包，不解压到安装目录，也不执行包内代码。
+2. 下载先通过 npm 元数据中的 **SHA-512** 完整性校验，再验证 gzip / tar、包名和版本，并要求包内每个文件都在该包自己的 `package.json` `files` 中声明（`package.json`、README、LICENSE 等 npm 总会打包的文件除外）；拒绝路径穿越、隐藏文件、`node_modules`、链接等特殊条目、依赖和安装生命周期脚本。下载被拒绝时，具体原因会写入 DSH 日志。只保存离线包，不解压到安装目录，也不执行包内代码。
 3. 校验成功后，卡片显示安装包的绝对路径与适用的升级命令。包保存在 `<Profile 目录>/.dsh-cliproxyapi/updates/dsh-cliproxyapi-pro-<version>.tgz`。
 4. **先保存工作并完全关闭 DSH**，再在终端执行卡片提供的命令。示意如下，以卡片里的实际 profile 名称和绝对路径为准：
 
@@ -370,7 +370,7 @@ npm run pack:check   # 查看打包文件列表
 
 发版只需推送 `v<版本号>` 标签：GitHub Actions 会运行测试、创建 GitHub Release 并附上安装包，再通过 npm 受信任发布（不使用任何 token）上传到 npm，并附带来源证明。稳定版本发布到 npm `latest`；Beta / 开发预发布分别进入 `beta` / `dev`，对应 GitHub Release 标记为预发布，不覆盖稳定通道。更新器只核对 registry 提供的 SHA-512 完整性与包结构，不验证发行者签名或 npm provenance。
 
-修改代码前请阅读 [AGENTS.md](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/AGENTS.md)；变更记录见 [CHANGELOG.md](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/CHANGELOG.md)。欢迎提交 Issue 和 Pull Request，修改说明文档时请同时更新中英文两份。
+修改代码前请阅读 [AGENTS.md](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/AGENTS.md)；变更记录见 [CHANGELOG.md](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/CHANGELOG.md)（英文版：[CHANGELOG.en.md](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/CHANGELOG.en.md)）。欢迎提交 Issue 和 Pull Request，修改说明文档时请同时更新中英文两份。
 
 ## 许可证
 

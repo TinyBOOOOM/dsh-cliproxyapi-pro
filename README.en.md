@@ -215,7 +215,7 @@ Each account's **Quota** tab (next to **Connection** and **Models**) shows that 
 Use this without the plugin market or for offline upgrades:
 
 1. Click **Check for Updates**. If a newer version is available, click **Download Update** and confirm its version, or wait for enabled automatic checks and downloads.
-2. The download must match the npm metadata's **SHA-512** integrity, then pass gzip / tar, expected file and directory, package name and version checks. Path traversal, links and other special entries, dependencies and installation lifecycle scripts are rejected. The package is saved without extracting into the installation directory or executing its code.
+2. The download must match the npm metadata's **SHA-512** integrity, then pass gzip / tar, package name and version checks, and every file in it must be declared by that package's own `package.json` `files` (except files npm always packs, such as `package.json`, README and LICENSE). Path traversal, hidden files, `node_modules`, links and other special entries, dependencies and installation lifecycle scripts are rejected. When a download is rejected, the concrete reason is written to the DSH log. The package is saved without extracting into the installation directory or executing its code.
 3. After verification, the card displays the absolute package path and an upgrade command when applicable. Packages are stored at `<profile dir>/.dsh-cliproxyapi/updates/dsh-cliproxyapi-pro-<version>.tgz`.
 4. **Save your work and fully close DSH first**, then run the card's command in a terminal. This example is illustrative; use the actual profile name and absolute path from your card:
 
@@ -370,7 +370,7 @@ npm run pack:check   # list the files a packed bundle contains
 
 Releasing is a pushed `v<version>` tag: GitHub Actions runs the tests, creates a GitHub Release with the package attached, and publishes to npm through npm trusted publishing (no token involved) with a provenance statement. Stable releases publish to npm `latest`; Beta / Dev prereleases publish to `beta` / `dev` and are marked as GitHub prereleases, without replacing the stable channel. The updater checks registry-provided SHA-512 integrity and package structure only; it does not verify publisher signatures or npm provenance.
 
-Read [AGENTS.md](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/AGENTS.md) before changing code; see [CHANGELOG.md](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/CHANGELOG.md) for history. Issues and pull requests are welcome — when you change the documentation, update both the Chinese and the English README.
+Read [AGENTS.md](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/AGENTS.md) before changing code; see [CHANGELOG.en.md](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/CHANGELOG.en.md) for history (Chinese: [CHANGELOG.md](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/CHANGELOG.md)). Issues and pull requests are welcome — when you change the documentation, update both the Chinese and the English README.
 
 ## License
 

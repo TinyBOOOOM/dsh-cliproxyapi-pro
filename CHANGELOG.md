@@ -1,108 +1,112 @@
-# Changelog
+# 更新日志
 
-All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
+中文 | [English](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/CHANGELOG.en.md)
+
+本插件的所有重要变更。版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
 ## Unreleased
 
-### Changed
-- The package description, keywords (`cpa`, `cli-proxy-api`) and the `zh`/`en` plugin title and description now include the common abbreviation **CPA**, so searching plugins for "CPA" finds this one.
-- **Removed the `cliproxyapi` agent tool.** Its schema cost about 3K tokens of model context in every session, while accounts are managed on the Settings page. The plugin now registers no agent tool at all; the Settings page, HTTP routes and `/cpa-status` / `/cpa-refresh` are unchanged. The AI installation guide in both READMEs now has the user add accounts in Settings → CLIProxyAPI.
-- **Reworked account settings flow.** One account bar serves every tab; each account has **Connection / Models / Quota** tabs (the separate quota account switcher is gone). The **Enabled** switch next to the account title applies immediately and sends only that field; **Probe & Refresh** and **Delete Account** moved into a **⋯** menu, away from saving. Connection and model edits share one dirty state and one sticky **Unsaved changes · Discard / Save & Apply** bar (the three save buttons are gone), and switching accounts asks before discarding. **Clear Key** clears only the key. The global refresh interval is labelled as shared by all accounts.
-- **Adding an account** is a small form (name, URL, key) that tests the connection first and only then creates an enabled account; **Add Anyway (Disabled)** keeps the old behaviour on failure. No placeholder account is created by just clicking **+ Add Account**.
-- Secondary explanations moved into accessible ⓘ tips (hover, keyboard focus or click); page subtitles were removed and hints became placeholders where that is what the user needs while typing. Labels are shorter.
+### 变更
+- 包描述、关键词（`cpa`、`cli-proxy-api`）以及中英文插件标题和简介中加入了常用简称 **CPA**，搜索 "CPA" 时可以找到本插件。
+- **移除 `cliproxyapi` agent 工具。** 它的工具定义在每个会话中占用约 3K tokens 的模型上下文，而账号本来就在设置页管理。插件现在不注册任何 agent 工具；设置页、HTTP 接口以及 `/cpa-status` / `/cpa-refresh` 不变。两份 README 中的 AI 安装指引改为让用户在 设置 → CLIProxyAPI 中添加账号。
+- **重做账号设置流程。** 所有标签页共用一个账号栏；每个账号分为 **连接 / 模型 / 额度** 三个标签页（额度页单独的账号切换器已移除）。账号标题旁的 **启用** 开关立即生效，只提交这一个字段；**立即探测刷新** 和 **删除此账号** 移入 **⋯** 菜单，与保存操作分开。连接和模型的修改共用一个"未保存"状态和一条吸底的 **有未保存的更改 · 放弃更改 / 保存并应用** 栏（原来的三个保存按钮已移除），切换账号前会确认是否放弃修改。**清除密钥** 只清除密钥。全局刷新间隔标注为所有账号共用。
+- **添加账号** 改为一个小表单（名称、地址、密钥）：先测试连接，成功后才创建一个已启用的账号；测试失败时可用 **仍然添加（不启用）** 保留旧行为。只点击 **+ 添加账号** 不会再创建占位账号。
+- 次要说明移入可访问的 ⓘ 提示（悬停、键盘聚焦或点击显示）；去掉了页面副标题，输入时需要的提示改为输入框占位文字。标签文字更简短。
 
-### Documentation
-- New README screenshots of the reworked settings page, the quota tab, the composer badge and the add-account form (labelled offline component renders with sample data); the 1.6.0 account-bar screenshot was removed and the live update-page capture kept.
+### 文档
+- README 新增重做后的设置页、额度标签页、输入框额度标识和添加账号表单的截图（已标注为使用示例数据的离线组件渲染）；移除 1.6.0 的账号栏截图，保留实机拍摄的更新页截图。
+- 更新日志改为中文（`CHANGELOG.md`，默认），英文版见 `CHANGELOG.en.md`。
 
-### Fixed
-- **The composer quota badge kept disappearing for a session.** DSH caches a slot entry's `inject()` result per session binding, and the badge resolved the session's model directory inside `inject()`. When that ran before the session had a binding (page load, DSH restart, switching sessions), the miss was cached and the badge stayed hidden for that session while the model selector itself recovered. The directory is now resolved while rendering and retried until it exists.
-- **The quota badge was missing on a new conversation.** DSH renders the composer's `conversation.input.right` list only once the session is bound, while the New Session page already shows the model selector. The badge now also registers in `conversation.hero.options` (the New Session row above the composer) and shows there only while no composer badge is mounted for the same session, so exactly one badge is visible.
-- **The composer quota badge (and possibly other plugin entries) disappeared after a plugin reload until the page was refreshed.** DSH rejects a second list/keyed slot entry with the same id/key at the same priority, and a hot reload can start the new activation before the old one is disposed. Entries now retry one priority lower (the stable id/key is kept; the lowest priority renders, so the new entry takes over when the old one goes). Each activation also owns its own stylesheet, so disposing the old activation no longer removes the new one's styles.
+### 修复
+- **离线更新下载会拒绝任何新增文件。** 更新器原来按写死的文件清单校验更新包，以后版本只要多带一个文件（比如英文更新日志、新的界面语言），内置的"下载"就会报"更新包无效"。现在改为：包内每个文件必须在该包自己的 `package.json` `files` 中声明（`package.json`、README、LICENSE 等 npm 总会打包的文件除外），路径穿越、隐藏文件、`node_modules`、链接/特殊条目、依赖和安装脚本仍然一律拒绝。被拒绝时，具体原因（例如哪个文件未声明）会写入 DSH 日志，页面仍只显示本地化的错误提示。已安装 1.5.0–1.6.0 的用户仍使用旧规则：如果以后某个版本新增了文件，请通过插件市场、插件页面或 `dsh plugin add` 升级一次。
+- **输入框额度标识在某个会话中反复消失。** DSH 会按会话绑定缓存插槽条目 `inject()` 的结果，而额度标识在 `inject()` 中解析会话的模型目录。如果这一步发生在会话完成绑定之前（页面加载、DSH 重启、切换会话），这次失败会被缓存，该会话的额度标识就一直隐藏，而模型选择器本身已经恢复。现在改为在渲染时解析模型目录，并在其可用之前持续重试。
+- **新对话页面没有额度标识。** DSH 只在会话绑定后才渲染输入框的 `conversation.input.right` 列表，而新会话页面已经显示了模型选择器。额度标识现在也注册到 `conversation.hero.options`（新会话页面输入框上方那一行），并且只在同一会话没有挂载输入框额度标识时显示，保证始终只出现一个。
+- **插件重载后输入框额度标识（以及可能的其他插件条目）消失，直到刷新页面。** DSH 会拒绝在同一优先级下注册相同 id/key 的第二个列表或键控插槽条目，而热重载可能在旧实例销毁之前就启动新实例。现在条目会降低一个优先级重试（保留稳定的 id/key；渲染优先级最低的那个，旧实例销毁后由新条目接管）。每个实例也拥有自己的样式表，销毁旧实例不会再移除新实例的样式。
 
-### Added
-- **Quota for every channel CPA's own panel supports.** Compared against CLIProxyAPI and its management center: **Meta** (Muse Code; plan, rolling window and weekly quota — its endpoint needs the credential's `dca_token`, read from `/v0/management/auth-files/download` for that one request and never stored, logged or returned), **Kimi International** (`kimi-ai` credentials query `api.kimi.ai`; a token rejected by one Kimi host is retried on the other), and **CPA plugin providers**: any other credential CPA marks `supports_quota` (quota plugins or declarative `quota_probe`) is read through CPA's normalized `POST /v0/management/quota/fetch` (plan plus grouped windows). API-key channels and Vertex have no quota endpoint; paid xAI accounts are not probed with a real chat request.
-- **Devin quota.** Devin credentials now show their plan and daily / weekly remaining quota with reset times, read through `/v0/management/api-call` from Devin's `SeatManagementService/GetUserStatus` (the same request CPA's management center makes; CPA substitutes the credential's session token). The quota is account-wide, so every `devin/…` model, in the badge and the Model → Channel table, shows the same windows. A response without quota fields is reported as an error instead of empty data.
-- **Test Connection** (`POST /api/dsh-cliproxyapi/accounts/test`) probes unsaved URL/key values without saving or writing routes; a blank key uses the stored one, and the key is never returned.
-- **Quota tab ("额度") in the CLIProxyAPI settings section.** The section now has two tabs, **Settings** (the existing accounts/models page) and **Quota**. Enter a CPA management key per account (stored in the DSH credentials service under `CLI_PROXY_MANAGEMENT_KEY` / `CLI_PROXY_MANAGEMENT_KEY_<ACCOUNT_ID>`, never in state or settings) and the Host reads that server's credentials (`/v0/management/auth-files`, their model lists, and upstream quota through `/v0/management/api-call`). The tab uses the flat row layout of the native DSH settings pages: key and refresh rows, a distribution bar, every credential grouped by channel with its plan, status and quota windows (5 h / weekly / monthly / daily) as meters with reset times, a channel filter, and an expandable "Model → Channel" table of how each picker model is mapped. Channels without a known quota endpoint are listed with their status only.
-- **Composer quota badge** left of the model selector (`conversation.input.right`): signal bars and the best remaining percentage among the credentials that serve the selected model on the selected model's own account; click for a per-credential peek on the DSH menu surface. The badge uses the model selector trigger's metrics and is not shown for accounts without a management key. Matching is per account and per channel: a model id is matched only to credentials of the account whose route it came from, prefixed ids (`devin/…`) only to credentials with that prefix, and bare ids prefer un-prefixed credentials.
-- `/cpa-status` appends a quota summary per account (key configured, state, credential count, and which credentials each picker model maps to with its tightest remaining percentage); no keys are printed.
-- Quota HTTP routes `/api/dsh-cliproxyapi/quota/{status,refresh,save}`; saving a key and refreshing start the refresh and return at once, and the page follows it while `refreshing` is set. The Host caches results for 5 minutes and refreshes stale accounts in the background only while a page asks; a rejected management key (401/403) pauses automatic refresh for that account until the key changes or a manual refresh, so CPA's bad-key protection is not triggered.
+### 新增
+- **支持 CPA 自带管理面板支持的所有渠道额度。** 对照 CLIProxyAPI 及其管理中心实现：**Meta**（Muse Code；套餐、滚动窗口和每周额度——其接口需要凭证的 `dca_token`，仅为这一次请求从 `/v0/management/auth-files/download` 读取，从不存储、记录或返回）、**Kimi 国际版**（`kimi-ai` 凭证查询 `api.kimi.ai`；被一个 Kimi 主机拒绝的令牌会在另一个主机上重试），以及 **CPA 插件渠道**：CPA 标记为 `supports_quota` 的其他凭证（额度插件或声明式 `quota_probe`）通过 CPA 统一的 `POST /v0/management/quota/fetch` 读取（套餐及分组额度窗口）。API Key 渠道和 Vertex 没有额度接口；付费 xAI 账号不会用真实的对话请求去探测。
+- **Devin 额度。** Devin 凭证现在显示套餐以及每日 / 每周剩余额度和重置时间，通过 `/v0/management/api-call` 调用 Devin 的 `SeatManagementService/GetUserStatus` 读取（与 CPA 管理中心发出的请求相同；由 CPA 代入凭证的会话令牌）。该额度按账号统计，因此所有 `devin/…` 模型在额度标识和"模型 → 渠道"表中显示相同的窗口。响应中没有额度字段时报告为错误，而不是显示空数据。
+- **测试连接**（`POST /api/dsh-cliproxyapi/accounts/test`）用尚未保存的地址/密钥进行探测，不保存也不写入路由；密钥留空时使用已存储的密钥，且从不返回密钥。
+- **CLIProxyAPI 设置分区新增"额度"标签页。** 分区现在有 **设置**（原有的账号/模型页）和 **额度** 两个标签页。为每个账号填写 CPA 管理密钥（存放在 DSH 凭据服务中的 `CLI_PROXY_MANAGEMENT_KEY` / `CLI_PROXY_MANAGEMENT_KEY_<ACCOUNT_ID>` 下，从不写入状态文件或设置）后，Host 会读取该服务器的凭证（`/v0/management/auth-files`、各凭证的模型列表，以及通过 `/v0/management/api-call` 获取的上游额度）。该标签页沿用 DSH 原生设置页的平铺行布局：密钥行和刷新行、分布条、按渠道分组的所有凭证及其套餐、状态和额度窗口（5 小时 / 每周 / 每月 / 每日，以进度条显示并附重置时间）、渠道筛选，以及可展开的"模型 → 渠道"表，展示每个选择器模型对应到哪些凭证。没有已知额度接口的渠道只显示状态。
+- **输入框额度标识**，位于模型选择器左侧（`conversation.input.right`）：显示信号格和在当前所选模型所属账号中、可服务该模型的凭证里最高的剩余百分比；点击可在 DSH 菜单面板上查看每个凭证的详情。标识沿用模型选择器触发按钮的尺寸，没有管理密钥的账号不显示。匹配按账号、按渠道进行：模型 id 只匹配其路由所属账号的凭证，带前缀的 id（`devin/…`）只匹配带该前缀的凭证，不带前缀的 id 优先匹配不带前缀的凭证。
+- `/cpa-status` 末尾追加每个账号的额度摘要（是否配置密钥、状态、凭证数量，以及每个选择器模型对应的凭证和其中最紧张的剩余百分比）；不输出任何密钥。
+- 额度 HTTP 接口 `/api/dsh-cliproxyapi/quota/{status,refresh,save}`；保存密钥和刷新会启动刷新并立即返回，页面在 `refreshing` 期间跟踪进度。Host 将结果缓存 5 分钟，且只在有页面请求时在后台刷新过期账号；管理密钥被拒绝（401/403）后，该账号暂停自动刷新，直到密钥变更或手动刷新，以免触发 CPA 的错误密钥保护。
 
 ## 1.6.0 — 2026-10-20
 
-### Changed
-- **Accounts and models moved to the Settings dialog's left navigation.** The account/model page is now its own `settings.section` entry ("CLIProxyAPI"), like the dshmarket "Market" section. The plugin's bundle page (Sidebar → Plugins) and its Built-in plugins tab now contain only plugin updates: a pointer to the new section plus the update card, expanded by default there.
+### 变更
+- **账号和模型移到设置对话框的左侧导航。** 账号/模型页现在是独立的 `settings.section` 条目（"CLIProxyAPI"），与 dshmarket 的"市场"分区一样。插件的捆绑包页面（侧边栏 → 插件）及其内置插件标签页现在只包含插件更新：一条指向新分区的提示和更新卡片，在这里默认展开。
 
-### Fixed
-- **"Check for Updates" always failed on the DSH desktop app.** The desktop shell strips the `Origin` header when it forwards page requests to the Host, and update POSTs (`check`, `save`, `download`) required an explicit exact `Origin`, so every one was refused with `forbidden-origin`. Update POSTs now follow the host connection fence: a missing `Origin` relies on the host session authentication, while a present `Origin` must still be this listener's own authority (compared under its own `http(s)` scheme). A refused origin now has its own localized message.
+### 修复
+- **DSH 桌面版上"检查更新"总是失败。** 桌面外壳在把页面请求转发给 Host 时会去掉 `Origin` 头，而更新 POST（`check`、`save`、`download`）要求带有完全匹配的 `Origin`，因此每次都以 `forbidden-origin` 被拒绝。更新 POST 现在遵循 Host 的连接防护规则：缺少 `Origin` 时依赖 Host 会话认证，而带有 `Origin` 时仍必须是本监听器自身的地址（按其自身的 `http(s)` 协议比较）。被拒绝的来源现在有单独的本地化提示。
 
-### Added
-- **One-click updates through the DSH plugin market.** When dshmarket's public Update API v1 is detected (`GET /dsh-market/api/v1/capabilities`), the update card offers **Update Now**: after a version confirmation it submits the update to the market, follows the operation's progress, reports the version actually installed (and warns when it is below the checked target), and shows restart/refresh guidance from the market's outcome, with a restart button only when the market owns restarts. Market failure codes are localized; **Install Anyway** is offered only after a release-age wait or unresolved version. Linked installs are never installed through the market. This plugin still never runs a package manager itself.
-- **Automatic installation (opt-in, `autoInstall`, default off).** With automatic checks on and dshmarket present, a version found by the Host's automatic check is installed through the market while a DSH page is open; each version is tried at most once every 6 hours and never again once installed, and automatic mode never forces. Stored as an optional field of the v1 `update-settings.json`; older files load as off.
+### 新增
+- **通过 DSH 插件市场一键更新。** 检测到 dshmarket 的公开 Update API v1（`GET /dsh-market/api/v1/capabilities`）时，更新卡片提供 **立即更新**：确认版本后将更新提交给市场，跟踪操作进度，报告市场实际安装的版本（低于检查到的目标版本时给出警告），并根据市场返回的结果给出重启/刷新指引，只有市场负责重启时才显示重启按钮。市场的失败代码均已本地化；只有在发布时间等待期或版本未解析时才提供 **仍然安装**。链接安装永远不会通过市场安装。本插件自身仍然从不运行包管理器。
+- **自动安装（可选，`autoInstall`，默认关闭）。** 开启自动检查且存在 dshmarket 时，Host 自动检查发现的新版本会在 DSH 页面打开期间通过市场安装；每个版本每 6 小时最多尝试一次，安装成功后不再重试，自动模式从不强制安装。该选项作为 v1 `update-settings.json` 的可选字段存储；旧文件加载时视为关闭。
 
 ## 1.5.1 — 2026-10-19
 
-### Fixed
-- A missing update endpoint (page updated but DSH still running the previous host code) is no longer reported as "invalid version information": 404/405/501 answers now map to a dedicated "update service unavailable" message that names the real cause and says DSH must be restarted, not merely refreshed.
+### 修复
+- 缺少更新接口（页面已更新但 DSH 仍在运行旧的 Host 代码）时，不再报告为"版本信息无效"：404/405/501 响应现在对应一条单独的"更新服务不可用"提示，说明真实原因，并指出需要重启 DSH 而不只是刷新页面。
 
 ## 1.5.0 — 2026-10-19
 
-### Added
-- **Plugin update card**, independent of account forms and drafts, with Chinese/English strings, localized errors, current/latest versions, Stable / Beta / Dev channels, Auto / Global / Mainland China regions, automatic checks and optional automatic downloads. The card is collapsed by default to a single compact row (title, current version, short update status) and expands on click; polling and saves never reset that choice.
-- Automatic checks enabled by default about 3 seconds after startup or rescheduling preferences, then every 6 hours; automatic downloads are off by default and run only after an automatic check finds a newer version. No automatic installation, uninstall, source overwrite or restart.
-- Strict SemVer channel checks using npm `latest` / `beta` / `dev`, explicit errors for unpublished channels, and no cross-channel fallback or downgrade. Auto region races npmjs and npmmirror for the first valid metadata; explicit regions stay on their selected registry and do not affect CPA traffic.
-- Mainland China downloads follow npmmirror's official CDN redirects through an exact host/package/version allowlist, with at most three HTTPS hops and the original metadata integrity preserved. External, local, cross-region and downgrade redirects are refused.
-- Verified offline package preparation: registry-provided SHA-512 integrity plus bounded gzip/tar, package identity/version and file-structure checks. Reject traversal, links/special entries, unexpected files, dependencies and installation lifecycle scripts; never extract or execute an update. These checks are not publisher-signature or npm provenance verification.
-- Packages saved atomically under the profile's `.dsh-cliproxyapi/updates/` directory, with a version-specific download confirmation and an offline `dsh plugin --profile 'name' add 'absolute.tgz'` command for use after DSH is closed, followed by a restart. Linked local installations can check/download but receive no command, protecting the source-based installation.
-- Separate versioned `update-settings.json` preferences; invalid or unreadable files disable automatic network checks, while a missing file uses first-run defaults. Existing v2 account state and credentials remain untouched. Check results and download notices are in-memory only; downloaded files remain for user-managed cleanup.
-- Authenticated update HTTP routes: read-only `GET /api/dsh-cliproxyapi/updates/status` and `POST` operations `/check`, `/save`, `/download`. Update POSTs require an explicit exact same-origin header matching the actual connection scheme and Host, without trusting forwarded-protocol claims.
-- Offline updater, HTTP and dependency-free VM/Hook client tests; actual-component offline previews (collapsed and expanded) with clearly labeled example versions.
+### 新增
+- **插件更新卡片**，独立于账号表单和草稿，提供中英文文案、本地化错误、当前/最新版本、稳定版 / Beta / Dev 渠道、自动 / 全球 / 中国大陆区域、自动检查和可选的自动下载。卡片默认折叠为一行（标题、当前版本、简短的更新状态），点击展开；轮询和保存不会重置展开状态。
+- 自动检查默认开启：启动或修改计划设置约 3 秒后执行，之后每 6 小时一次；自动下载默认关闭，只在自动检查发现新版本后运行。不会自动安装、卸载、覆盖源码或重启。
+- 严格的 SemVer 渠道检查，使用 npm `latest` / `beta` / `dev`；未发布的渠道明确报错，不会跨渠道回退或降级。自动区域同时请求 npmjs 和 npmmirror，取最先返回的有效元数据；指定区域只使用所选的源，且不影响 CPA 流量。
+- 中国大陆下载按精确的主机/包名/版本白名单跟随 npmmirror 官方 CDN 重定向，最多 3 次 HTTPS 跳转，并保留原始元数据中的完整性校验值。拒绝外部、本地、跨区域和降级的重定向。
+- 离线包校验：使用源提供的 SHA-512 完整性校验值，并检查 gzip/tar 大小上限、包名/版本和文件结构。拒绝路径穿越、链接/特殊条目、意外文件、依赖和安装生命周期脚本；从不解压或执行更新包。这些检查不是发布者签名或 npm 来源证明（provenance）验证。
+- 更新包以原子方式保存到 profile 的 `.dsh-cliproxyapi/updates/` 目录，下载前需确认具体版本，并提供离线命令 `dsh plugin --profile 'name' add 'absolute.tgz'`，在关闭 DSH 后运行，然后重启。本地链接安装可以检查和下载，但不提供命令，以保护基于源码的安装。
+- 独立的带版本号的 `update-settings.json` 偏好设置；文件无效或无法读取时关闭自动网络检查，文件缺失时使用首次运行的默认值。现有 v2 账号状态和凭据保持不变。检查结果和下载提示只保存在内存中；下载的文件由用户自行清理。
+- 需要认证的更新 HTTP 接口：只读的 `GET /api/dsh-cliproxyapi/updates/status`，以及 `POST` 操作 `/check`、`/save`、`/download`。更新 POST 要求带有与实际连接协议和 Host 完全匹配的同源请求头，不信任转发的协议声明。
+- 离线更新器、HTTP 以及无依赖的 VM/Hook 客户端测试；使用真实组件的离线预览（折叠和展开），并清楚标注示例版本。
 
-### Changed
-- Release automation publishes stable versions to npm `latest` and Beta / Dev prereleases to `beta` / `dev`, marking the corresponding GitHub Releases as prereleases without replacing stable.
-- Both READMEs and the architecture guide explain download-versus-install behavior, linked-source protection, storage, API admission and the manual closed-DSH upgrade workflow. The packed zero-dependency bundle now includes the internal `lib/updater.js` module.
+### 变更
+- 发布流程将稳定版发布到 npm `latest`，Beta / Dev 预发布版发布到 `beta` / `dev`，并将对应的 GitHub Release 标记为预发布，不会替换稳定版。
+- 两份 README 和架构指南说明了下载与安装的区别、链接源码保护、存储位置、接口准入规则，以及关闭 DSH 后手动升级的流程。打包的零依赖插件现在包含内部模块 `lib/updater.js`。
 
 ## 1.4.1 — 2026-10-19
 
-Documentation and release tooling only; the plugin code is unchanged from 1.4.0.
+仅涉及文档和发布工具；插件代码与 1.4.0 相同。
 
-### Changed
-- `README.md` is now Chinese (the default on GitHub and npm), with the English version in `README.en.md`. Both are rewritten: a quick start, four verified ways to install (DSH **Plugins** page, the DSH agent, `dsh plugin add`, GitHub / offline package), upgrading and uninstalling, and a FAQ. Images and links use absolute URLs so they also render on npmjs.com.
-- Releases publish to npm through npm trusted publishing (GitHub Actions OIDC) with an automatic provenance statement; no npm token is stored anywhere. The release workflow can also be run by hand for an existing tag and skips steps that are already done.
+### 变更
+- `README.md` 改为中文（GitHub 和 npm 上的默认版本），英文版见 `README.en.md`。两份文档都已重写：快速开始、四种经过验证的安装方式（DSH **插件** 页面、DSH agent、`dsh plugin add`、GitHub / 离线包）、升级和卸载，以及常见问题。图片和链接使用绝对地址，在 npmjs.com 上也能正常显示。
+- 发布通过 npm 可信发布（GitHub Actions OIDC）推送到 npm，并自动附带来源证明；任何地方都不存储 npm 令牌。发布流程也可以针对已有标签手动运行，并跳过已完成的步骤。
 
 ## 1.4.0 — 2026-10-19
 
-First public release.
+首个公开版本。
 
-### Added
-- **Multiple CLIProxyAPI accounts.** Each account has its own base URL, API key (own credential ref), provider route ID, protocol mode, model selection and per-model overrides, and synchronizes into its own `llm-pi-ai` routes (`cli-proxy-2`, `cli-proxy-2-responses`, `cli-proxy-2-messages`, …).
-- **Per-account enable switch.** A disabled account keeps its settings but its routes are removed, so its models leave the picker. New accounts start disabled; a manual refresh still probes them so models can be picked before enabling.
-- Settings panel account bar: switch accounts, **+ Add Account**, **Delete Account**, credential-ref field.
-- `cliproxyapi` tool: `add_account` and `remove_account` actions, `account`, `enabled` and `apiKeyEnv` parameters; output lists every account.
-- HTTP routes `POST /api/dsh-cliproxyapi/accounts/add` and `/accounts/remove`; `refresh` and `save` accept `accountId`.
-- English `README.md` and Chinese `README.zh.md` with captioned screenshots; `screenshots.json` for plugin storefronts; `LICENSE`, `AGENTS.md`, `CHANGELOG.md`.
-- GitHub Actions: CI (Ubuntu + Windows, Node 22 / 24) and a tag-triggered release that attaches the packed bundle and optionally publishes to npm.
+### 新增
+- **多个 CLIProxyAPI 账号。** 每个账号有独立的基础地址、API 密钥（独立的凭据引用）、提供方路由 ID、协议模式、模型选择和单模型覆盖设置，并同步到各自的 `llm-pi-ai` 路由（`cli-proxy-2`、`cli-proxy-2-responses`、`cli-proxy-2-messages` 等）。
+- **单账号启用开关。** 停用的账号保留设置，但其路由会被移除，模型也随之从选择器中消失。新账号默认停用；手动刷新仍会探测它们，以便在启用前选好模型。
+- 设置面板账号栏：切换账号、**+ 添加账号**、**删除此账号**、凭据引用字段。
+- `cliproxyapi` 工具：新增 `add_account` 和 `remove_account` 操作，以及 `account`、`enabled` 和 `apiKeyEnv` 参数；输出列出所有账号。
+- HTTP 接口 `POST /api/dsh-cliproxyapi/accounts/add` 和 `/accounts/remove`；`refresh` 和 `save` 支持 `accountId`。
+- 英文 `README.md` 和中文 `README.zh.md`，附带说明的截图；供插件商店读取的 `screenshots.json`；`LICENSE`、`AGENTS.md`、`CHANGELOG.md`。
+- GitHub Actions：CI（Ubuntu + Windows，Node 22 / 24），以及由标签触发的发布流程，附加打包好的插件并可选发布到 npm。
 
-### Changed
-- `state.json` is now `{ version: 2, refreshIntervalSeconds, probeTimeoutMs, accounts: [...] }`. A v1 single-account file migrates automatically into account `default` with the same routes, key and selection; the original is kept as `state.v1.json`.
-- An account with an explicit base URL only probes that URL and never falls back to local `:8317`, the existing route or `CLIPROXYAPI_BASE_URL`.
-- Overlapping provider route IDs between accounts are rejected on save; an overlapping account in a hand-edited file is reported as an error and never writes or removes another account's routes.
-- Settings writes from concurrent account syncs are serialized.
-- `/cpa-status` and `/cpa-refresh` cover every account.
-- The DSH version requirement moved to top-level `engines.dsh`, where DSH reads it; `./icon` is exported.
-- `engines.node` is now `>=22` (the versions CI tests).
+### 变更
+- `state.json` 改为 `{ version: 2, refreshIntervalSeconds, probeTimeoutMs, accounts: [...] }`。v1 单账号文件会自动迁移为账号 `default`，保留相同的路由、密钥和模型选择；原文件保存为 `state.v1.json`。
+- 设置了明确基础地址的账号只探测该地址，不再回退到本地 `:8317`、已有路由或 `CLIPROXYAPI_BASE_URL`。
+- 保存时拒绝账号之间重叠的提供方路由 ID；手动编辑文件导致重叠的账号会报告错误，且从不写入或删除其他账号的路由。
+- 多个账号并发同步时，设置写入按顺序执行。
+- `/cpa-status` 和 `/cpa-refresh` 覆盖所有账号。
+- DSH 版本要求移到顶层 `engines.dsh`，DSH 从这里读取；导出了 `./icon`。
+- `engines.node` 改为 `>=22`（CI 测试的版本）。
 
-### Fixed
-- **First-run selection no longer uses hard-coded model ids.** An account without a saved selection is seeded once, on its first successful probe, with the newest model of each family from its own server's catalog (at most 12). Previously a fresh install pre-selected 7 fixed ids that most servers do not offer, so nothing reached the picker.
-- **Reset to Recommended** uses the same catalog-derived list (with its count) instead of the fixed 7.
-- Saving a new account before its catalog was ever probed no longer stores an empty selection.
-- When a saved selection matches nothing on the server, the error names the server and the discovered models stay visible in the panel.
+### 修复
+- **首次运行的模型选择不再使用写死的模型 id。** 没有保存过选择的账号会在首次成功探测时，从其服务器自己的模型目录中为每个系列选出最新的模型（最多 12 个），只做一次。之前全新安装会预选 7 个固定 id，而大多数服务器并不提供这些模型，导致选择器里什么都没有。
+- **恢复推荐精选** 使用同样从模型目录推导出的列表（并显示数量），不再使用固定的 7 个。
+- 在从未探测模型目录前保存新账号，不再存储一个空的模型选择。
+- 保存的模型选择在服务器上一个都匹配不到时，错误信息会指出是哪个服务器，已发现的模型仍显示在面板中。
 
 ## 1.3.0
 
-- Per-model native protocol routing (`protocolMode: "auto"`): Claude via Anthropic Messages, GPT/Codex/Grok via OpenAI Responses, others via OpenAI Chat, one `llm-pi-ai` route per protocol; the default model follows its route.
-- Per-model protocol override and fixed protocol mode.
+- 按模型使用原生协议路由（`protocolMode: "auto"`）：Claude 走 Anthropic Messages，GPT/Codex/Grok 走 OpenAI Responses，其他走 OpenAI Chat，每种协议一条 `llm-pi-ai` 路由；默认模型跟随其路由。
+- 单模型协议覆盖和固定协议模式。
 
-## 1.2.0 and earlier
+## 1.2.0 及更早
 
-- Auto-discovery of CLIProxyAPI, model selection filter, per-model parameter editor, credentials-service key storage, `/cpa-status` and `/cpa-refresh`.
+- CLIProxyAPI 自动发现、模型选择过滤、单模型参数编辑器、基于凭据服务的密钥存储、`/cpa-status` 和 `/cpa-refresh`。
