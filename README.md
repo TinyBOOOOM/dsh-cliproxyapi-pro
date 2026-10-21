@@ -158,6 +158,18 @@ CPA 对每个模型同时提供 OpenAI Chat、OpenAI Responses、Anthropic Messa
 - 可以改为「统一使用」某一种协议，或在单个模型的「编辑参数」里指定。
 - 你在路由上手动加的其他字段（如 `retryPolicy`）会被保留。
 
+### 渠道额度（「额度」标签页与对话框额度徽标）
+
+**设置** → **CLIProxyAPI** 页顶部有两个标签：**设置**（上面介绍的账号与模型）和 **额度**。
+
+- **填写管理密钥**：在「额度」页为每个账号填写 CPA 的管理密钥（CPA 配置里的 `remote-management.secret-key`；远程 CPA 还需开启 `remote-management.allow-remote`）。密钥保存在 DSH 凭证服务中，引用名第一个账号为 `CLI_PROXY_MANAGEMENT_KEY`，其他账号为 `CLI_PROXY_MANAGEMENT_KEY_<账号 ID>`（如 `CLI_PROXY_MANAGEMENT_KEY_ACCOUNT_2`）；不会写入 `state.json`、设置或日志，也不会返回给页面。
+- **由宿主读取**：宿主用管理接口读取该 CPA 的全部凭证（`/v0/management/auth-files`）、每个凭证服务的模型列表，并经 `/v0/management/api-call` 查询上游额度（Codex、Claude、Antigravity、Gemini CLI、Kimi、xAI 等）。没有可查询额度接口的渠道（如 Devin）只显示账号状态与近期请求数。
+- **额度页**：采用 DSH 原生设置页的行式布局：管理密钥、额度数据与刷新、凭证分布条（充足 / 偏低 / 耗尽 / 停用异常），按渠道分组的凭证列表（套餐、前缀、状态、5 小时 / 每周 / 每月 / 每日额度条与重置时间，问题与剩余最少的排在前面）、渠道筛选（凭证较多时可搜索），以及可展开的「模型 → 渠道」表，列出模型选择器中每个模型实际匹配到的凭证。
+- **对话框徽标**：模型选择器左侧的小徽标（信号格 + 百分比）显示当前所选模型可用凭证中最充足的剩余额度，点击可查看每个凭证的额度。只对本插件同步、且所属账号已填写管理密钥的模型显示；没有管理密钥时不显示徽标。
+- **精确匹配**：只在所选模型所属的账号（按路由 `cli-proxy*`、`cli-proxy-2*`…）里找凭证；带前缀的模型（如 `devin/claude-opus-5-5`）只匹配该前缀的凭证；不带前缀的同名模型（如 `claude-opus-5-5`）优先匹配不带前缀的凭证，Claude 渠道与 Devin 渠道不会混用。Antigravity 等按模型分组的额度窗口只取与当前模型相符的那一组。
+- **排查**：`cliproxyapi` 工具的 `status` 与 `/cpa-status` 会附带额度摘要：每个账号的管理密钥状态、额度状态、凭证数，以及模型选择器中每个模型匹配到的凭证和剩余额度（不输出密钥）。
+- **刷新**：结果在宿主端缓存 5 分钟；有页面在看时才在后台刷新过期账号，也可手动「刷新额度」。管理密钥被拒（401/403）后暂停该账号的自动刷新，直到更新密钥或手动刷新，避免触发 CPA 的错误密钥封禁。
+
 ## 插件自身更新
 
 **插件更新** 位于左侧栏 **插件** → **CLIProxyAPI** 的插件页，以及 **设置** → **内置插件** → **CLIProxyAPI** 标签页；这两处只有更新功能，账号与模型设置在 **设置** 左侧导航的 **CLIProxyAPI** 页。更新卡片在插件页默认展开，摘要行显示当前版本和更新状态，可随时收起；后台检查仍按保存的开关运行，展开状态不会被轮询重置。它只管理 `dsh-cliproxyapi-pro` 自身，不会更新 CPA 服务或 DSH 宿主，也不改变 CPA 请求的路由、账号或模型勾选。更新设置修改后立即保存；卡片独立轮询状态，不会重载未保存的账号表单。
@@ -266,6 +278,9 @@ DSH 的 Agent 可以用这个工具查看和配置插件，你只需用自然语
 | POST | `/api/dsh-cliproxyapi/updates/check` | `{}` | 主动检查所选通道与区域；手动检查不触发自动下载 |
 | POST | `/api/dsh-cliproxyapi/updates/save` | `{ autoCheck?, autoDownload?, autoInstall?, channel?, region? }` | 只保存这五项更新设置，与账号配置独立 |
 | POST | `/api/dsh-cliproxyapi/updates/download` | `{ version }` | 下载最近一次检查确认的新版本，完成校验后保存离线包；不安装 |
+| GET | `/api/dsh-cliproxyapi/quota/status` | — | `{ ok, quota }`：缓存的额度快照；过期账号在后台刷新 |
+| POST | `/api/dsh-cliproxyapi/quota/refresh` | `{ accountId? }` | 开始刷新一个或全部账号的额度并立即返回（快照中 `refreshing` 为真） |
+| POST | `/api/dsh-cliproxyapi/quota/save` | `{ accountId, managementKey?, clear? }` | 保存或清除该账号的管理密钥，并开始刷新额度；响应不含密钥 |
 
 更新接口的操作响应采用 `{ ok, update }`，状态包含 `currentVersion`、`latestVersion`、`available`、`channel`、`region`、`effectiveRegion`、`autoCheck`、`autoDownload`、`autoInstall`、`checking`、`downloading`、`lastCheckedAt`、`error` / `errorCode`、`blockedReason`、`downloadedVersion`、`downloadPath` 与 `upgradeCommand`。未检查或未下载的相关字段为 `null`。`channel` 为 `stable` / `beta` / `dev`，`region` 为 `auto` / `global` / `cn`；`effectiveRegion` 为本次成功检查使用的 `global` / `cn`（此前为 `null`）。
 

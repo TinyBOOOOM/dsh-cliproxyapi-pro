@@ -38,6 +38,7 @@
     "lib/index.js",
     "lib/client.js",
     "lib/updater.js",
+    "lib/quota.js",
     "locale/*.json",
     "cordis.patch.yml",
     "icon.svg",
@@ -59,13 +60,15 @@
         "@deepseek-ai/dsh-client-ui-settings-plugins",
         "@deepseek-ai/dsh-client-ui-plugin-manager",
         "@deepseek-ai/dsh-client-ui-theme",
-        "@deepseek-ai/dsh-client-ui-renderer"
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-model-selection",
+        "@deepseek-ai/dsh-client-ui-conversation"
       ]
     }
   },
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check lib/index.js && node --check lib/client.js && node --check lib/updater.js && node --test tests/*.test.mjs",
+    "check": "node --check lib/index.js && node --check lib/client.js && node --check lib/updater.js && node --check lib/quota.js && node --test tests/*.test.mjs",
     "pack:check": "npm pack --dry-run"
   }
 }

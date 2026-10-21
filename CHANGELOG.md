@@ -2,6 +2,14 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Added
+- **Quota tab ("额度") in the CLIProxyAPI settings section.** The section now has two tabs, **Settings** (the existing accounts/models page) and **Quota**. Enter a CPA management key per account (stored in the DSH credentials service under `CLI_PROXY_MANAGEMENT_KEY` / `CLI_PROXY_MANAGEMENT_KEY_<ACCOUNT_ID>`, never in state or settings) and the Host reads that server's credentials (`/v0/management/auth-files`, their model lists, and upstream quota through `/v0/management/api-call`). The tab uses the flat row layout of the native DSH settings pages: key and refresh rows, a distribution bar, every credential grouped by channel with its plan, status and quota windows (5 h / weekly / monthly / daily) as meters with reset times, a channel filter, and an expandable "Model → Channel" table of how each picker model is mapped. Channels without a known quota endpoint (for example Devin) are listed with their status only.
+- **Composer quota badge** left of the model selector (`conversation.input.right`): signal bars and the best remaining percentage among the credentials that serve the selected model on the selected model's own account; click for a per-credential peek on the DSH menu surface. The badge uses the model selector trigger's metrics and is not shown for accounts without a management key. Matching is per account and per channel: a model id is matched only to credentials of the account whose route it came from, prefixed ids (`devin/…`) only to credentials with that prefix, and bare ids prefer un-prefixed credentials.
+- The `cliproxyapi` tool's `status` action and `/cpa-status` append a quota summary per account (key configured, state, credential count, and which credentials each picker model maps to with its tightest remaining percentage); no keys are printed.
+- Quota HTTP routes `/api/dsh-cliproxyapi/quota/{status,refresh,save}`; saving a key and refreshing start the refresh and return at once, and the page follows it while `refreshing` is set. The Host caches results for 5 minutes and refreshes stale accounts in the background only while a page asks; a rejected management key (401/403) pauses automatic refresh for that account until the key changes or a manual refresh, so CPA's bad-key protection is not triggered.
+
 ## 1.6.0 — 2026-10-20
 
 ### Changed

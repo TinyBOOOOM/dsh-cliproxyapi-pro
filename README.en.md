@@ -158,6 +158,18 @@ CPA serves every model on OpenAI Chat, OpenAI Responses and Anthropic Messages, 
 - Switch to one protocol for every model, or set a protocol per model under **Edit Parameters**.
 - Other fields you add to a managed route by hand (such as `retryPolicy`) are kept.
 
+### Channel quota (the "Quota" tab and the composer badge)
+
+The **Settings** → **CLIProxyAPI** page has two tabs at the top: **Settings** (the accounts and models described above) and **Quota**.
+
+- **Management key**: on the Quota tab, enter each account's CPA management key (`remote-management.secret-key` in the CPA config; a remote CPA also needs `remote-management.allow-remote`). It is stored in the DSH credentials service under `CLI_PROXY_MANAGEMENT_KEY` for the first account and `CLI_PROXY_MANAGEMENT_KEY_<ACCOUNT_ID>` for the others (for example `CLI_PROXY_MANAGEMENT_KEY_ACCOUNT_2`); it is never written to `state.json`, settings or logs, and never sent back to the page.
+- **Read by the Host**: the Host reads every credential on that CPA (`/v0/management/auth-files`), the models each credential serves, and the upstream quota through `/v0/management/api-call` (Codex, Claude, Antigravity, Gemini CLI, Kimi, xAI and more). Channels without a known quota endpoint (such as Devin) show their status and recent request counts only.
+- **Quota tab**: laid out as flat rows like the native DSH settings pages: management key, quota data and refresh, a distribution bar (healthy / low / exhausted / off or failing), credentials grouped by channel (plan, prefix, status, 5-hour / weekly / monthly / daily meters with reset times; problems and the least remaining first), channel filter (search when there are many credentials), and an expandable "Model → Channel" table showing which credentials each picker model is matched to.
+- **Composer badge**: a small badge left of the model selector (signal bars + percentage) shows the best remaining quota among the usable credentials serving the selected model; click it for every credential's windows. It appears only for models this plugin synchronizes whose account has a management key; without a key there is no badge.
+- **Exact matching**: credentials are looked up only in the account the selected route belongs to (`cli-proxy*`, `cli-proxy-2*`, …); a prefixed model (such as `devin/claude-opus-5-5`) matches only credentials with that prefix; a bare id (such as `claude-opus-5-5`) prefers un-prefixed credentials, so the Claude and Devin channels never mix. Per-model-group windows (for example Antigravity) count only the group that fits the current model.
+- **Troubleshooting**: the `cliproxyapi` tool's `status` and `/cpa-status` include a quota summary: each account's key state, quota state, credential count, and which credentials each picker model maps to with its remaining quota (never the key).
+- **Refreshing**: results are cached on the Host for 5 minutes; stale accounts refresh in the background only while a page is asking, or on **Refresh Quota**. A rejected management key (401/403) pauses that account's automatic refresh until the key changes or you refresh manually, so CPA's bad-key protection is not triggered.
+
 ## Updating this plugin
 
 **Plugin Updates** live on the plugin page (sidebar **Plugins** → **CLIProxyAPI**) and on **Settings** → **Built-in plugins** → the **CLIProxyAPI** tab; those places contain only update features, while accounts and models are on the **CLIProxyAPI** page in the Settings dialog's left navigation. On the plugin page the update card starts expanded, with a summary row showing the current version and update status, and can be collapsed at any time. Background checks still follow the saved switches, and polling never resets the expanded state. It manages only `dsh-cliproxyapi-pro`. It does not update the CPA server or DSH, or change CPA routes, accounts or model selections. Update settings save immediately; the card polls independently without reloading unsaved account forms.
@@ -266,6 +278,9 @@ Used by the settings panel. Requires the DSH Web session's authentication; POST 
 | POST | `/api/dsh-cliproxyapi/updates/check` | `{}` | Check the selected channel and region now; a manual check does not trigger automatic downloading |
 | POST | `/api/dsh-cliproxyapi/updates/save` | `{ autoCheck?, autoDownload?, autoInstall?, channel?, region? }` | Save only these five update preferences, independently of accounts |
 | POST | `/api/dsh-cliproxyapi/updates/download` | `{ version }` | Download the newer version confirmed by the latest check, verify it, and save an offline package without installing |
+| GET | `/api/dsh-cliproxyapi/quota/status` | — | `{ ok, quota }`: the cached quota snapshot; stale accounts refresh in the background |
+| POST | `/api/dsh-cliproxyapi/quota/refresh` | `{ accountId? }` | Start refreshing the quota of one or every account and return at once (`refreshing` is set in the snapshot) |
+| POST | `/api/dsh-cliproxyapi/quota/save` | `{ accountId, managementKey?, clear? }` | Store or clear the account's management key and start refreshing its quota; the response never contains the key |
 
 Update operation responses use `{ ok, update }`. State includes `currentVersion`, `latestVersion`, `available`, `channel`, `region`, `effectiveRegion`, `autoCheck`, `autoDownload`, `autoInstall`, `checking`, `downloading`, `lastCheckedAt`, `error` / `errorCode`, `blockedReason`, `downloadedVersion`, `downloadPath` and `upgradeCommand`. Fields without a check or download result are `null`. `channel` is `stable` / `beta` / `dev`; `region` is `auto` / `global` / `cn`; `effectiveRegion` is the `global` / `cn` source used by the last successful check (`null` before one).
 

@@ -56,7 +56,7 @@ describe("plugin update client", () => {
     assert.equal(section.meta.id, "cliproxyapi");
     assert.equal(typeof section.meta.order, "number");
     assert.equal(section.meta.label(), h.zh.nav);
-    assert.equal(section.render().type, h.CpaSettingsPanel);
+    assert.equal(section.render().type, h.CpaSectionPage);
     assert.equal(byName["settings.plugins.tab"].render().type, h.PluginUpdatePage);
     assert.equal(byName["plugins.bundle.config"].meta.key, "dsh-cliproxyapi-pro");
     assert.equal(byName["plugins.bundle.config"].render({ view: "page" }).type, h.PluginUpdatePage);
@@ -408,5 +408,141 @@ describe("dshmarket installation", () => {
     market.dispose();
     assert.equal(signal.aborted, true);
     assert.equal(timers.size, 0);
+  });
+});
+
+const quotaData = {
+  generatedAt: "2026-10-21T06:00:00.000Z", refreshing: false,
+  accounts: [
+    {
+      accountId: "default", displayName: "BCPA", provider: "cli-proxy",
+      routes: ["cli-proxy", "cli-proxy-responses", "cli-proxy-messages"], enabled: true,
+      keyRef: "CLI_PROXY_MANAGEMENT_KEY", keyConfigured: true, state: "ok", refreshing: false,
+      fetchedAt: "2026-10-21T06:00:00.000Z",
+      pickerModels: [
+        { id: "claude-opus-5-5", route: "cli-proxy-messages" },
+        { id: "devin/claude-opus-5-5", route: "cli-proxy-messages" },
+        { id: "gpt-6.1-sol", route: "cli-proxy-responses" },
+      ],
+      credentials: [
+        { id: "claude-a.json", label: "a@x.dev", provider: "claude", status: "active", models: ["claude-opus-5-5"], quotaState: "ok",
+          windows: [{ id: "c5", kind: "5h", label: "", remainingPercent: 40, resetAt: null }, { id: "c7", kind: "7d", label: "", remainingPercent: 70, resetAt: null }] },
+        { id: "claude-b.json", label: "b@x.dev", provider: "claude", status: "active", models: ["claude-opus-5-5"], quotaState: "ok",
+          windows: [{ id: "c5", kind: "5h", label: "", remainingPercent: 90, resetAt: null }] },
+        { id: "devin.json", label: "devin", provider: "devin", prefix: "devin", status: "active", models: ["devin/claude-opus-5-5"], quotaState: "unsupported", windows: [] },
+        { id: "codex.json", label: "c@x.dev", provider: "codex", status: "disabled", models: ["gpt-6.1-sol"], quotaState: "ok",
+          windows: [{ id: "x", kind: "7d", label: "", remainingPercent: 0, resetAt: null }] },
+        { id: "ag.json", label: "g@x.dev", provider: "antigravity", status: "active", models: ["gemini-4-argon", "claude-opus-5-5"], quotaState: "ok",
+          windows: [{ id: "g1", kind: "5h", label: "Gemini", remainingPercent: 10, resetAt: null, modelPrefixes: ["gemini"] },
+            { id: "g2", kind: "5h", label: "Claude", remainingPercent: 55, resetAt: null, modelPrefixes: ["claude", "gpt"] }] },
+      ],
+      modelIndex: {
+        "claude-opus-5-5": ["claude-a.json", "claude-b.json"],
+        "devin/claude-opus-5-5": ["devin.json"],
+        "gpt-6.1-sol": ["codex.json"],
+      },
+      modelMatch: { "claude-opus-5-5": "model-list", "devin/claude-opus-5-5": "prefix", "gpt-6.1-sol": "model-list" },
+    },
+    {
+      accountId: "account-2", displayName: "ZZ", provider: "cli-proxy-2",
+      routes: ["cli-proxy-2", "cli-proxy-2-responses", "cli-proxy-2-messages"], enabled: true,
+      keyRef: "CLI_PROXY_MANAGEMENT_KEY_ACCOUNT_2", keyConfigured: false, state: "nokey", refreshing: false,
+      pickerModels: [], credentials: [], modelIndex: {},
+    },
+  ],
+};
+
+describe("quota client", () => {
+  it("maps a selection to its own account and channel only", () => {
+    const h = clientHarness();
+    const claude = h.summarizeModelQuota(quotaData, "cli-proxy-messages", "claude-opus-5-5");
+    assert.equal(claude.account.accountId, "default");
+    assert.deepEqual(claude.entries.map((e) => e.cred.id), ["claude-b.json", "claude-a.json"], "best headroom first");
+    assert.equal(claude.best, 90);
+    const devin = h.summarizeModelQuota(quotaData, "cli-proxy-messages", "devin/claude-opus-5-5");
+    assert.deepEqual(devin.entries.map((e) => e.cred.id), ["devin.json"], "a prefixed channel never borrows claude quota");
+    assert.equal(devin.best, null);
+    const codex = h.summarizeModelQuota(quotaData, "cli-proxy-responses", "gpt-6.1-sol");
+    assert.equal(codex.usableCount, 0, "disabled credentials do not count as usable");
+    assert.equal(codex.best, null);
+    const other = h.summarizeModelQuota(quotaData, "cli-proxy-2-messages", "claude-opus-5-5");
+    assert.equal(other.account.accountId, "account-2");
+    assert.equal(other.entries.length, 0, "same model id on another account maps to nothing from the first");
+    assert.equal(h.summarizeModelQuota(quotaData, "deepseek", "deepseek-chat"), null, "non-CPA routes show no badge");
+  });
+
+  it("filters tagged windows by model family", () => {
+    const h = clientHarness();
+    const ag = quotaData.accounts[0].credentials.find((c) => c.id === "ag.json");
+    assert.equal(h.credentialHeadroom(ag, "claude-opus-5-5"), 55);
+    assert.equal(h.credentialHeadroom(ag, "gemini-4-argon"), 10);
+    assert.equal(h.credentialHeadroom(ag), 10);
+    assert.equal(h.quotaLevel(0), "empty");
+    assert.equal(h.quotaLevel(12), "low");
+    assert.equal(h.quotaLevel(null), "unknown");
+    const stats = h.quotaStats(quotaData.accounts[0].credentials);
+    assert.deepEqual({ ...stats }, { total: 5, healthy: 2, low: 1, empty: 0, issue: 1, unknown: 1 });
+  });
+
+  it("registers the composer badge beside the model selector and the quota tab", () => {
+    const h = clientHarness();
+    const registrations = [], disposers = [];
+    const directories = new Map([["s1", { subscribe: () => () => {}, getSnapshot: () => ({ current: { provider: "cli-proxy-messages", model: "claude-opus-5-5" }, pending: null }) }]]);
+    const ctx = {
+      effect(fn) { const off = fn(); if (typeof off === "function") disposers.push(off); },
+      locale: { register: () => () => {}, bind: () => (key) => h.zh[key] ?? key },
+      slots: { inject(_n, fn) { fn(); }, register(meta, render) { registrations.push({ meta, render }); return () => {}; } },
+      inject(names, fn) {
+        assert.deepEqual([...names], ["slots", "modelDirectories"]);
+        fn({ slots: ctx.slots, modelDirectories: { directoryFor: (id) => { const store = directories.get(id); if (!store) throw new Error("no scope"); return { store }; } } });
+      },
+    };
+    h.apply(ctx);
+    const badge = registrations.find((r) => r.meta.name === "conversation.input.right");
+    assert.ok(badge, "badge registered in conversation.input.right");
+    assert.ok(badge.meta.order >= 1000, "last entry, adjacent to the model selector");
+    assert.equal(badge.meta.inject("s1").directory, directories.get("s1"));
+    assert.equal(badge.meta.inject("missing").directory, null, "a session without scope degrades to no badge");
+    assert.equal(badge.render({ directory: null }).type, h.QuotaBadge);
+    for (const off of disposers) off();
+    assert.equal(h.timers.size, 0);
+  });
+
+  it("renders the badge with the best remaining percentage and hides it for other providers", () => {
+    const h = clientHarness();
+    const store = { getSnapshot: () => ({ data: quotaData, loading: false, error: null, busy: null }), subscribe: () => () => {}, refresh: async () => ({ ok: true }) };
+    const dir = (provider, model) => ({ subscribe: () => () => {}, getSnapshot: () => ({ current: { provider, model }, pending: null }) });
+    const t = (key) => h.zh[key] ?? key;
+    const tree = h.QuotaBadge({ t, directory: dir("cli-proxy-messages", "claude-opus-5-5"), store });
+    assert.ok(content(tree).includes("90%"));
+    assert.equal(nodes(tree, (n) => n.type === "button")[0].props["aria-expanded"], false);
+    assert.equal(h.QuotaBadge({ t, directory: dir("deepseek", "deepseek-chat"), store }), null);
+    assert.equal(
+      h.QuotaBadge({ t, directory: dir("cli-proxy-2-messages", "claude-opus-5-5"), store }),
+      null,
+      "an account without a management key shows no badge"
+    );
+  });
+
+  it("polls only while subscribed and disposes cleanly", async () => {
+    const timers = new Map(); let id = 0; const calls = [];
+    const h = clientHarness();
+    const store = h.createQuotaStore({
+      fetch: async (url, init) => { calls.push([url, init?.method ?? "GET", init?.body]); return new Response(JSON.stringify({ ok: true, quota: quotaData })); },
+      setTimeout: (fn, ms) => { timers.set(++id, { fn, ms }); return id; },
+      clearTimeout: (k) => timers.delete(k),
+    });
+    const off = store.subscribe(() => {});
+    await flushClient(); await flushClient();
+    assert.equal(calls[0][0], "api/dsh-cliproxyapi/quota/status");
+    assert.equal(store.getSnapshot().data.accounts.length, 2);
+    assert.equal(timers.size, 1, "next poll scheduled");
+    const saved = await store.saveKey("default", "mgmt-secret");
+    assert.equal(saved.ok, true);
+    assert.equal(calls.at(-1)[0], "api/dsh-cliproxyapi/quota/save");
+    assert.deepEqual(JSON.parse(calls.at(-1)[2]), { accountId: "default", managementKey: "mgmt-secret" });
+    off();
+    assert.equal(timers.size, 0, "no polling without subscribers");
+    store.dispose();
   });
 });
