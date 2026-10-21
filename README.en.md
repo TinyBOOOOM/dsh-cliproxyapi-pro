@@ -13,7 +13,7 @@ Enter a server URL and an API key, and the plugin reads the CPA model catalog an
 - **Multiple accounts**: each account has its own URL, key, model selection and parameters, and can be switched off at any time.
 - **Works out of the box**: on the first connection, the newest model of each family in that server's own catalog is checked (at most 12), so the picker isn't flooded with hundreds of models.
 - **Native protocols**: Claude over Anthropic Messages, GPT / Codex / Grok over OpenAI Responses, everything else over OpenAI Chat — fewer protocol translations inside CPA.
-- **Visual management**: check models and edit per-model parameters in the settings panel, or let the DSH agent configure things for you through the `cliproxyapi` tool.
+- **Visual management**: check models and edit per-model parameters in the settings panel. The plugin registers no agent tool, so it takes no model context.
 - **Plugin updates**: automatically check Stable / Beta / Dev channels and choose global / Mainland China sources. With the [DSH plugin market (dshmarket)](https://github.com/dsh-market/dsh-market) installed, new versions install in one click or automatically; otherwise download a verified offline package and upgrade with DSH closed.
 - **Secure**: API keys live only in the DSH credentials service, never in configuration files.
 - **Zero dependencies**: no npm dependencies and no build step; installs in seconds.
@@ -27,7 +27,7 @@ Works with DSH `0.2.0-rc.1` and later (desktop and web).
 - [Screenshots](#screenshots)
 - [Features in detail](#features-in-detail)
 - [Updating this plugin](#updating-this-plugin)
-- [Agent tool and slash commands](#agent-tool-and-slash-commands)
+- [Slash commands and HTTP routes](#slash-commands-and-http-routes)
 - [Storage and configuration](#storage-and-configuration)
 - [Upgrading and uninstalling](#upgrading-and-uninstalling)
 - [FAQ](#faq)
@@ -106,7 +106,7 @@ The panel follows the DSH display language; the screenshots show the Chinese UI.
 
 ![Models tab with the save bar (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/model-filter.png)
 
-**3. Quota.** The **Quota** tab: management key, quota data and refresh, a distribution bar, credentials grouped by channel (plan, prefix, status, 5-hour / weekly meters with reset times; channels without a quota endpoint such as Devin show status and recent requests only), and an expandable "Model → Channel" table. The tab label shows the lowest remaining quota among the account's usable credentials.
+**3. Quota.** The **Quota** tab: management key, quota data and refresh, a distribution bar, credentials grouped by channel (plan, prefix, status, 5-hour / daily / weekly meters with reset times; Devin shows its daily / weekly quota, shared by every Devin model; channels without a quota endpoint show status and recent requests only), and an expandable "Model → Channel" table. The tab label shows the lowest remaining quota among the account's usable credentials.
 
 ![Quota tab: distribution bar and per-channel credential quota (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/quota.png)
 
@@ -174,11 +174,11 @@ CPA serves every model on OpenAI Chat, OpenAI Responses and Anthropic Messages, 
 Each account's **Quota** tab (next to **Connection** and **Models**) shows that account's channel quota; the tab label shows the lowest remaining quota among its usable credentials.
 
 - **Management key**: on an account's Quota tab, enter its CPA management key (`remote-management.secret-key` in the CPA config; a remote CPA also needs `remote-management.allow-remote`). It is stored in the DSH credentials service under `CLI_PROXY_MANAGEMENT_KEY` for the first account and `CLI_PROXY_MANAGEMENT_KEY_<ACCOUNT_ID>` for the others (for example `CLI_PROXY_MANAGEMENT_KEY_ACCOUNT_2`); it is never written to `state.json`, settings or logs, and never sent back to the page.
-- **Read by the Host**: the Host reads every credential on that CPA (`/v0/management/auth-files`), the models each credential serves, and the upstream quota through `/v0/management/api-call` (Codex, Claude, Antigravity, Gemini CLI, Kimi, xAI and more). Channels without a known quota endpoint (such as Devin) show their status and recent request counts only.
+- **Read by the Host**: the Host reads every credential on that CPA (`/v0/management/auth-files`), the models each credential serves, and the upstream quota through `/v0/management/api-call`: Codex, Claude, Antigravity, Gemini CLI, Kimi (including Kimi International, kimi.ai), xAI, Devin and Meta. Channels provided by CPA plugins (credentials marked `supports_quota`) use CPA's own `/v0/management/quota/fetch` instead. Devin's daily / weekly quota belongs to the whole account, so every `devin/…` model shows the same windows. Meta's quota endpoint needs the `dca_token` from the credential file; the Host reads it through the management API for each query, uses it for that one request only, and never stores or logs it. API-key channels (OpenAI-compatible, Gemini / Claude / Codex API keys) and Vertex have no quota endpoint (CPA's own panel shows none either) and show their status and recent request counts only; paid xAI accounts expose no quota counters either (CPA's panel probes them with a real chat request; this plugin does not, so background refreshes never cost money).
 - **Quota tab**: laid out as flat rows like the native DSH settings pages: management key, quota data and refresh, a distribution bar (healthy / low / exhausted / off or failing), credentials grouped by channel (plan, prefix, status, 5-hour / weekly / monthly / daily meters with reset times; problems and the least remaining first), channel filter (search when there are many credentials), and an expandable "Model → Channel" table showing which credentials each picker model is matched to.
 - **Composer badge**: a small badge left of the model selector (signal bars + percentage) shows the best remaining quota among the usable credentials serving the selected model; click it for every credential's windows. It appears only for models this plugin synchronizes whose account has a management key; without a key there is no badge. On the New Session page (before the composer takes over the session) the badge sits at the right end of the workspace row above the input box.
 - **Exact matching**: credentials are looked up only in the account the selected route belongs to (`cli-proxy*`, `cli-proxy-2*`, …); a prefixed model (such as `devin/claude-opus-5-5`) matches only credentials with that prefix; a bare id (such as `claude-opus-5-5`) prefers un-prefixed credentials, so the Claude and Devin channels never mix. Per-model-group windows (for example Antigravity) count only the group that fits the current model.
-- **Troubleshooting**: the `cliproxyapi` tool's `status` and `/cpa-status` include a quota summary: each account's key state, quota state, credential count, and which credentials each picker model maps to with its remaining quota (never the key).
+- **Troubleshooting**: `/cpa-status` includes a quota summary: each account's key state, quota state, credential count, and which credentials each picker model maps to with its remaining quota (never the key).
 - **Refreshing**: results are cached on the Host for 5 minutes; stale accounts refresh in the background only while a page is asking, or on **Refresh Quota**. A rejected management key (401/403) pauses that account's automatic refresh until the key changes or you refresh manually, so CPA's bad-key protection is not triggered.
 
 ## Updating this plugin
@@ -227,47 +227,9 @@ Use this without the plugin market or for offline upgrades:
 
 **Linked local installations (`link:`)** can check and download packages, but do not receive an upgrade command and their source directories are never overwritten. To keep the development setup, manually update the Git source at an appropriate time, then restart DSH. Reinstalling from an offline package changes the plugin's installation source from the link to the package.
 
-## Agent tool and slash commands
+## Slash commands and HTTP routes
 
-### The `cliproxyapi` tool
-
-The DSH agent uses this tool to inspect and configure the plugin; just ask in plain language.
-
-| `action` | Effect |
-|---|---|
-| `status` | Show every account (or only `account`) with its state and models |
-| `refresh` | Probe and sync now; without `account`, all accounts |
-| `configure` | Update one account (the first by default), then refresh it |
-| `add_account` | Create an account; enabled when `baseURL` is given, otherwise disabled |
-| `remove_account` | Delete the `account` and its routes |
-
-Parameters (all optional except `action`):
-
-| Parameter | Meaning |
-|---|---|
-| `account` | Account id (e.g. `default`, `account-2`), or its provider route ID or display name |
-| `enabled` | Enable or disable the account |
-| `baseURL` | CPA URL such as `http://127.0.0.1:8317`; an empty string means auto-discover |
-| `apiKey` | Bearer key, stored under the account's `apiKeyEnv` ref |
-| `apiKeyEnv` | Credential ref name (`[A-Za-z_][A-Za-z0-9_]*`) |
-| `provider` | `llm-pi-ai` provider route ID, unique per account |
-| `displayName` | Account name, also the group title in the model picker |
-| `protocolMode` | `auto` (native protocol per family, default) or `fixed` |
-| `protocol` | Protocol used in `fixed` mode: `openai-completions` / `openai-responses` / `anthropic-messages` |
-| `selectedModels` | Model ids shown in the picker; `[]` shows all |
-| `includePrefix` / `excludePrefix` | Comma-separated model id keywords |
-| `modelOverrides` | `{ [modelId]: { contextWindow?, maxTokens?, image?, reasoningLevels?, protocol? } }`, replacing the whole map |
-
-Examples:
-
-```json
-{ "action": "configure", "baseURL": "http://127.0.0.1:8317", "apiKey": "sk-...", "selectedModels": ["gpt-6.1-sol", "claude-opus-5-5"] }
-{ "action": "add_account", "displayName": "Backup CPA", "baseURL": "https://other-cpa:8317", "apiKey": "sk-...", "selectedModels": ["gpt-6-astra"] }
-{ "action": "configure", "account": "account-2", "enabled": false }
-{ "action": "remove_account", "account": "account-2" }
-```
-
-The output has `accounts[]` (each with `id`, `displayName`, `provider`, `enabled`, `state`, `endpoint`, `modelCount`, `totalDiscovered`, `error`) and a text `summary`. `state` is one of `idle`, `probing`, `connected`, `disabled`, `error`.
+This plugin registers no agent tool, so it adds nothing to model context. Accounts and models are managed on the **CLIProxyAPI** page in Settings; the slash commands below show and refresh their state.
 
 ### Slash commands
 
@@ -336,7 +298,7 @@ Failures use a top-level `errorCode` or `update.errorCode`; HTTP status or `ok` 
   Panel saves take effect immediately. After editing this file manually, reload the plugin or restart DSH to re-read it. Corrupt, structurally invalid, invalid-field or unreadable files use safe defaults with automatic network checks disabled. Check results, the candidate version, download notices and commands are in-memory only and reset on plugin reload; downloaded packages remain in the separate `updates` subdirectory for you to clean up when needed.
 - **Keys**: stored and resolved by ref through the DSH `credentials` service, falling back to an environment variable of the same name.
 - **Environment**: `CLIPROXYAPI_BASE_URL` is used only for auto-discovery of accounts without a base URL.
-- **Plugin row config**: the plugin row's `config` in `cordis.patch.yml` is overlaid on the state file at startup: `accounts` replaces the account list, other fields apply to the first account. Normally keep it `{}` and configure through the panel or the tool.
+- **Plugin row config**: the plugin row's `config` in `cordis.patch.yml` is overlaid on the state file at startup: `accounts` replaces the account list, other fields apply to the first account. Normally keep it `{}` and configure through the Settings panel.
 
 ## Upgrading and uninstalling
 
@@ -377,13 +339,10 @@ Downloading and verification do not install anything. Exit DSH, run the card's u
 > **For the AI agent in DeepSeek Harness**: when the user asks you to install or configure this plugin, follow these steps. The package has no npm dependencies and no build scripts.
 
 1. **Install**: call `plugin_manager` with `{"action": "install_bundle", "target": "dsh-cliproxyapi-pro", "enabled": true}`. Read `application` and `warnings` in the result; `restart-required` means DSH must restart before the new code runs.
-2. **Configure** with the `cliproxyapi` tool:
-   - Local CPA on `http://127.0.0.1:8317` without auth: nothing to configure; call `{"action": "refresh"}`.
-   - Remote URL or key: `{"action": "configure", "baseURL": "...", "apiKey": "..."}` (first account), or `{"action": "add_account", ...}` for another account. Pass `"account": "<id>"` to target a specific account.
-   - Narrow the picker with `selectedModels` (exact ids from the `status` output).
-3. **Verify**: `{"action": "status"}` shows `state: "connected"` and `modelCount > 0` for each enabled account. Tell the user the models are in the DSH model picker under the account's name, and that accounts are managed on the **CLIProxyAPI** page in the Settings dialog's left navigation.
+2. **Configure**: this plugin provides no agent tool; the user configures accounts in the UI. A local CPA on `http://127.0.0.1:8317` without auth needs nothing — it is discovered automatically once the plugin runs. Otherwise ask the user to open the **CLIProxyAPI** page in the Settings dialog's left navigation, click **+ Add Account**, enter the server URL and API key, then check the wanted models on the **Models** tab.
+3. **Verify**: ask the user to run `/cpa-status`; each enabled account should be `connected` with more than 0 models. Tell the user the models are in the DSH model picker under the account's name.
 
-Never echo API keys back to the user or write them into files.
+Never ask the user for an API key or write it into files; keys are entered only on the Settings page.
 
 ## Development
 

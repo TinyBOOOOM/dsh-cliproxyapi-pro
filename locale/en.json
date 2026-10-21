@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "CLIProxyAPI Provider",
-    "description": "Connect one or more CLIProxyAPI accounts, enable or disable each, synchronize their models and reasoning capabilities into DSH, and manage settings visually."
+    "title": "CLIProxyAPI (CPA) Provider",
+    "description": "Connect one or more CLIProxyAPI (CPA) accounts, enable or disable each, synchronize their models and reasoning capabilities into DSH, and manage settings visually."
   }
 }

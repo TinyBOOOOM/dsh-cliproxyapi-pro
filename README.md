@@ -13,7 +13,7 @@
 - **多账号**：每个账号独立的地址、密钥、模型勾选和参数，互不影响，可随时停用。
 - **开箱即用**：首次连接时按该服务自己的模型目录，为每个模型家族勾选最新的一个（最多 12 个），模型选择器不会被上百个模型淹没。
 - **原生协议**：Claude 走 Anthropic Messages，GPT / Codex / Grok 走 OpenAI Responses，其余走 OpenAI Chat，减少 CPA 的协议转换。
-- **可视化管理**：设置面板里勾选模型、编辑单个模型的参数；也可以让 DSH 的 Agent 通过 `cliproxyapi` 工具帮你配置。
+- **可视化管理**：设置面板里勾选模型、编辑单个模型的参数。插件不注册 Agent 工具，不占用模型上下文。
 - **插件更新**：自动检查稳定 / Beta / 开发通道，可选择全球 / 中国大陆下载源；装有 [DSH 插件市场（dshmarket）](https://github.com/dsh-market/dsh-market) 时可一键或自动安装新版本，否则下载校验离线包，在关闭 DSH 后手动升级。
 - **安全**：API Key 只保存在 DSH 凭证服务里，不写入任何配置文件。
 - **零依赖**：不依赖任何 npm 包，无需构建，安装几秒完成。
@@ -27,7 +27,7 @@
 - [截图](#截图)
 - [功能详解](#功能详解)
 - [插件自身更新](#插件自身更新)
-- [Agent 工具与斜杠命令](#agent-工具与斜杠命令)
+- [斜杠命令与 HTTP 接口](#斜杠命令与-http-接口)
 - [存储与配置](#存储与配置)
 - [升级与卸载](#升级与卸载)
 - [常见问题](#常见问题)
@@ -106,7 +106,7 @@ CPA 就在本机默认端口 `8317` 且没有设置密钥时，什么都不用�
 
 ![模型标签与底部保存栏（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/model-filter.png)
 
-**3. 额度。** 「额度」标签：管理密钥、额度数据与刷新、凭证分布条，按渠道分组的凭证（套餐、前缀、状态、5 小时 / 每周等额度条与重置时间；没有额度接口的渠道如 Devin 只显示状态与近期请求），以及可展开的「模型 → 渠道」表。标签上显示该账号可用凭证中最低的剩余额度。
+**3. 额度。** 「额度」标签：管理密钥、额度数据与刷新、凭证分布条，按渠道分组的凭证（套餐、前缀、状态、5 小时 / 每日 / 每周等额度条与重置时间；Devin 显示每日 / 每周额度，所有 Devin 模型共用；没有额度接口的渠道只显示状态与近期请求），以及可展开的「模型 → 渠道」表。标签上显示该账号可用凭证中最低的剩余额度。
 
 ![额度标签：分布条与按渠道分组的凭证额度（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/quota.png)
 
@@ -174,11 +174,11 @@ CPA 对每个模型同时提供 OpenAI Chat、OpenAI Responses、Anthropic Messa
 每个账号的 **额度** 标签（与 **连接**、**模型** 并列）显示该账号的渠道额度；标签上显示该账号可用凭证中最低的剩余额度。
 
 - **填写管理密钥**：在「额度」标签里为每个账号填写 CPA 的管理密钥（CPA 配置里的 `remote-management.secret-key`；远程 CPA 还需开启 `remote-management.allow-remote`）。密钥保存在 DSH 凭证服务中，引用名第一个账号为 `CLI_PROXY_MANAGEMENT_KEY`，其他账号为 `CLI_PROXY_MANAGEMENT_KEY_<账号 ID>`（如 `CLI_PROXY_MANAGEMENT_KEY_ACCOUNT_2`）；不会写入 `state.json`、设置或日志，也不会返回给页面。
-- **由宿主读取**：宿主用管理接口读取该 CPA 的全部凭证（`/v0/management/auth-files`）、每个凭证服务的模型列表，并经 `/v0/management/api-call` 查询上游额度（Codex、Claude、Antigravity、Gemini CLI、Kimi、xAI 等）。没有可查询额度接口的渠道（如 Devin）只显示账号状态与近期请求数。
+- **由宿主读取**：宿主用管理接口读取该 CPA 的全部凭证（`/v0/management/auth-files`）、每个凭证服务的模型列表，并经 `/v0/management/api-call` 查询上游额度：Codex、Claude、Antigravity、Gemini CLI、Kimi（含 Kimi 国际版 kimi.ai）、xAI、Devin、Meta。CPA 插件提供的渠道（凭证标记了 `supports_quota`）改走 CPA 自己的 `/v0/management/quota/fetch`。Devin 的每日 / 每周额度是整个账号共用的，所有 `devin/…` 模型显示同一组额度。Meta 的额度接口需要凭证文件里的 `dca_token`，宿主每次查询时经管理接口读取，只用于这一次请求，不保存、不记录。API Key 类渠道（OpenAI 兼容、Gemini / Claude / Codex API Key）和 Vertex 没有额度接口（CPA 自带面板同样不显示），只显示账号状态与近期请求数；xAI 付费账号也没有额度计数（CPA 面板为此会真实发一次对话请求探测，本插件不这样做，以免后台刷新产生费用）。
 - **额度页**：采用 DSH 原生设置页的行式布局：管理密钥、额度数据与刷新、凭证分布条（充足 / 偏低 / 耗尽 / 停用异常），按渠道分组的凭证列表（套餐、前缀、状态、5 小时 / 每周 / 每月 / 每日额度条与重置时间，问题与剩余最少的排在前面）、渠道筛选（凭证较多时可搜索），以及可展开的「模型 → 渠道」表，列出模型选择器中每个模型实际匹配到的凭证。
 - **对话框徽标**：模型选择器左侧的小徽标（信号格 + 百分比）显示当前所选模型可用凭证中最充足的剩余额度，点击可查看每个凭证的额度。只对本插件同步、且所属账号已填写管理密钥的模型显示；没有管理密钥时不显示徽标。在新建对话页（输入栏尚未接管会话时），徽标显示在输入框上方工作区一行的右侧。
 - **精确匹配**：只在所选模型所属的账号（按路由 `cli-proxy*`、`cli-proxy-2*`…）里找凭证；带前缀的模型（如 `devin/claude-opus-5-5`）只匹配该前缀的凭证；不带前缀的同名模型（如 `claude-opus-5-5`）优先匹配不带前缀的凭证，Claude 渠道与 Devin 渠道不会混用。Antigravity 等按模型分组的额度窗口只取与当前模型相符的那一组。
-- **排查**：`cliproxyapi` 工具的 `status` 与 `/cpa-status` 会附带额度摘要：每个账号的管理密钥状态、额度状态、凭证数，以及模型选择器中每个模型匹配到的凭证和剩余额度（不输出密钥）。
+- **排查**：`/cpa-status` 会附带额度摘要：每个账号的管理密钥状态、额度状态、凭证数，以及模型选择器中每个模型匹配到的凭证和剩余额度（不输出密钥）。
 - **刷新**：结果在宿主端缓存 5 分钟；有页面在看时才在后台刷新过期账号，也可手动「刷新额度」。管理密钥被拒（401/403）后暂停该账号的自动刷新，直到更新密钥或手动刷新，避免触发 CPA 的错误密钥封禁。
 
 ## 插件自身更新
@@ -227,47 +227,9 @@ CPA 对每个模型同时提供 OpenAI Chat、OpenAI Responses、Anthropic Messa
 
 **本地链接安装（`link:`）** 可以检查并下载包，但不会提供升级命令，也不会覆盖链接的源码目录。若要保留源码开发方式，请在合适时机手动更新 Git 源码，再重启 DSH；通过离线包重新安装会将插件的安装来源从链接切换到离线包。
 
-## Agent 工具与斜杠命令
+## 斜杠命令与 HTTP 接口
 
-### `cliproxyapi` 工具
-
-DSH 的 Agent 可以用这个工具查看和配置插件，你只需用自然语言提要求。
-
-| `action` | 作用 |
-|---|---|
-| `status` | 查看所有账号（或 `account` 指定的账号）的状态与模型 |
-| `refresh` | 立即探测并同步；不带 `account` 时刷新全部账号 |
-| `configure` | 修改一个账号（默认第一个），保存后立即刷新 |
-| `add_account` | 新增账号；给了 `baseURL` 时默认启用，否则停用 |
-| `remove_account` | 删除 `account` 指定的账号及其路由 |
-
-参数（除 `action` 外都可选）：
-
-| 参数 | 说明 |
-|---|---|
-| `account` | 账号 id（如 `default`、`account-2`），也可用路由 ID 或账号名称 |
-| `enabled` | 启用 / 停用该账号 |
-| `baseURL` | CPA 地址，如 `http://127.0.0.1:8317`；空字符串表示自动发现 |
-| `apiKey` | Bearer 密钥，保存到该账号的 `apiKeyEnv` 引用名下 |
-| `apiKeyEnv` | 密钥引用名（`[A-Za-z_][A-Za-z0-9_]*`） |
-| `provider` | `llm-pi-ai` 路由 ID，每个账号唯一 |
-| `displayName` | 账号名称，也是模型选择器中的分组名 |
-| `protocolMode` | `auto`（按家族走原生协议，默认）或 `fixed` |
-| `protocol` | `fixed` 时使用的协议：`openai-completions` / `openai-responses` / `anthropic-messages` |
-| `selectedModels` | 显示在选择器中的模型 id 列表；`[]` 表示全部 |
-| `includePrefix` / `excludePrefix` | 逗号分隔的模型 id 关键词 |
-| `modelOverrides` | `{ [modelId]: { contextWindow?, maxTokens?, image?, reasoningLevels?, protocol? } }`，整体替换 |
-
-示例：
-
-```json
-{ "action": "configure", "baseURL": "http://127.0.0.1:8317", "apiKey": "sk-...", "selectedModels": ["gpt-6.1-sol", "claude-opus-5-5"] }
-{ "action": "add_account", "displayName": "Backup CPA", "baseURL": "https://other-cpa:8317", "apiKey": "sk-...", "selectedModels": ["gpt-6-astra"] }
-{ "action": "configure", "account": "account-2", "enabled": false }
-{ "action": "remove_account", "account": "account-2" }
-```
-
-输出包含 `accounts[]`（每个账号的 `id`、`displayName`、`provider`、`enabled`、`state`、`endpoint`、`modelCount`、`totalDiscovered`、`error`）和文字摘要 `summary`。`state` 取值：`idle`、`probing`、`connected`、`disabled`、`error`。
+本插件不注册任何 Agent 工具，不占用模型上下文。账号与模型在 **设置** → **CLIProxyAPI** 页管理，也可以用下面的斜杠命令查看和刷新。
 
 ### 斜杠命令
 
@@ -336,7 +298,7 @@ DSH 的 Agent 可以用这个工具查看和配置插件，你只需用自然语
   设置通过面板保存后立即应用。手动编辑此文件后需重载插件或重启 DSH 才会重新读取；文件损坏、结构 / 字段无效或无法读取时采用关闭自动联网检查的安全默认值。版本检查结果、候选版本、下载完成提示与命令只在内存中，插件重载后重新检查；下载包仍位于独立的 `updates` 子目录，由用户按需清理。
 - **密钥**：通过 DSH 的 `credentials` 服务按引用名存取；凭证服务里没有时，回退读取同名环境变量。
 - **环境变量**：`CLIPROXYAPI_BASE_URL` 只用于服务地址留空的账号的自动发现。
-- **插件行配置**：`cordis.patch.yml` 中本插件行的 `config` 会在启动时叠加到状态文件上：包含 `accounts` 时替换账号列表，否则其中的字段作用于第一个账号。一般保持 `{}`，用面板或工具配置即可。
+- **插件行配置**：`cordis.patch.yml` 中本插件行的 `config` 会在启动时叠加到状态文件上：包含 `accounts` 时替换账号列表，否则其中的字段作用于第一个账号。一般保持 `{}`，用设置面板配置即可。
 
 ## 升级与卸载
 
@@ -377,13 +339,10 @@ DSH 使用的 pnpm 可能设置了新版本发布后的等待期（`minimumRelea
 > 给 DeepSeek Harness 中的 AI Agent：用户要求安装或配置本插件时按以下步骤执行。本包没有 npm 依赖，也没有构建脚本。
 
 1. **安装**：调用 `plugin_manager`：`{"action": "install_bundle", "target": "dsh-cliproxyapi-pro", "enabled": true}`。查看结果中的 `application` 与 `warnings`；`restart-required` 表示需要重启 DSH 后新代码才会运行。
-2. **配置**：使用 `cliproxyapi` 工具。
-   - CPA 在本机 `http://127.0.0.1:8317` 且无鉴权：无需配置，调用 `{"action": "refresh"}`。
-   - 远程地址或有密钥：`{"action": "configure", "baseURL": "...", "apiKey": "..."}`（作用于第一个账号）；额外的账号用 `{"action": "add_account", ...}`；指定账号时传 `"account": "<id>"`。
-   - 用 `selectedModels`（取自 `status` 输出中的精确 id）精简模型选择器。
-3. **验证**：`{"action": "status"}` 中每个启用的账号 `state` 为 `connected` 且 `modelCount > 0`。告诉用户模型已出现在 DSH 模型选择器中（按账号名称分组），可在 **设置** 左侧导航的 **CLIProxyAPI** 页管理账号。
+2. **配置**：本插件不提供 Agent 工具，账号由用户在界面里配置。CPA 在本机 `http://127.0.0.1:8317` 且无鉴权时无需配置，插件启动后会自动发现；否则请用户打开 **设置** 左侧导航的 **CLIProxyAPI** 页，点 **+ 添加账号** 并填写服务地址和 API Key，再在 **模型** 标签勾选需要的模型。
+3. **验证**：请用户运行 `/cpa-status`，每个启用的账号应为 `connected` 且模型数大于 0。告诉用户模型已出现在 DSH 模型选择器中（按账号名称分组）。
 
-不要把 API Key 回显给用户，也不要写入任何文件。
+不要向用户索要 API Key，也不要把它写入任何文件；密钥只在设置页填写。
 
 ## 开发
 

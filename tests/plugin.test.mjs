@@ -569,7 +569,7 @@ describe("multi-account", () => {
     assert.equal(h.providers["cli-proxy-2"], undefined, "still disabled");
   });
 
-  it("apply() migrates the legacy state file and serves tool, commands and routes", async () => {
+  it("apply() migrates the legacy state file and serves commands and routes, but no agent tool", async () => {
     const dir = mkdtempSync(join(tmpdir(), "cpa-test-"));
     const stateDir = join(dir, ".dsh-cliproxyapi");
     mkdirSync(stateDir, { recursive: true });
@@ -592,6 +592,7 @@ describe("multi-account", () => {
     const creds = { CLI_PROXY_API_KEY: "key-a" };
     const disposers = [];
     const tools = [];
+    const injected = [];
     const commands = [];
     const routes = new Map();
     const realFetch = globalThis.fetch;
@@ -626,7 +627,10 @@ describe("multi-account", () => {
         const d = fn();
         if (typeof d === "function") disposers.push(d);
       },
-      inject: (_deps, fn) => fn(sub),
+      inject: (deps, fn) => {
+        injected.push(...deps);
+        fn(sub);
+      },
       logger: { info() {}, warn() {} },
     };
     const sub = {
@@ -635,36 +639,8 @@ describe("multi-account", () => {
       tools: { register: (t) => (tools.push(t), () => {}) },
       webServer: { register: (r) => (routes.set(r.path, r.handler), () => {}) },
     };
-    try {
-      apply(ctx, {});
-      const saved = JSON.parse(readFileSync(join(stateDir, "state.json"), "utf8"));
-      assert.equal(saved.version, 2);
-      assert.equal(saved.accounts[0].id, "default");
-      assert.deepEqual(saved.accounts[0].selectedModels, ["claude-opus-5-5"]);
-      assert.ok(existsSync(join(stateDir, "state.v1.json")));
-
-      const tool = tools[0];
-      let out = await tool.execute({ action: "refresh" });
-      assert.equal(out.accounts[0].state, "connected", out.summary);
-      assert.deepEqual(providers["cli-proxy-messages"].models.map((m) => m.id), ["claude-opus-5-5"]);
-
-      out = await tool.execute({ action: "add_account", baseURL: "http://b.test", apiKey: "key-b", displayName: "Backup", selectedModels: ["gpt-6-astra"] });
-      assert.equal(out.account, "account-2");
-      assert.equal(out.accounts[1].enabled, true);
-      assert.equal(out.accounts[1].state, "connected", out.summary);
-      assert.equal(providers["cli-proxy-2-responses"].displayName, "Backup (OpenAI Responses)");
-
-      out = await tool.execute({ action: "configure", account: "account-2", enabled: false });
-      assert.equal(out.accounts[1].state, "disabled");
-      assert.equal(providers["cli-proxy-2-responses"], undefined);
-      assert.match(out.summary, /disabled/);
-
-      const status = await commands.find((c) => c.name === "cpa-status").handler();
-      assert.match(status.text, /accounts: 2 \(1 enabled\)/);
-
-      // HTTP route: remove the second account.
-      const handler = routes.get("/api/dsh-cliproxyapi/accounts/remove");
-      const body = JSON.stringify({ accountId: "account-2" });
+    const post = async (path, payload) => {
+      const body = JSON.stringify(payload);
       const req = {
         method: "POST",
         headers: { host: "127.0.0.1:1" },
@@ -674,7 +650,51 @@ describe("multi-account", () => {
       };
       let sent;
       const res = { writeHead: (code) => (sent = { code }), end: (text) => (sent.body = JSON.parse(text)) };
-      await handler(req, res);
+      await routes.get(path)(req, res);
+      return sent;
+    };
+    try {
+      apply(ctx, {});
+      const saved = JSON.parse(readFileSync(join(stateDir, "state.json"), "utf8"));
+      assert.equal(saved.version, 2);
+      assert.equal(saved.accounts[0].id, "default");
+      assert.deepEqual(saved.accounts[0].selectedModels, ["claude-opus-5-5"]);
+      assert.ok(existsSync(join(stateDir, "state.v1.json")));
+
+      // No agent tool: nothing is added to model context.
+      assert.equal(injected.includes("tools"), false);
+      assert.equal(tools.length, 0);
+      assert.deepEqual(commands.map((c) => c.name).sort(), ["cpa-refresh", "cpa-status"]);
+
+      let sent = await post("/api/dsh-cliproxyapi/refresh", {});
+      assert.equal(sent.code, 200, JSON.stringify(sent.body));
+      assert.equal(sent.body.accounts[0].status.state, "connected");
+      assert.deepEqual(providers["cli-proxy-messages"].models.map((m) => m.id), ["claude-opus-5-5"]);
+
+      sent = await post("/api/dsh-cliproxyapi/accounts/add", {
+        baseURL: "http://b.test",
+        apiKey: "key-b",
+        displayName: "Backup",
+        selectedModels: ["gpt-6-astra"],
+        enabled: true,
+      });
+      assert.equal(sent.code, 200, JSON.stringify(sent.body));
+      assert.equal(sent.body.createdId, "account-2");
+      assert.equal(sent.body.accounts[1].config.enabled, true);
+      assert.equal(sent.body.accounts[1].status.state, "connected");
+      assert.equal(providers["cli-proxy-2-responses"].displayName, "Backup (OpenAI Responses)");
+
+      sent = await post("/api/dsh-cliproxyapi/save", { accountId: "account-2", enabled: false });
+      assert.equal(sent.code, 200, JSON.stringify(sent.body));
+      assert.equal(sent.body.accounts[1].status.state, "disabled");
+      assert.equal(providers["cli-proxy-2-responses"], undefined);
+
+      const status = await commands.find((c) => c.name === "cpa-status").handler();
+      assert.match(status.text, /accounts: 2 \(1 enabled\)/);
+      assert.match(status.text, /disabled/);
+
+      // HTTP route: remove the second account.
+      sent = await post("/api/dsh-cliproxyapi/accounts/remove", { accountId: "account-2" });
       assert.equal(sent.code, 200, JSON.stringify(sent.body));
       assert.equal(sent.body.accounts.length, 1);
       assert.equal(JSON.parse(readFileSync(join(stateDir, "state.json"), "utf8")).accounts.length, 1);

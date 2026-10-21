@@ -16,7 +16,7 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) bund
 | Market installation (client) | `lib/client.js` — dshmarket Update API v1 one-click install and opt-in auto-install; the market installs |
 | Bundle patch | `cordis.patch.yml` — inserts row `dsh-cliproxyapi-pro` |
 | Display metadata | `locale/en.json`, `locale/zh.json` (`meta.title`, `meta.description`), `icon.svg` |
-| Agent tool | `cliproxyapi` (actions `status`, `refresh`, `configure`, `add_account`, `remove_account`) |
+| Agent tool | **None, on purpose.** The plugin registers no `ctx.tools` entry (see the invariant below) |
 | Slash commands | `/cpa-status`, `/cpa-refresh` |
 | Account HTTP routes | `/api/dsh-cliproxyapi/{status,refresh,save,accounts/add,accounts/remove,accounts/test}` |
 | Update HTTP routes | `/api/dsh-cliproxyapi/updates/{status,check,save,download}` |
@@ -28,7 +28,7 @@ Repository: <https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro> (default branch 
 
 ## Hard constraints
 
-- **Zero dependencies, no build.** Only Node.js built-ins and Cordis context services (`ctx.settings`, `ctx.credentials`, `ctx.commands`, `ctx.tools`, `ctx.webServer`, `ctx.logger`). Do not add `dependencies`, install scripts, TypeScript, or bundlers. Installation must stay offline-safe.
+- **Zero dependencies, no build.** Only Node.js built-ins and Cordis context services (`ctx.settings`, `ctx.credentials`, `ctx.commands`, `ctx.webServer`, `ctx.logger`). Do not add `dependencies`, install scripts, TypeScript, or bundlers. Installation must stay offline-safe.
 - **Client module format.** `lib/client.js` is hand-written for `window.__ModuleLoader__.load({ id, factory })`; the id equals the package name. React comes from `require("react")` inside the factory. Never `require` any `@deepseek-ai/dsh-client-*` package — entries in `dsh.client.inject` only order activation.
 - **Host UI conventions.** Style only with `--dsw-alias-*` theme tokens (literal colors only in artwork); to match native controls the quota UI also uses DSH design tokens (`--dsw-radius-*`, `--dsw-elevation-*`, `--dsw-menu-surface-fill` / `--dsw-menu-backdrop-filter`, `--dsw-alias-interactive-*` / `--dsw-alias-button-*`), always with a core `--dsw-alias-*` fallback, keep all visible text in the `zh`/`en` dictionaries registered through `ctx.locale`, use `role="switch"` + `aria-checked` for toggles, and render only inside the registered slots (no DOM writes outside the component, nothing appended to `document.body`).
 - **Resources are effects.** Every timer, listener, registration and stylesheet is created inside `apply` and disposed via `ctx.effect` / `ctx.on`. Timers that later write settings must be created through `outsideHmrTransaction(ctx, …)`, otherwise writes fail with "HMR transactions cannot be nested". Component polling uses a cleaned-up `useEffect`, cancels requests, and never sets state after unmount.
@@ -43,14 +43,16 @@ Repository: <https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro> (default branch 
 3. **Persistent State Store** — `<profileDir>/.dsh-cliproxyapi/state.json`, atomic write via temp file + rename.
 4. **Discovery & Catalog Parsing** — `discoveryCandidates()`, `discoverCpa()` (`/v1/models?client_version=pi` enriched catalog + plain `/v1/models` for `owned_by`), `parseCatalog()`.
 5. **Profile & Model Builder** — filtering, family/version sorting, `nativeProtocol()`, `buildPiAiRoutes()` (one route per protocol), `managedRouteKeys()`.
-6. **Runtime Synchronizer** — `CpaRuntime` (one per account: discover → build → diff-write routes → follow default model), `serializeSettings()`, `createCpaController()` (owns account runtimes and state; all account UI/tool/HTTP operations go through it).
+6. **Runtime Synchronizer** — `CpaRuntime` (one per account: discover → build → diff-write routes → follow default model), `serializeSettings()`, `createCpaController()` (owns account runtimes and state; all account UI/command/HTTP operations go through it).
 7. **HTTP Gate** — `admitRequest()` enforces host connection policy, loopback/trusted host, same-origin for POST. `admitUpdateRequest()` additionally requires a Host and, when an `Origin` is present, the same authority under the Origin's own `http(s)` scheme (the host connection fence's rule). A missing `Origin` is allowed: the DSH desktop shell (`forwardWebRequest` in the desktop main process) strips `origin`, `host` and `sec-fetch-site` before forwarding page requests with its session cookie, so requiring it rejects every desktop update POST (the 1.5.1 "check fails" bug; dshmarket hit the same, its #648).
 8. **Mount Once Guard** — prevents double activation across HMR generations.
-9. **Plugin Apply** — wires state file, credentials, timers, commands, tool and HTTP routes to the controller, plus an independent updater and its disposed startup/6-hour schedule.
+9. **Plugin Apply** — wires state file, credentials, timers, commands and HTTP routes to the controller, plus an independent updater and its disposed startup/6-hour schedule.
 
 `lib/updater.js`: `loadUpdateSettings()` / `saveUpdateSettings()` own separate v1 preferences; `parseUpdateVersion()` / `compareUpdateVersions()` implement strict SemVer; `validateUpdateMetadata()` validates channel/package/HTTPS registry metadata; `createPluginUpdater()` owns checks, automatic region racing, candidate generations and abortable downloads; `verifyUpdatePackage()` checks registry-provided SHA-512 integrity and restricted gzip/tar structure without extraction; `storeUpdatePackage()` atomically saves the verified `.tgz`. Integrity from registry metadata is not a publisher signature or npm provenance verification.
 
 `lib/quota.js`: `createQuotaController()` (fed by `controller.quotaAccounts()`: id, endpoint, owned `routes`, `pickerModels`) returns cached snapshots, refreshes stale accounts in the background, locks an account out of background refresh after a management 401/403 until `saveKey`/manual refresh, and never touches the management API without a key. `matchCredentials()` is the single source of model → credential mapping (`modelIndex`/`modelMatch` in each snapshot account): prefixed ids only to that prefix, bare ids prefer un-prefixed credentials, family heuristics only when model lists are missing. Snapshots never contain keys, tokens or raw upstream bodies.
+
+Quota probes (`PROBES`, keyed by normalized provider) mirror CLIProxyAPI's management center (`src/features/quota/providers/*` in router-for-me/Cli-Proxy-API-Management-Center): codex, claude, antigravity, gemini-cli, kimi (kimi.com / kimi.ai hosts, retry the other on 401/403), xai, devin (`GetUserStatus`, account-wide daily/weekly windows without a model filter), meta. Upstream tokens normally stay inside CPA via `$TOKEN$`; the one exception is Meta, whose endpoint needs the credential's `dca_token`: `meta` reads only that field from `/v0/management/auth-files/download` for one request and must never store, log or return it. Any other credential with `supports_quota` goes through `pluginProbe` → `POST /v0/management/quota/fetch` (CPA's normalized `pluginapi.QuotaFetchResponse`, parsed by `groupedQuotaWindows()`). Never add probes that spend money (e.g. CPA's paid-xAI chat-completion health check); background refresh runs every 5 minutes. When CPA adds a quota provider, compare against the management center first.
 
 `lib/client.js`: surfaces registered in `apply`.
 - `settings.section` renders `CpaSectionPage` → `CpaSettingsPanel`: one account bar (+ `AddAccountForm`, which tests with `accounts/test` before `accounts/add`), then `AccountPanel` keyed by account id with **Connection / Models / Quota** tabs (`QuotaPanel` with `accountId`, no switcher of its own). The **Enabled** switch and **Clear Key** call `actions.patch` with one field and never bump `rev`; `actions.save` sends the full draft (without `enabled`) and bumps `rev`. Dirty state = draft vs live `account.config` + selection/overrides + key draft; one sticky save bar; account switches confirm before discarding. Secondary help text uses `InfoTip` (button + `role="tooltip"`), never `title` attributes.
@@ -74,6 +76,7 @@ Update polling must never refetch account status or bump `rev`. `PluginUpdatePan
 - Account ids are stable; renaming `provider` releases the old keys on the next sync. Removing an account tears down its runtime and unsets its routes but keeps its stored credential.
 - Re-syncing unchanged data performs **zero** settings writes (diff via `sameJson`). User-set fields on managed routes (e.g. `retryPolicy`) survive; only `MANAGED_ROUTE_FIELDS` are replaced.
 - `selectedModels` absent means "never chosen": the first successful probe seeds `recommendModels()` (newest per family, from that server's catalog) exactly once via `seedSelection`. `[]` is an explicit choice meaning "all models". Never ship hard-coded model ids as defaults — catalogs differ between servers.
+- **No agent tool.** The plugin is managed through the Settings page, its HTTP routes and the slash commands only. Do not register anything with `ctx.tools` (the former `cliproxyapi` tool cost ~3K tokens of model context in every session) and do not reintroduce it behind a switch; `apply()` never injects `tools` (asserted in `tests/plugin.test.mjs`).
 - `state.json` is re-read on every access so hand edits apply; always write the normalized shape (`version: 2`). Format changes need a migration in `normalizeState()` plus a test, and must keep a v1 file loading losslessly.
 
 ### Offline update invariants
@@ -91,7 +94,7 @@ Update polling must never refetch account status or bump `rev`. `PluginUpdatePan
 
 ## Adding a setting
 
-**Account setting:** update, in order: `ACCOUNT_FIELDS` and `resolveConfig()` → `pickAccount()` → `accountPatchFromInput()` (tool + HTTP) → tool `parameters` schema and description → client draft state, the draft-loading `useEffect`, `onSave` payload and form control (with `zh`/`en` strings) → the tool/API tables in **both** `README.md` and `README.en.md` → a test. Global (all-account) settings go in `GLOBAL_FIELDS` instead.
+**Account setting:** update, in order: `ACCOUNT_FIELDS` and `resolveConfig()` → `pickAccount()` → `accountPatchFromInput()` (HTTP) → client draft state, the draft-loading `useEffect`, `onSave` payload and form control (with `zh`/`en` strings) → the API tables in **both** `README.md` and `README.en.md` → a test. Global (all-account) settings go in `GLOBAL_FIELDS` instead.
 
 **Update preference:** change updater defaults/normalization, strict persisted-file validation and `save()` validation → the isolated update card and both locale dictionaries → both READMEs → updater/client/HTTP tests. Keep the independent preferences schema versioned; do not change account-state migration for an update preference.
 
@@ -111,7 +114,7 @@ Tests fake `fetch`, settings and credentials; they never touch the network or th
 - This directory may be installed **by link** into the user's profile (`plugin_manager list_bundles` shows `source: link:<this dir>`). Saved edits then become live on the next plugin reload — and the agent session itself may be using models routed through this plugin. Make risky changes in a scratch copy, get tests green, then copy back only within the user's approved scope.
 - Back up `<profileDir>/.dsh-cliproxyapi/state.json` before changing its format or migration logic. Update preferences intentionally do not modify that format.
 - Reload host code: `plugin_manager set_plugin include:dsh-cliproxyapi-pro` `enabled:false`, then `enabled:true`. Routes already written to `llm-pi-ai` persist across the reload. Client code needs a page refresh.
-- Verify account behavior through the `cliproxyapi` tool (`status` / `refresh`) or `/cpa-status`; HTTP routes require the Web session's auth and return 401 to plain `curl`. Update POSTs additionally reject a present cross-origin `Origin`.
+- Verify account behavior through `/cpa-status` / `/cpa-refresh` or the Settings page; HTTP routes require the Web session's auth and return 401 to plain `curl`. Update POSTs additionally reject a present cross-origin `Origin`.
 - Never upgrade the live plugin, uninstall it, restart DSH or overwrite a linked checkout merely to test the updater. Prefer injected offline I/O and component fixtures. Restore any account, selection or route you changed while testing.
 
 ## Documentation
@@ -135,5 +138,5 @@ Tests fake `fetch`, settings and credentials; they never touch the network or th
 1. For an actual release, bump `version` in `package.json` and the pinned versions in both READMEs (`dsh-cliproxyapi-pro@<version>` and the `#v<version>` Git target); turn the `Unreleased` notes into a `## <version> — <date>` section of `CHANGELOG.md` (the release workflow publishes exactly that section as the Release notes).
 2. `npm run check` passes; `npm run pack:check` lists exactly `lib/index.js`, `lib/client.js`, `lib/updater.js`, `lib/quota.js`, `locale/*.json`, `cordis.patch.yml`, `icon.svg`, `README.md`, `README.en.md`, `CHANGELOG.md`, `LICENSE`, `package.json`.
 3. `locale/*.json` `meta` text still describes the plugin; `icon.svg` renders (≤ 256 KiB).
-4. With user approval, check the Settings panel in both languages and the tool output in a live Harness. Offline component previews must be labeled and do not substitute for a claimed live test; never install an update merely to capture the UI.
+4. With user approval, check the Settings panel in both languages and the `/cpa-status` output in a live Harness. Offline component previews must be labeled and do not substitute for a claimed live test; never install an update merely to capture the UI.
 5. Commit (`type: summary`, e.g. `feat: offline update downloads`, `fix: …`, `docs: …`), push `main`, wait for CI, then `git tag v<version>` and `git push origin v<version>` to trigger the release. Verify stable/Beta/Dev npm dist-tag and GitHub prerelease classification.
