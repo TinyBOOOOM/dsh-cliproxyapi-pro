@@ -49,7 +49,7 @@ The plugin is published on npm as [`dsh-cliproxyapi-pro`](https://www.npmjs.com/
    dsh-cliproxyapi-pro
    ```
 
-   To pin a version, write `dsh-cliproxyapi-pro@1.6.0`.
+   To pin a version, write `dsh-cliproxyapi-pro@1.7.0`.
 4. Click **Install**. When it finishes, the dialog offers to enable the plugin right away — accept it.
 
 > If downloads are slow in mainland China, open **Registry** next to the input and choose **the mainland China mirror**.
@@ -78,7 +78,7 @@ In **Add plugin**, or as the `plugin_manager` `target`, you can also enter:
 
 | Source | What to enter |
 |---|---|
-| A released version | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v1.6.0` |
+| A released version | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v1.7.0` |
 | Latest development version | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#main` |
 | Offline package | Download [`dsh-cliproxyapi-pro.tgz`](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/releases/latest/download/dsh-cliproxyapi-pro.tgz) (always the latest release) and enter its absolute local path |
 | Local source (development) | Absolute path of a cloned repository; installed as a link, so code changes go live when the plugin reloads |

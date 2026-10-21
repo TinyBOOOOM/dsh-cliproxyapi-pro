@@ -4,7 +4,7 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 1.7.0 — 2026-10-21
 
 ### Changed
 - The package description, keywords (`cpa`, `cli-proxy-api`) and the `zh`/`en` plugin title and description now include the common abbreviation **CPA**, so searching plugins for "CPA" finds this one.
