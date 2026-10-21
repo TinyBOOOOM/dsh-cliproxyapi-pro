@@ -501,9 +501,22 @@ describe("quota client", () => {
     const badge = registrations.find((r) => r.meta.name === "conversation.input.right");
     assert.ok(badge, "badge registered in conversation.input.right");
     assert.ok(badge.meta.order >= 1000, "last entry, adjacent to the model selector");
-    assert.equal(badge.meta.inject("s1").directory, directories.get("s1"));
-    assert.equal(badge.meta.inject("missing").directory, null, "a session without scope degrades to no badge");
+    // DSH caches inject() per session binding: it must not resolve the
+    // directory (an early miss would be cached); the component resolves lazily.
+    assert.equal(badge.meta.inject("s1").directory, undefined, "inject never resolves eagerly");
+    assert.equal(badge.meta.inject("s1").resolveDirectory(), directories.get("s1"));
+    assert.throws(() => badge.meta.inject("missing").resolveDirectory(), /no scope/);
+    assert.equal(badge.meta.inject("s1").sessionId, "s1");
+    const resolver = () => directories.get("s1");
+    assert.equal(badge.render({ resolveDirectory: resolver }).props.resolveDirectory, resolver);
     assert.equal(badge.render({ directory: null }).type, h.QuotaBadge);
+    assert.equal(badge.render({ directory: null }).props.placement, "composer");
+    const hero = registrations.find((r) => r.meta.name === "conversation.hero.options");
+    assert.ok(hero, "New Session hero gets its own badge entry (the composer list needs a bound session)");
+    assert.notEqual(hero.meta.id, badge.meta.id);
+    assert.equal(hero.meta.inject("s1").resolveDirectory(), directories.get("s1"));
+    assert.equal(hero.render({ directory: null, sessionId: "s1" }).props.placement, "hero");
+    assert.equal(hero.render({ directory: null, sessionId: "s1" }).props.sessionId, "s1");
     for (const off of disposers) off();
     assert.equal(h.timers.size, 0);
   });
@@ -522,6 +535,32 @@ describe("quota client", () => {
       null,
       "an account without a management key shows no badge"
     );
+  });
+
+  it("recovers when the session's model directory appears after the first render", () => {
+    const h = clientHarness();
+    const store = { getSnapshot: () => ({ data: quotaData, loading: false, error: null, busy: null }), subscribe: () => () => {}, refresh: async () => ({ ok: true }) };
+    const directory = { subscribe: () => () => {}, getSnapshot: () => ({ current: { provider: "cli-proxy-messages", model: "claude-opus-5-5" }, pending: null }) };
+    const t = (key) => h.zh[key] ?? key;
+    let ready = false;
+    const resolveDirectory = () => { if (!ready) throw new Error("ui-model-selection: session resolved no binding"); return directory; };
+    assert.equal(h.QuotaBadge({ t, resolveDirectory, store, sessionId: "s1" }), null, "binding not ready: nothing rendered, nothing thrown");
+    ready = true;
+    assert.ok(content(h.QuotaBadge({ t, resolveDirectory, store, sessionId: "s1" })).includes("90%"), "a later render resolves the directory");
+  });
+
+  it("shows the hero badge only while no composer badge covers the same session", () => {
+    const h = clientHarness();
+    const store = { getSnapshot: () => ({ data: quotaData, loading: false, error: null, busy: null }), subscribe: () => () => {}, refresh: async () => ({ ok: true }) };
+    const directory = { subscribe: () => () => {}, getSnapshot: () => ({ current: { provider: "cli-proxy-messages", model: "claude-opus-5-5" }, pending: null }) };
+    const t = (key) => h.zh[key] ?? key;
+    const presence = { ids: new Map(), add(id) { this.ids.set(id, (this.ids.get(id) ?? 0) + 1); return () => this.ids.set(id, this.ids.get(id) - 1); }, has(id) { return (this.ids.get(id) ?? 0) > 0; }, subscribe: () => () => {} };
+    const hero = h.QuotaBadge({ t, directory, store, sessionId: "s1", placement: "hero", presence });
+    assert.ok(content(hero).includes("90%"), "New Session hero shows the badge");
+    assert.equal(hero.props["data-placement"], "hero");
+    presence.add("s1");
+    assert.equal(h.QuotaBadge({ t, directory, store, sessionId: "s1", placement: "hero", presence }), null, "composer badge present: hero steps aside");
+    assert.ok(content(h.QuotaBadge({ t, directory, store, sessionId: "s2", placement: "hero", presence })).includes("90%"), "other sessions unaffected");
   });
 
   it("polls only while subscribed and disposes cleanly", async () => {
@@ -591,7 +630,7 @@ describe("hot reload", () => {
     const disposeNew = activation(); // overlaps: the old entries still hold the stable ids
     disposeOld();
     const names = [...live.values()].map((e) => e.meta.name).sort();
-    assert.deepEqual(names, ["conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section"]);
+    assert.deepEqual(names, ["conversation.hero.options", "conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section"]);
     const badge = [...live.values()].find((e) => e.meta.name === "conversation.input.right");
     assert.equal(badge.meta.id, "dsh-cliproxyapi-pro:quota", "the id stays stable");
     assert.equal(badge.meta.priority, 1, "the reloaded entry shadows one priority lower");
