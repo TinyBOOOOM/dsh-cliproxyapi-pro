@@ -218,12 +218,29 @@ CPA 通过 `/v1/images/*` 和 `/v1/videos/*` 提供生图、生视频模型（�
 ```
 
 - **选项**（写在提示词前面）：`-m <模型>` 临时指定模型（规则同 `/cpa-image`）；`-s <1-15>` 时长（秒）；`-r <480p|720p>` 分辨率；`--aspect <比例>` 可选 `1:1`、`16:9`、`9:16`、`4:3`、`3:4`、`3:2`、`2:3`，不写时由 xAI 决定（通常为 16:9，有首帧图时按首帧图的比例）。这些参数也可以直接写在提示词开头或结尾，作为独立的词：`10秒` / `10 秒` / `10s`、`480p` / `720p`、`16:9`、`竖屏`、`横屏`、`方形`，例如 `/cpa-video 10秒 480p 这个角色跳社会摇`；只有紧跟空格、逗号或结尾时才算参数，所以「3 秒后爆炸」仍是提示词，写在句子中间的也不会被识别。`-s` 等选项写了时以选项为准。都没写时用「生成」标签里的视频默认值。`--` 之后的内容一律当作提示词。
-- **首帧图**：附带一张图片再执行命令，会把它作为视频的第一帧（图生视频）。最多一张，只接受图片，超过 1 MB 时按上面「改图」里的方式缩小。
+- **附带图片的用法**（只接受图片，过大的按上面「改图」里的方式缩小）：
+  - 1 张：默认作为**首帧**（图生视频）；加 `--ref`（或写「参考图」）作为**参考图**；加 `--last`（或写「尾帧」）作为**尾帧**，视频最后停在这张图上。
+  - 2 张：默认作为**参考图**；加 `--first-last`（或写「首尾帧」）则第 1 张是首帧、第 2 张是尾帧，模型补出中间过程。
+  - 3 张及以上：**参考图**，`grok-imagine-video-1.5` 最多 14 张，其他视频模型最多 7 张。参考图用来带入人物、服装、物品等，不锁定第一帧；提示词里可以用 `<IMAGE_0>`、`<IMAGE_1>`… 按顺序指代。
+  - 首帧 / 尾帧固定只支持 `grok-imagine-video-1.5`。字段按 xAI 文档发送：`image`、`last_frame`、`reference_images`。
 - **无法取消**：视频一旦提交就无法撤回（CPA 和 xAI 都没有取消接口），会照常计费；生成期间输入框的「停止」按钮停不下它。
 - **请求细节**：向该模型所属账号的 CPA 发送一次 `POST /v1/videos/generations`（xAI 原生格式：`model`、`prompt`、`duration`、`resolution`，以及可选的 `aspect_ratio`、`image.url`；`sora-2*` 按 CPA 的规则改写为 `grok-imagine-video`），然后查询 `GET /v1/videos/{请求 id}`：开始 1 分钟内每 5 秒、3 分钟内每 10 秒、之后每 15 秒一次。完成后通过 CPA 的 `GET /openai/v1/videos/{请求 id}/content` 下载（CPA 用该凭据自己的代理去取文件，插件不直接访问上游地址），边下载边写入保存位置，最大 200 MiB，只接受 MP4 / MOV / WebM，同名不覆盖。
 - **后台与恢复**：提交成功后，任务记录在 `media-jobs.json` 里。重载插件或重启 DSH 只会暂停等待：下次启动时继续查询并保存；但 CPA 只在 3 小时内记得这个视频由哪个凭据生成，超过 3 小时仍未完成的任务标记为「已过期」，不再查询。还没拿到请求 id 就被重载打断的，记为「已中断」（可能已经提交，无法确认）。期间会话同样显示为「进行中」。
 - **结果**：对话里 `/cpa-video` 这一行同样显示成一问一答：右侧是提示词和时长、分辨率、比例、首帧图标签；左侧显示排队 / 生成进度（CPA 返回进度时显示百分比）/ 保存中和计时，完成后直接显示可播放的视频（支持拖动进度），下方按钮和右键菜单可以用其他应用打开、在文件资源管理器中显示、复制文件路径。
 - `/cpa-video-status` 列出本会话最近 20 个视频任务的状态和请求 id。
+
+#### 编辑 / 延长视频（`/cpa-video-edit`、`/cpa-video-extend`）
+
+```text
+/cpa-video-edit 把衣服换成红色，其他保持不变
+/cpa-video-extend 4秒 她转身走出画面
+/cpa-video-extend --from cmd-xxxx-3 -s 6 镜头慢慢拉远
+```
+
+- 视频完成后，下方会出现「编辑视频…」「延长视频…」按钮，点开写一句话即可提交，结果出现在对话下方新的一行。也可以直接输入命令：不写 `--from` 时使用本会话最新的、还能用的视频。
+- **原理**：xAI 的编辑（`/v1/videos/edits`）和延长（`/v1/videos/extensions`）需要原视频。插件不上传本地文件（视频有几 MB，远超请求大小上限，CPA 也没有 xAI 的文件上传接口），而是把 xAI 生成结果自带的**短期链接**交给 xAI，由 xAI 自己去取。这个链接只保存在内存里，不写入任何文件、日志，也不发给页面；所以**只能编辑 / 延长插件这次加载后生成、大约 1 小时内的视频**，插件重载或超过 1 小时后按钮消失，命令会提示重新生成。不能编辑你自己的本地视频。
+- **限制**（xAI 文档）：都使用 `grok-imagine-video`；编辑要求原视频不超过 8.7 秒，输出保持原时长、比例和分辨率（最高 720p）；延长要求原视频 2–15 秒，`-s` 指定新增的 2–10 秒（默认 6 秒，也可以写「4秒」），输出是原视频加新增部分。
+- 编辑和延长同样提交后无法取消、照常计费，后台等待、重载后继续、按钮操作都与 `/cpa-video` 相同。
 
 #### 输入框旁的生成模型按钮
 
@@ -291,6 +308,7 @@ CPA 通过 `/v1/images/*` 和 `/v1/videos/*` 提供生图、生视频模型（�
 - `/cpa-image [-m 模型] [--aspect 比例] [-n 1-4] 提示词`：生成图片；附带图片时改图。见 [生成图片](#生成图片cpa-image)。
 - `/cpa-video [-m 模型] [--aspect 比例] [-s 1-15] [-r 480p|720p] 提示词`：生成视频；可附带一张首帧图。提交后无法取消。见 [生成视频](#生成视频cpa-video)。
 - `/cpa-video-status`：列出本会话的视频任务。
+- `/cpa-video-edit [--from 命令id] 修改说明`、`/cpa-video-extend [--from 命令id] [-s 2-10] 接下来的内容`：编辑 / 延长插件生成的视频。见 [编辑 / 延长视频](#编辑--延长视频cpa-video-editcpa-video-extend)。
 
 ### HTTP 接口
 
@@ -317,7 +335,7 @@ CPA 通过 `/v1/images/*` 和 `/v1/videos/*` 提供生图、生视频模型（�
 | GET | `/api/dsh-cliproxyapi/media/session?sessionId=` | — | `{ ok, session }`：可选的生图 / 生视频模型、当前选择及其来源（`session` / `last` / `only`）、本会话最近生成的文件（只有文件名和 id，不含路径）；不联网 |
 | POST | `/api/dsh-cliproxyapi/media/session/save` | `{ sessionId?, kind: "image" \| "video", ref }` | 为会话选择模型（`ref` 为 `账号id/模型id`，`null` 清除本会话的选择），并记为上一次选择；不在可选列表里的模型返回 400 `invalid-model` |
 | GET | `/api/dsh-cliproxyapi/media/file?sessionId=&id=` | — | 返回插件为该会话记录过的生成文件；其他文件或其他会话一律 404。视频以流的形式返回，支持单个 `Range` 区间（206），便于播放器拖动 |
-| GET | `/api/dsh-cliproxyapi/media/command?sessionId=&commandId=` | — | `{ ok, run, files }`：该会话中某次命令的生成记录（状态 `running` / `done` / `error`、模型、提示词、比例、张数、参考图数量、起止时间、保存目录的显示名、错误代码和摘要）和生成的文件（id、文件名和完整路径，以及保存目录 `folderPath`、Host 的文件管理器类型 `desktop`：`explorer` / `finder` / `filemanager`），供对话里的命令行显示和打开文件；视频记录另有时长、分辨率、请求 id，进行中时附带阶段 `phase`（`submitting` / `queued` / `running` / `downloading`）和 CPA 返回的进度 `progress`；记录为进行中、但当前没有对应后台任务的（插件重载或崩溃）报告为 `interrupted` |
+| GET | `/api/dsh-cliproxyapi/media/command?sessionId=&commandId=` | — | `{ ok, run, files }`：该会话中某次命令的生成记录（状态 `running` / `done` / `error`、模型、提示词、比例、张数、参考图数量、起止时间、保存目录的显示名、错误代码和摘要）和生成的文件（id、文件名和完整路径，以及保存目录 `folderPath`、Host 的文件管理器类型 `desktop`：`explorer` / `finder` / `filemanager`），供对话里的命令行显示和打开文件；视频记录另有时长、分辨率、请求 id、方式 `mode`（`text` / `first-frame` / `reference` / `first-last` / `last-frame` / `edit` / `extend`）和来源命令 id；还能编辑 / 延长时附带 `actions: { edit, extend, expiresAt }`（不含链接）；进行中时附带阶段 `phase`（`submitting` / `queued` / `running` / `downloading`）和 CPA 返回的进度 `progress`；记录为进行中、但当前没有对应后台任务的（插件重载或崩溃）报告为 `interrupted` |
 
 更新接口的操作响应采用 `{ ok, update }`，状态包含 `currentVersion`、`latestVersion`、`available`、`channel`、`region`、`effectiveRegion`、`autoCheck`、`autoDownload`、`autoInstall`、`checking`、`downloading`、`lastCheckedAt`、`error` / `errorCode`、`blockedReason`、`downloadedVersion`、`downloadPath` 与 `upgradeCommand`。未检查或未下载的相关字段为 `null`。`channel` 为 `stable` / `beta` / `dev`，`region` 为 `auto` / `global` / `cn`；`effectiveRegion` 为本次成功检查使用的 `global` / `cn`（此前为 `null`）。
 

@@ -12,6 +12,8 @@ import {
   mediaOptions,
   normalizeRun,
   parseVideoCommand,
+  parseVideoEditCommand,
+  submitVideoEdit,
   submitVideo,
   retrieveVideo,
   downloadVideo,
@@ -444,6 +446,19 @@ describe("video generation", () => {
     assert.deepEqual(parseImageCommand("2张 16:9 一只猫"), { aspect: "16:9", count: 2, prompt: "一只猫" });
     assert.deepEqual(parseImageCommand("一只猫 横屏"), { aspect: "16:9", prompt: "一只猫" });
     assert.throws(() => parseImageCommand("一只猫 5张"), (e) => e.code === "invalid-count");
+    // How attached images are used.
+    assert.equal(parseVideoCommand("--ref 跳舞").frames, "reference");
+    assert.equal(parseVideoCommand("--first-last 跳舞").frames, "first-last");
+    assert.equal(parseVideoCommand("首尾帧 从白天到黑夜").frames, "first-last");
+    assert.deepEqual(parseVideoCommand("参考图 8秒 三个人跳舞"), { seconds: 8, frames: "reference", prompt: "三个人跳舞" });
+    // Edit / extend.
+    assert.deepEqual(parseVideoEditCommand("--from cmd-a-1 把衣服换成红色", "edit"), { from: "cmd-a-1", prompt: "把衣服换成红色" });
+    assert.deepEqual(parseVideoEditCommand("然后转身离开 4秒", "extend"), { seconds: 4, prompt: "然后转身离开" });
+    assert.deepEqual(parseVideoEditCommand("4秒 然后离开", "edit"), { prompt: "4秒 然后离开" }, "an edit has no length");
+    assert.throws(() => parseVideoEditCommand("-s 4 x", "edit"), (e) => e.code === "invalid-option");
+    assert.throws(() => parseVideoEditCommand("-s 11 x", "extend"), (e) => e.code === "invalid-extend-seconds");
+    assert.throws(() => parseVideoEditCommand("--from bad! x", "edit"), (e) => e.code === "invalid-option");
+    assert.throws(() => parseVideoEditCommand("--from cmd-a-1", "edit"), (e) => e.code === "missing-prompt");
   });
 
   it("submits through the native route with the alias resolved and only the given options", async () => {
@@ -464,16 +479,27 @@ describe("video generation", () => {
       (e) => e.code === "upstream-error" && e.detail === "HTTP 400: Model x is not supported, see [url]"
     );
     await assert.rejects(submitVideo({ fetch: async () => new Response("{}"), rootURL: "http://c", model: "x", prompt: "p", seconds: 4 }), (e) => e.code === "invalid-response");
+    await submitVideo({ fetch: fetchImpl, rootURL: "http://cpa.test", model: "grok-imagine-video-1.5", prompt: "p", seconds: 4, lastFrame: { mediaType: "image/jpeg", data: new Uint8Array([9]) }, references: [{ mediaType: "image/png", data: new Uint8Array([1]) }] });
+    const pinned = JSON.parse(calls[2].init.body);
+    assert.equal(pinned.last_frame.url, "data:image/jpeg;base64,CQ==");
+    assert.deepEqual(pinned.reference_images, [{ url: "data:image/png;base64,AQ==" }]);
+    await submitVideoEdit({ fetch: fetchImpl, rootURL: "http://cpa.test", apiKey: "k", mode: "extend", sourceUrl: "https://vidgen.x.ai/a.mp4", prompt: "next", seconds: 5 });
+    assert.equal(calls[3].url, "http://cpa.test/v1/videos/extensions");
+    assert.deepEqual(JSON.parse(calls[3].init.body), { model: "grok-imagine-video", prompt: "next", video: { url: "https://vidgen.x.ai/a.mp4" }, duration: 5 });
+    await submitVideoEdit({ fetch: fetchImpl, rootURL: "http://cpa.test", mode: "edit", sourceUrl: "https://vidgen.x.ai/a.mp4", prompt: "red", seconds: 5 });
+    assert.equal(calls[4].url, "http://cpa.test/v1/videos/edits");
+    assert.equal(JSON.parse(calls[4].init.body).duration, undefined, "edits keep the source's length");
   });
 
-  it("maps CPA / xAI states and never returns the video URL", async () => {
+  it("maps CPA / xAI states and passes a finished video's HTTPS link only as sourceUrl", async () => {
     const answer = (payload, status = 200) => async () => new Response(JSON.stringify(payload), { status });
     const base = { rootURL: "http://c", requestId: "req-1" };
     assert.deepEqual(await retrieveVideo({ ...base, fetch: answer({ status: "pending" }) }), { state: "queued" });
     assert.deepEqual(await retrieveVideo({ ...base, fetch: answer({ status: "processing", progress: 41.6 }) }), { state: "running", progress: 42 });
     const done = await retrieveVideo({ ...base, fetch: answer({ status: "done", video: { url: "https://vidgen.x.ai/secret.mp4", duration: 6 } }) });
-    assert.deepEqual(done, { state: "done", seconds: 6 });
-    assert.deepEqual(await retrieveVideo({ ...base, fetch: answer({ video: { url: "https://v/x.mp4" } }) }), { state: "done" });
+    assert.deepEqual(done, { state: "done", sourceUrl: "https://vidgen.x.ai/secret.mp4", seconds: 6 });
+    assert.deepEqual(await retrieveVideo({ ...base, fetch: answer({ video: { url: "https://v/x.mp4" } }) }), { state: "done", sourceUrl: "https://v/x.mp4" });
+    assert.deepEqual(await retrieveVideo({ ...base, fetch: answer({ status: "done", video: { url: "http://v/x.mp4" } }) }), { state: "done" }, "only HTTPS links are kept");
     assert.deepEqual(await retrieveVideo({ ...base, fetch: answer({ status: "expired" }) }), { state: "failed", error: "the video could not be generated" });
     assert.deepEqual(await retrieveVideo({ ...base, fetch: answer({ error: { message: "moderated, see https://x.ai/p" } }) }), { state: "failed", error: "moderated, see [url]" });
     await assert.rejects(retrieveVideo({ ...base, fetch: answer({ error: { message: "gone" } }, 404) }), (e) => e.code === "upstream-error" && e.status === 404);

@@ -665,7 +665,7 @@ describe("multi-account", () => {
       // No agent tool: nothing is added to model context.
       assert.equal(injected.includes("tools"), false);
       assert.equal(tools.length, 0);
-      assert.deepEqual(commands.map((c) => c.name).sort(), ["cpa-image", "cpa-refresh", "cpa-status", "cpa-video", "cpa-video-status"]);
+      assert.deepEqual(commands.map((c) => c.name).sort(), ["cpa-image", "cpa-refresh", "cpa-status", "cpa-video", "cpa-video-edit", "cpa-video-extend", "cpa-video-status"]);
       assert.equal(commands.find((c) => c.name === "cpa-video").input.attachments, true);
       assert.equal(commands.find((c) => c.name === "cpa-image").input.attachments, true);
 
@@ -1329,7 +1329,7 @@ describe("media models", () => {
       const signal = new AbortController().signal;
       const result = await video.handler({ agent: { id: "s-1" }, rawInput: "waves at sunset", attachments: [], signal, commandId: "cmd-v-1" });
       assert.equal(result.kind, "success", result.text);
-      assert.match(result.text, /^Submitting a 6 s 720p video to grok-imagine-video-1\.5 .*cannot be cancelled/);
+      assert.match(result.text, /^Submitting a 6 s 720p video \(text\) to grok-imagine-video-1\.5 .*cannot be cancelled/);
       assert.deepEqual(m.emitted[0], ["api-session/status", "s-1", true]);
       const row = await settledRun(m, "s-1", "cmd-v-1");
       assert.equal(row.body.run.status, "done", JSON.stringify(row.body.run));
@@ -1410,8 +1410,8 @@ describe("media models", () => {
       assert.equal(row.body.run.references, 1);
       assert.equal(JSON.parse(readFileSync(join(m.stateDir, "media-jobs.json"), "utf8")).jobs[0].state, "failed");
 
-      let result = await video().handler({ agent: { id: "s-1" }, rawInput: "x", attachments: [image, image], signal });
-      assert.match(result.text, /attach at most one image \(the first frame\)/);
+      let result = await video().handler({ agent: { id: "s-1" }, rawInput: "x", attachments: Array.from({ length: 15 }, () => image), signal });
+      assert.match(result.text, /attach at most 14 images/);
       result = await video().handler({ agent: { id: "s-1" }, rawInput: "-s 30 x", attachments: [], signal });
       assert.match(result.text, /seconds must be a whole number from 1 to 15/);
       result = await video().handler({ agent: { id: "s-1" }, rawInput: "-m grok-imagine-image x", attachments: [], signal });
@@ -1517,6 +1517,87 @@ describe("media models", () => {
       const refused = await video.handler({ agent: { id: "s-1" }, rawInput: "move", attachments: [image], signal });
       assert.equal(refused.kind, "error");
       assert.match(refused.text, /could not be made smaller than 1000 KB/);
+    } finally {
+      m.dispose();
+    }
+  });
+  it("/cpa-video sends references or pinned frames, and /cpa-video-edit / -extend reuse xAI's short-lived link", async () => {
+    const serve = fakeServers(MEDIA_SERVERS);
+    const workDir = mkdtempSync(join(tmpdir(), "cpa-work-"));
+    const mp4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypisom"), Buffer.alloc(16)]);
+    const posts = [];
+    let next = 0;
+    const durations = {};
+    const m = mountPlugin({
+      state: { version: 2, accounts: [{ id: "default", baseURL: "http://m.test", selectedModels: [] }] },
+      fetchImpl: async (url, init) => {
+        const path = new URL(String(url)).pathname;
+        if (init?.method === "POST" && path.startsWith("/v1/videos/")) {
+          const body = JSON.parse(init.body);
+          const id = `req-${++next}`;
+          posts.push({ path, body, id });
+          durations[id] = path.endsWith("/extensions") ? 6 + body.duration : 6;
+          return new Response(JSON.stringify({ request_id: id }));
+        }
+        const poll = /^\/v1\/videos\/(req-\d+)$/.exec(path);
+        if (poll) return new Response(JSON.stringify({ status: "done", video: { url: `https://vidgen.x.ai/${poll[1]}.mp4`, duration: durations[poll[1]] } }));
+        if (/^\/openai\/v1\/videos\/req-\d+\/content$/.test(path)) return new Response(mp4);
+        return serve(url, init);
+      },
+      extraServices: {
+        workingDirectory: { ensure: async () => workDir },
+        attachments: { readImage: async (ref) => ({ ref, data: new Uint8Array([1, 2, 3]) }) },
+      },
+    });
+    const signal = new AbortController().signal;
+    const image = { type: "image", attachment: { mediaType: "image/png" } };
+    const run = (name, rawInput, attachments, commandId, sessionId = "s-1") =>
+      m.commands.find((c) => c.name === name).handler({ agent: { id: sessionId }, rawInput, attachments, signal, commandId });
+    try {
+      await m.call("POST", "/api/dsh-cliproxyapi/refresh", {});
+      let result = await run("cpa-video", "三个人跳舞", [image, image, image], "cmd-m-1");
+      assert.match(result.text, /\(reference\)/);
+      let row = await settledRun(m, "s-1", "cmd-m-1");
+      assert.equal(row.body.run.mode, "reference");
+      assert.equal(posts[0].body.reference_images.length, 3);
+      assert.equal(posts[0].body.image, undefined);
+      assert.deepEqual(row.body.actions.edit, true, "a 6 s video can be edited");
+      assert.equal(row.body.actions.extend, true);
+      assert.ok(!JSON.stringify(row.body).includes("vidgen"), "the page never sees xAI's link");
+
+      await run("cpa-video", "首尾帧 从白天到黑夜", [image, image], "cmd-m-2");
+      await settledRun(m, "s-1", "cmd-m-2");
+      assert.ok(posts[1].body.image && posts[1].body.last_frame && posts[1].body.reference_images === undefined);
+      await run("cpa-video", "--last 落在这里", [image], "cmd-m-3");
+      await settledRun(m, "s-1", "cmd-m-3");
+      assert.ok(posts[2].body.last_frame && posts[2].body.image === undefined);
+      result = await run("cpa-video", "--first-last x", [image], "cmd-m-x");
+      assert.match(result.text, /need attached images/);
+
+      // Extend the newest video by 4 s, then edit the first one by id.
+      result = await run("cpa-video-extend", "4秒 然后转身离开", [], "cmd-m-4");
+      assert.equal(result.kind, "success", result.text);
+      row = await settledRun(m, "s-1", "cmd-m-4");
+      assert.deepEqual(posts[3], { path: "/v1/videos/extensions", id: "req-4", body: { model: "grok-imagine-video", prompt: "然后转身离开", video: { url: "https://vidgen.x.ai/req-3.mp4" }, duration: 4 } });
+      assert.equal(row.body.run.mode, "extend");
+      assert.equal(row.body.run.sourceCommandId, "cmd-m-3");
+      assert.equal(row.body.run.status, "done");
+      assert.equal(row.body.actions.edit, false, "the 10 s result is too long to edit");
+      assert.equal(row.body.actions.extend, true);
+
+      await run("cpa-video-edit", "--from cmd-m-1 把衣服换成红色", [], "cmd-m-5");
+      await settledRun(m, "s-1", "cmd-m-5");
+      assert.deepEqual(posts[4].body, { model: "grok-imagine-video", prompt: "把衣服换成红色", video: { url: "https://vidgen.x.ai/req-1.mp4" } });
+      result = await run("cpa-video-edit", "--from cmd-m-4 换背景", [], "cmd-m-6");
+      assert.match(result.text, /at most 8\.7 seconds/);
+      result = await run("cpa-video-extend", "继续", [], "cmd-m-7", "s-2");
+      assert.match(result.text, /no video of this session can be edited or extended/);
+      result = await run("cpa-video-extend", "-s 12 继续", [], "cmd-m-8");
+      assert.match(result.text, /adds 2 to 10 seconds/);
+
+      for (const file of ["media-sessions.json", "media-jobs.json"]) {
+        assert.ok(!readFileSync(join(m.stateDir, file), "utf8").includes("vidgen"), `${file} keeps no xAI link`);
+      }
     } finally {
       m.dispose();
     }

@@ -54,7 +54,7 @@ describe("plugin update client", () => {
     // Without modelDirectories only the generation-model button joins the composer and hero.
     assert.deepEqual(Object.keys(byName).sort(), ["conversation.chat.commandview", "conversation.hero.options", "conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section"]);
     const row = byName["conversation.chat.commandview"];
-    assert.deepEqual(registrations.filter((r) => r.meta.name === "conversation.chat.commandview").map((r) => r.meta.key), ["cpa-image", "cpa-video"], "only the /cpa-image and /cpa-video rows are replaced");
+    assert.deepEqual(registrations.filter((r) => r.meta.name === "conversation.chat.commandview").map((r) => r.meta.key), ["cpa-image", "cpa-video", "cpa-video-edit", "cpa-video-extend"], "only the generation command rows are replaced");
     assert.equal(JSON.stringify(row.meta.inject("s-1")), JSON.stringify({ sessionId: "s-1" }));
     assert.equal(row.render({ sessionId: "s-1", node: { name: "cpa-image" } }).type, h.ImageCommandCard);
     const chip = byName["conversation.input.right"];
@@ -1058,7 +1058,7 @@ describe("hot reload", () => {
     const disposeNew = activation(); // overlaps: the old entries still hold the stable ids
     disposeOld();
     const names = [...live.values()].map((e) => e.meta.name).sort();
-    assert.deepEqual(names, ["conversation.chat.commandview", "conversation.chat.commandview", "conversation.hero.options", "conversation.hero.options", "conversation.input.right", "conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section"]);
+    assert.deepEqual(names, ["conversation.chat.commandview", "conversation.chat.commandview", "conversation.chat.commandview", "conversation.chat.commandview", "conversation.hero.options", "conversation.hero.options", "conversation.input.right", "conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section"]);
     const chip = [...live.values()].find((e) => e.meta.id === "dsh-cliproxyapi-pro:media");
     assert.equal(chip.meta.priority, 1, "the generation button also shadows one priority lower");
     const badge = [...live.values()].find((e) => e.meta.id === "dsh-cliproxyapi-pro:quota");
@@ -1175,5 +1175,66 @@ describe("/cpa-video chat row and video model picker", () => {
     nodes(sections[1], (n) => n.props.role === "menuitemradio")[0].props.onClick();
     await flushClient();
     assert.deepEqual(posts[0], { sessionId: "s-1", kind: "video", ref: "default/grok-imagine-video" });
+  });
+});
+describe("video modes, edit and extend in the chat row", () => {
+  const okJson = (body) => new Response(JSON.stringify({ ok: true, ...body }));
+  const base = { commandId: "cmd-v-1", kind: "video", status: "done", model: "default/grok-imagine-video-1.5", modelName: "grok-imagine-video-1.5", accountName: "BCPA", prompt: "跳舞", seconds: 6, resolution: "480p", count: 1, references: 0, files: 1, startedAt: "2026-10-22T07:00:00.000Z", finishedAt: "2026-10-22T07:00:40.000Z", folder: "generated" };
+  const files = [{ id: "abcdef0123456789", kind: "video", name: "a.mp4", path: "D:\\w\\generated\\a.mp4" }];
+  const node = { name: "cpa-video", commandId: "cmd-v-1", args: "跳舞", outcome: { kind: "success", text: "Submitting" } };
+
+  it("labels references, pinned frames and extensions", () => {
+    const tagsOf = (run, name = "cpa-video") => {
+      const h = clientHarness({ update: { run, files }, loading: false, fetch: async () => okJson({}) });
+      return content(nodes(h.renderCard({ node: { ...node, name }, sessionId: "s-1" }, "zh", false), (n) => n.props.className === "dcpa-chat-tags")[0]);
+    };
+    assert.equal(tagsOf({ ...base, mode: "reference", references: 3 }), "/cpa-video6 秒480p参考图 ×3");
+    assert.equal(tagsOf({ ...base, mode: "first-last", references: 2 }), "/cpa-video6 秒480p首尾帧");
+    assert.equal(tagsOf({ ...base, mode: "extend", seconds: 4, resolution: undefined }, "cpa-video-extend"), "/cpa-video-extend延长 +4 秒");
+    assert.equal(tagsOf({ ...base, mode: "edit", resolution: undefined }, "cpa-video-edit"), "/cpa-video-edit编辑视频");
+  });
+
+  it("offers edit / extend while the host still has the video's link, and submits a follow-up command", async () => {
+    const lines = [];
+    const runCommand = async (sessionId, line) => (lines.push([sessionId, line]), { ok: true });
+    const h = clientHarness({ update: { run: base, files, actions: { edit: true, extend: true, expiresAt: "2026-10-22T08:00:00.000Z" } }, loading: false, fetch: async () => okJson({}) });
+    let tree = h.renderCard({ node, sessionId: "s-1", runCommand }, "zh", false);
+    const extend = nodes(tree, (n) => n.type === "button" && content(n) === h.zh.mediaExtendOpen)[0];
+    assert.ok(nodes(tree, (n) => n.type === "button" && content(n) === h.zh.mediaEditOpen)[0], "edit is offered too");
+    extend.props.onClick();
+    tree = h.renderCard({ node, sessionId: "s-1", runCommand }, "zh", false);
+    nodes(tree, (n) => n.type === "textarea")[0].props.onChange({ target: { value: "  然后转身离开 " } });
+    tree = h.renderCard({ node, sessionId: "s-1", runCommand }, "zh", false);
+    nodes(tree, (n) => n.type === "select" && n.props["aria-label"] === h.zh.mediaExtendSeconds)[0].props.onChange({ target: { value: "4" } });
+    tree = h.renderCard({ node, sessionId: "s-1", runCommand }, "zh", false);
+    nodes(tree, (n) => n.type === "button" && content(n) === h.zh.mediaExtendSubmit)[0].props.onClick();
+    await flushClient();
+    assert.deepEqual(lines, [["s-1", "/cpa-video-extend --from cmd-v-1 -s 4 -- 然后转身离开"]]);
+    tree = h.renderCard({ node, sessionId: "s-1", runCommand }, "zh", false);
+    assert.equal(nodes(tree, (n) => n.type === "textarea").length, 0, "the form closes");
+    assert.ok(content(tree).includes(h.zh.mediaEditSubmitted));
+
+    const gone = clientHarness({ update: { run: base, files }, loading: false, fetch: async () => okJson({}) });
+    tree = gone.renderCard({ node, sessionId: "s-1", runCommand }, "zh", false);
+    assert.equal(nodes(tree, (n) => n.type === "button" && content(n) === gone.zh.mediaEditOpen).length, 0, "no link, no edit");
+  });
+
+  it("runs follow-up commands through DSH's remote.commands service", async () => {
+    const h = clientHarness();
+    const live = [];
+    const executed = [];
+    const ctx = {
+      effect(fn) { return fn(); },
+      locale: { register: () => () => {}, bind: () => (key) => key },
+      slots: { inject: (_name, fn) => fn(), register: (meta, render) => (live.push({ meta, render }), () => {}) },
+      inject(_names, fn) { fn({ slots: ctx.slots, modelDirectories: { directoryFor: () => ({ store: null }) } }); },
+      get: (name) => (name === "remote.commands" ? { execute: async (...args) => (executed.push(args), { ok: true, value: { result: { kind: args[1].includes("bad") ? "error" : "success", text: "nope" } } }) } : undefined),
+    };
+    h.apply(ctx);
+    const row = live.find((e) => e.meta.name === "conversation.chat.commandview" && e.meta.key === "cpa-video-extend");
+    const runCommand = row.render({ node: { name: "cpa-video-extend" }, sessionId: "s-1" }).props.runCommand;
+    assert.equal(JSON.stringify(await runCommand("s-1", "/cpa-video-extend -- go")), JSON.stringify({ ok: true }));
+    assert.equal(JSON.stringify(await runCommand("s-1", "/cpa-video-extend -- bad")), JSON.stringify({ ok: false, text: "nope" }));
+    assert.deepEqual(JSON.parse(JSON.stringify(executed[0])), ["s-1", "/cpa-video-extend -- go", []]);
   });
 });
