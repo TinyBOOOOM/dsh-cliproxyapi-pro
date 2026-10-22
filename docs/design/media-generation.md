@@ -348,6 +348,7 @@ submit ──► queued/processing ──► done ──► download ──► s
    - 后续补充（2026-10-22）：按 xAI 文档实现参考图（`reference_images`，1.5 最多 14 张）、首尾帧（`image` + `last_frame`）、尾帧，以及编辑 / 延长（`/v1/videos/edits`、`/extensions`，模型 `grok-imagine-video`）。原视频不上传：请求体上限约 2 MiB、CPA 没有 `/v1/files`，所以用 xAI 结果自带的短期链接（只放内存、约 1 小时、重载即失效）。这改写了 D9（v1 不做编辑 / 延长）。
     - 再次补充（2026-10-22）：用不会生成内容的请求（空提示词 / 非法时长）实测 BCPA 的请求体上限：`/v1/videos/generations` 读得下 1 MiB、1.2 MiB 起返回「length limit exceeded」；`/v1/videos/edits` 读得下 20 MiB；`/v1/videos/extensions` 返回 405（该服务器上游没有延长接口，CPA 随后让凭据冷却约 1 分钟）。据此 `/cpa-video-edit` / `-extend` 改为接受任意 MP4：附带文件、`--video` 路径、`--url` 公开链接、`--from`，本地视频以 base64 内联（≤ 14 MiB），插件生成的视频在链接过期后发送已保存的文件；视频的附带图片按 1 MiB 请求体分配。
    - 视频预览没有用 `documentPreviews`：对话里的命令行直接用 `<video>` 播放，`media/file` 支持 `Range`。§15 第 5 项（完成提示）由命令行本身承担：后台完成后该行自动显示视频；第 6 项因此不再需要。
-4. **P4 agent 工具**：`generate_media`、开关、确认、上限，以及 AGENTS.md / README / CHANGELOG 的修改。
+4. **P4 agent 工具**（✅ 已实现，待真实测试）：`generate_media`、开关、确认、上限，以及 AGENTS.md / README / CHANGELOG 的修改。
+   - 与原设计的差异（2026-10-22，经用户确认）：工具也支持编辑 / 延长视频（`mode`、`video` 参数，另有 `frames`），定义约 400 token；不再提供 `video_id` 续等参数，超时后由后台任务继续、对话行展示结果。确认走 `ctx.approval.request`（与 DSH 自带工具的审批相同，会话审批策略为 `never` 时拒绝）；工具调用行通过 `tool.call.toolview` 复用斜杠命令的一问一答显示。工具复用斜杠命令的处理函数（`literal` 模式：不识别提示词里的参数词、不请对话模型解读），在受理后、记录和发送前调用 `gate` 完成确认、上限检查和扣秒。编辑按原视频时长、延长按新增秒数扣秒。图片确认方式也可按会话覆盖。
 
 每个阶段结束都要通过 `npm run check`。P4 完成后再一起发布 1.8.0。
