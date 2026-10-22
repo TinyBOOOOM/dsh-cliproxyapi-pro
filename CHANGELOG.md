@@ -20,6 +20,9 @@
 - **只读诊断。** 只发送 GET 请求，读取两份模型目录中的生成模型字段，并在不带 Key 的情况下探测 CPA 的视频接口是否存在；不生成内容、不消耗额度、不返回 Key。
 - 新接口 `/api/dsh-cliproxyapi/media/{status,save,diagnose}`；生成设置独立保存在 `.dsh-cliproxyapi/media-settings.json`，`state.json` 格式不变。`/cpa-status` 显示识别出的生成模型数量。
 
+### 修复
+- **「测试连接」总是报错 `Failed to execute 'json' on 'Response': Unexpected end of JSON input`。** 设置页（添加账号表单和连接标签页）缺少测试连接接口的地址，请求发到了不存在的路径。现在会正确调用 `/api/dsh-cliproxyapi/accounts/test`；页面收到非 JSON 回复时改为显示 `HTTP <状态码>`。（1.7.0 起存在）
+
 ### 注意
 - 新增了打包文件 `lib/media.js`。1.5.0–1.6.0 内置的离线更新仍使用旧的固定文件清单，会拒绝这个版本的离线包；这些版本的用户请先通过插件市场或 npm 升级一次（插件页和 `dsh plugin add` 不受影响）。
 

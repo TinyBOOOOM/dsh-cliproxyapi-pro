@@ -20,6 +20,9 @@ All notable changes to this plugin. Versions follow [Semantic Versioning](https:
 - **Read-only diagnostic.** Sends GET requests only: reads the media-model fields of both catalogs and probes, without the key, whether CPA's video routes exist. It generates nothing, spends no quota and never returns the key.
 - New routes `/api/dsh-cliproxyapi/media/{status,save,diagnose}`; generation settings live separately in `.dsh-cliproxyapi/media-settings.json`, and the `state.json` format is unchanged. `/cpa-status` reports how many media models were recognized.
 
+### Fixed
+- **"Test connection" always failed with `Failed to execute 'json' on 'Response': Unexpected end of JSON input`.** The Settings page (add-account form and Connection tab) lacked the test route's path, so the request went to a path that does not exist. It now calls `/api/dsh-cliproxyapi/accounts/test`, and a non-JSON reply is shown as `HTTP <status>`. (Present since 1.7.0.)
+
 ### Notes
 - Adds the shipped file `lib/media.js`. The built-in offline updater of 1.5.0–1.6.0 still uses the old fixed file list and rejects this version's offline package; users of those versions should update once through the plugin market or npm (the Plugins page and `dsh plugin add` are unaffected).
 
