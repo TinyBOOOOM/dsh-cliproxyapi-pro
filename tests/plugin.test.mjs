@@ -1831,13 +1831,20 @@ it("generate_media: off by default, then image / video with approval, budget, re
       assert.equal(out.run, "toolu_1");
 
       // Words that look like options stay in the prompt (literal).
-      out = await call({ kind: "video", prompt: "10秒 竖屏 一只猫", seconds: 4, resolution: "480p" });
+      // A real Responses all-fields call formerly failed on model:"", count:1,
+      // then on first-frame without images. It must use the selected model and
+      // reach confirmation exactly once as a text-to-video request.
+      out = await call({ kind: "video", prompt: "10秒 竖屏 一只猫", mode: "generate", model: "", images: [], frames: "first-frame", video: "", aspect: "16:9", seconds: 4, resolution: "480p", count: 1 });
       assert.equal(approvals.length, 1, "videos ask by default");
       assert.match(approvals[0].displayReason.zh, /4 秒视频/);
       assert.match(approvals[0].displayReason.en, /cannot be cancelled/);
       assert.equal(approvals[0].toolName, "generate_media");
       assert.equal(posts[1].body.prompt, "10秒 竖屏 一只猫");
       assert.equal(posts[1].body.duration, 4);
+      assert.equal(posts[1].body.model, "grok-imagine-video-1.5", "an empty model uses the user's selected model");
+      assert.equal(posts[1].body.image, undefined);
+      assert.equal(posts[1].body.reference_images, undefined);
+      assert.equal((await m.call("GET", `/api/dsh-cliproxyapi/media/command?sessionId=s-root&commandId=${out.run}`)).body.run.mode, "text");
       assert.equal(out.status, "done");
       assert.equal(out.files.length, 1);
       assert.equal((await session()).agent.used, 4, "confirmed videos are counted too");
@@ -1874,7 +1881,7 @@ it("generate_media: off by default, then image / video with approval, budget, re
       await m.call("POST", "/api/dsh-cliproxyapi/media/confirm", { sessionId: "s-root", commandId: `toolu_${n}`, allow: false });
       await assert.rejects(pendingCall, /the user declined this video; do not retry/);
       assert.equal(posts.length, before);
-      pendingCall = call({ kind: "video", prompt: "in row", seconds: 4 });
+      pendingCall = call({ kind: "video", prompt: "in row", mode: null, model: null, images: null, frames: null, video: null, aspect: null, seconds: 4, resolution: null, count: null });
       shown = await waitConfirm(`toolu_${n}`);
       const ok = await m.call("POST", "/api/dsh-cliproxyapi/media/confirm", { sessionId: "s-root", commandId: `toolu_${n}`, allow: true });
       assert.equal(ok.code, 200);

@@ -55,6 +55,7 @@ import {
   approvalText,
   chargeSeconds,
   parseToolArgs,
+  GENERATE_MEDIA_TOOL,
   toolCommandLine,
   toolRunId,
 } from "../lib/media.js";
@@ -734,6 +735,39 @@ describe("agent tool (generate_media)", () => {
     assert.equal(toolRunId("toolu_01ABC"), "toolu_01ABC");
     assert.equal(toolRunId("call|00=x"), "call_00_x");
     assert.equal(toolRunId("--"), undefined);
+  });
+
+  it("accepts Responses all-fields calls with nulls and legacy neutral defaults", () => {
+    const optional = Object.keys(GENERATE_MEDIA_TOOL.parameters.properties).filter((key) => !["kind", "prompt"].includes(key));
+    const nullable = Object.fromEntries(optional.map((key) => [key, null]));
+    for (const key of optional) {
+      assert.ok(GENERATE_MEDIA_TOOL.parameters.properties[key].oneOf.some((branch) => branch.type === "null"), `${key} can be null in a strict schema`);
+    }
+    const image = parseToolArgs({ ...nullable, kind: "image", prompt: "10秒 竖屏 原样保留" });
+    assert.deepEqual(image, { kind: "image", prompt: "10秒 竖屏 原样保留" });
+    assert.equal(toolCommandLine(image), "-- 10秒 竖屏 原样保留");
+    const expected = { kind: "video", prompt: "北方下大雪", mode: "generate", aspect: "16:9", seconds: 5, resolution: "480p" };
+    const canonical = { ...nullable, kind: "video", prompt: "北方下大雪", seconds: 5, resolution: "480p", aspect: "16:9" };
+    assert.deepEqual(parseToolArgs(canonical), expected);
+    // The exact field pattern from the failed Responses session, before null was offered.
+    const legacy = { ...canonical, mode: "generate", model: "", images: [], frames: "first-frame", video: "", count: 1 };
+    assert.deepEqual(parseToolArgs(legacy), expected);
+    assert.equal(toolCommandLine(parseToolArgs(legacy)), "--aspect 16:9 -s 5 -r 480p -- 北方下大雪");
+    assert.deepEqual(parseToolArgs({ ...nullable, kind: "video", prompt: "next", mode: "extend", video: "clip.mp4", seconds: 4 }), { kind: "video", prompt: "next", mode: "extend", video: "clip.mp4", seconds: 4 });
+    assert.deepEqual(parseToolArgs({ ...nullable, kind: "video", prompt: "red", mode: "edit", images: [], frames: "first-frame", video: "clip.mp4", count: 1 }), { kind: "video", prompt: "red", mode: "edit", video: "clip.mp4" });
+    assert.equal(legacy.model, "", "normalization does not mutate the input");
+    for (const [args, pattern] of [
+      [{ ...canonical, count: 2 }, /count is for images only/],
+      [{ ...canonical, frames: "reference" }, /frames needs images/],
+      [{ ...canonical, frames: "typo" }, /frames must be/],
+      [{ ...canonical, frames: "first-frame", images: ["a.png", "b.png"] }, /exactly one image/],
+      [{ ...canonical, frames: "first-last", images: ["a.png"] }, /exactly two images/],
+      [{ ...canonical, resolution: "1080p" }, /resolution must be/],
+      [{ ...canonical, seconds: 16 }, /seconds must be 1–15/],
+      [{ ...nullable, kind: "video", prompt: "next", mode: "extend", seconds: 11 }, /seconds must be 2–10/],
+      [{ ...nullable, kind: "image", prompt: "x", count: 5 }, /count must be 1–4/],
+      [{ ...nullable, kind: "image", prompt: null }, /prompt must be/],
+    ]) assert.throws(() => parseToolArgs(args), pattern);
   });
 
   it("counts video seconds per session, starts again on a new limit or auto, and states it in the approval", () => {
