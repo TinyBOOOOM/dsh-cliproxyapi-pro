@@ -22,6 +22,9 @@ All notable changes to this plugin. Versions follow [Semantic Versioning](https:
 - **Read-only diagnostic.** Sends GET requests only: reads the media-model fields of both catalogs and probes, without the key, whether CPA's video routes exist. It generates nothing, spends no quota and never returns the key.
 - New routes `/api/dsh-cliproxyapi/media/{status,save,diagnose}`; generation settings live separately in `.dsh-cliproxyapi/media-settings.json`, and the `state.json` format is unchanged. `/cpa-status` reports how many media models were recognized.
 
+### Changed
+- **Image and video models are picked separately.** The composer now shows two buttons: the image button opens only image models and the video button only video models. The agent confirmations and video seconds limit moved behind **Agent generation settings** in the model menu footer as a secondary menu, no longer mixed into the model lists.
+
 ### Fixed
 - **Image models occasionally vanished from the generation picker.** The plain `/v1/models` listing shared the enriched catalog's timeout, so a slightly slow catalog dropped every image model that only the plain listing carries; the composer showed video models alone until the next five-minute refresh. Both catalogs are now fetched in parallel, the plain listing gets its own deadline and one retry, and a still-failed read is retried about four seconds after the sync (at most twice). `media/session` also reports `catalogIncomplete`, and the generation button keeps refreshing while it is true.
 - **Agent generation on Responses routes repeatedly failed argument checks.** Optional arguments accept `null`, and an empty model name uses the user's pick. Legacy empty fields, video `count: 1` and a default `first-frame` without images are accepted, avoiding successive model/count errors. Multi-video requests and genuinely invalid frame counts, resolutions or lengths are still rejected; generation is never automatically retried.

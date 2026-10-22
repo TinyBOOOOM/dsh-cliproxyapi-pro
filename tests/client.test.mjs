@@ -833,21 +833,24 @@ describe("generation-model button", () => {
     let tree = h.renderChip({ sessionId: "s-1" });
     await flushClient();
     tree = h.renderChip({ sessionId: "s-1" });
+    const byKind = (root, kind) => nodes(root, (n) => n.type === "button" && n.props["data-kind"] === kind)[0];
     assert.equal(
-      nodes(tree, (n) => n.type === "button")[0].props["aria-label"],
+      byKind(tree, "video").props["aria-label"],
       h.zh.mediaChipVideoLabel.replace("{model}", "Grok Video"),
       "a video model alone is shown first"
     );
+    assert.equal(byKind(tree, "image"), undefined, "no image button without image models");
     assert.deepEqual([...h.timers.values()].map((x) => x.ms), [3000], "retries although a video model is already known");
     [...h.timers.values()][0].fn();
     tree = h.renderChip({ sessionId: "s-1" });
     await flushClient();
     tree = h.renderChip({ sessionId: "s-1" });
     assert.equal(
-      nodes(tree, (n) => n.type === "button")[0].props["aria-label"],
-      `${h.zh.mediaChipLabel.replace("{model}", "grok-imagine-image")}${h.zh.mediaChipJoin}${h.zh.mediaChipVideoLabel.replace("{model}", "Grok Video")}`,
-      "the image model appears once the catalog is complete"
+      byKind(tree, "image").props["aria-label"],
+      h.zh.mediaChipLabel.replace("{model}", "grok-imagine-image"),
+      "the image model gets its own button once the catalog is complete"
     );
+    assert.equal(byKind(tree, "video").props["aria-label"], h.zh.mediaChipVideoLabel.replace("{model}", "Grok Video"));
     h.unmount();
     assert.equal(h.timers.size, 0, "the retry is cleared on unmount");
   });
@@ -1247,18 +1250,26 @@ describe("/cpa-video chat row and video model picker", () => {
     };
     const posts = [];
     const h = clientHarness({ update: session, loading: false, fetch: async (url, options = {}) => (options.method === "POST" && posts.push(JSON.parse(options.body)), okJson({ session })) });
+    const chipButton = (tree, kind) => nodes(tree, (n) => n.type === "button" && n.props["data-kind"] === kind)[0];
     let tree = h.renderChip({ sessionId: "s-1" }, "zh", false);
-    const button = nodes(tree, (n) => n.type === "button")[0];
-    assert.equal(button.props["aria-label"], "生图模型：grok-imagine-image；生视频模型：grok-imagine-video");
-    assert.equal(nodes(button, (n) => n.props.className === "dcpa-m-chip-part").length, 2);
-    button.props.onClick();
+    assert.equal(chipButton(tree, "image").props["aria-label"], "生图模型：grok-imagine-image");
+    assert.equal(chipButton(tree, "video").props["aria-label"], "生视频模型：grok-imagine-video");
+    assert.equal(nodes(tree, (n) => n.props.className === "dcpa-m-chip-part").length, 2);
+    chipButton(tree, "image").props.onClick();
     tree = h.renderChip({ sessionId: "s-1" }, "zh", false);
-    const sections = nodes(tree, (n) => n.props.className === "dcpa-m-section");
-    assert.deepEqual(sections.map((n) => n.props["data-kind"]), ["image", "video"]);
-    assert.ok(content(sections[1]).includes(h.zh.mediaChipInherited), "the video pick is inherited here");
-    nodes(sections[1], (n) => n.props.role === "menuitemradio")[0].props.onClick();
+    let sections = nodes(tree, (n) => n.props.className === "dcpa-m-section");
+    assert.deepEqual(sections.map((n) => n.props["data-kind"]), ["image"], "the image button opens only image models");
+    nodes(sections[0], (n) => n.props.role === "menuitemradio")[0].props.onClick();
     await flushClient();
-    assert.deepEqual(posts[0], { sessionId: "s-1", kind: "video", ref: "default/grok-imagine-video" });
+    assert.deepEqual(posts[0], { sessionId: "s-1", kind: "image", ref: "default/grok-imagine-image" });
+    chipButton(tree, "video").props.onClick();
+    tree = h.renderChip({ sessionId: "s-1" }, "zh", false);
+    sections = nodes(tree, (n) => n.props.className === "dcpa-m-section");
+    assert.deepEqual(sections.map((n) => n.props["data-kind"]), ["video"], "the video button opens only video models");
+    assert.ok(content(sections[0]).includes(h.zh.mediaChipInherited), "the video pick is inherited here");
+    nodes(sections[0], (n) => n.props.role === "menuitemradio")[0].props.onClick();
+    await flushClient();
+    assert.deepEqual(posts[1], { sessionId: "s-1", kind: "video", ref: "default/grok-imagine-video" });
   });
 });
 describe("video modes, edit and extend in the chat row", () => {
@@ -1419,11 +1430,16 @@ describe("generate_media in the chat and the composer button", () => {
     });
     const base = { enabled: true, imageConfirm: "auto", videoConfirm: "ask", videoBudget: { mode: "limited", seconds: 60 }, used: 12, sources: { imageConfirm: "global", videoConfirm: "global", videoBudget: "global" }, global: { imageConfirm: "auto", videoConfirm: "ask", videoBudget: { mode: "limited", seconds: 60 } } };
     const h = clientHarness({ update: session(base), loading: false, fetch: async (url, options = {}) => (options.method === "POST" && posts.push(JSON.parse(options.body)), okJson({ session: session(base) })) });
-    nodes(h.renderChip({ sessionId: "s-1" }, "zh", false), (n) => n.type === "button")[0].props.onClick();
+    nodes(h.renderChip({ sessionId: "s-1" }, "zh", false), (n) => n.type === "button" && n.props["data-kind"] === "image")[0].props.onClick();
     let tree = h.renderChip({ sessionId: "s-1" }, "zh", false);
+    const agentButton = nodes(tree, (n) => n.type === "button" && n.props.className.includes("dcpa-m-agent-open"))[0];
+    assert.ok(agentButton, "the model menu offers a separate agent settings button");
+    agentButton.props.onClick();
+    tree = h.renderChip({ sessionId: "s-1" }, "zh", false);
     const section = nodes(tree, (n) => n.props["data-kind"] === "agent")[0];
-    assert.ok(section, "the agent section shows while the tool is on");
+    assert.ok(section, "the agent section shows in its secondary menu while the tool is on");
     assert.ok(content(section).includes("本会话 agent 已用视频 12 / 60 秒"));
+    assert.equal(nodes(tree, (n) => n.props.className === "dcpa-m-section").length, 0, "the model list is hidden in the agent menu");
     const selects = nodes(section, (n) => n.type === "select");
     assert.equal(selects.length, 3);
     assert.equal(selects[0].props.value, "inherit");
