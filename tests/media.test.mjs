@@ -737,6 +737,13 @@ describe("agent tool (generate_media)", () => {
     assert.equal(toolRunId("--"), undefined);
   });
 
+  it("tells the model to pass the user's prompt verbatim instead of an expanded description", () => {
+    assert.match(GENERATE_MEDIA_TOOL.description, /Pass the user's prompt in their own words/);
+    assert.match(GENERATE_MEDIA_TOOL.description, /never expand/i);
+    assert.match(GENERATE_MEDIA_TOOL.parameters.properties.prompt.description, /verbatim/);
+    assert.match(GENERATE_MEDIA_TOOL.parameters.properties.prompt.description, /Do not rewrite, expand/);
+  });
+
   it("accepts Responses all-fields calls with nulls and legacy neutral defaults", () => {
     const optional = Object.keys(GENERATE_MEDIA_TOOL.parameters.properties).filter((key) => !["kind", "prompt"].includes(key));
     const nullable = Object.fromEntries(optional.map((key) => [key, null]));
