@@ -758,6 +758,7 @@ function mountPlugin({ state, fetchImpl, extraServices = {}, files = {}, dir: re
   const providers = {};
   const creds = { CLI_PROXY_API_KEY: "key-a" };
   const disposers = [];
+  const effects = new Map();
   const tools = [];
   const injected = [];
   const commands = [];
@@ -789,9 +790,18 @@ function mountPlugin({ state, fetchImpl, extraServices = {}, files = {}, dir: re
         : extraServices[name],
     on: (event, fn) => ((listeners[event] ??= []).push(fn), () => {}),
     emit: (...args) => emitted.push(args),
-    effect: (fn) => {
+    effect: (fn, name) => {
       const d = fn();
-      if (typeof d === "function") disposers.push(d);
+      if (typeof d === "function") {
+        let disposed = false;
+        const dispose = () => {
+          if (disposed) return;
+          disposed = true;
+          d();
+        };
+        disposers.push(dispose);
+        effects.set(name, dispose);
+      }
     },
     inject: (deps, fn) => {
       injected.push(...deps);
@@ -848,6 +858,7 @@ function mountPlugin({ state, fetchImpl, extraServices = {}, files = {}, dir: re
     routes,
     emitted,
     listeners,
+    disposeEffect: (name) => effects.get(name)?.(),
     dispose() {
       globalThis.fetch = realFetch;
       for (const d of disposers) d();
@@ -866,6 +877,91 @@ const MEDIA_SERVERS = {
     ],
   },
 };
+
+/** Deferred native question answerer: cancellation models removal of PendingQuestion. */
+function fakeMediaQuestions() {
+  const requests = [];
+  const active = new Set();
+  return {
+    requests,
+    active,
+    ask(request) {
+      return new Promise((resolve, reject) => {
+        const finish = (settle, value) => {
+          active.delete(entry);
+          request.signal.removeEventListener("abort", onAbort);
+          settle(value);
+        };
+        const onAbort = () => finish(reject, new Error("ASK_ABORTED"));
+        const entry = {
+          request,
+          answer: (answer) => finish(resolve, answer),
+          select: (label) => finish(resolve, { answers: [{ id: request.questions[0].id, selected: [label] }] }),
+          reject: () => finish(reject, new Error("native question unavailable")),
+        };
+        requests.push(entry);
+        active.add(entry);
+        request.signal.addEventListener("abort", onAbort, { once: true });
+        if (request.signal.aborted) onAbort();
+      });
+    },
+  };
+}
+
+async function mediaConsentFixture({ native = true } = {}) {
+  const serve = fakeServers(MEDIA_SERVERS);
+  const workDir = mkdtempSync(join(tmpdir(), "cpa-consent-"));
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9, 9]);
+  const mp4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypisom"), Buffer.alloc(16)]);
+  const posts = [];
+  const appended = [];
+  const root = { id: "s-root", session: { append: (...args) => appended.push(args) } };
+  const child = { id: "s-child", session: { append: (...args) => appended.push(args) } };
+  const questions = fakeMediaQuestions();
+  const services = {
+    workingDirectory: { ensure: async () => workDir },
+    agents: { list: () => [root, child], isOwnedBy: (id, owner) => id === child.id && owner === root },
+    approval: {
+      effectivePolicy: () => { throw new Error("unpublished approval policy must not be read"); },
+      request: () => { throw new Error("cost confirmation must not use execution approval"); },
+    },
+    ...(native ? { userQuestions: questions } : {}),
+  };
+  const m = mountPlugin({
+    state: { version: 2, accounts: [{ id: "default", baseURL: "http://m.test", selectedModels: [] }] },
+    extraServices: services,
+    fetchImpl: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (init?.method === "POST" && /\/v1\/(images|videos)\//.test(path)) {
+        posts.push({ path, body: JSON.parse(init.body) });
+        return path.includes("/images/") ? json({ data: [{ b64_json: png.toString("base64") }] }) : json({ request_id: `req-${posts.length}` });
+      }
+      if (/^\/v1\/videos\/req-\d+$/.test(path)) return json({ status: "done", video: { duration: 4 } });
+      if (/^\/openai\/v1\/videos\/req-\d+\/content$/.test(path)) return new Response(mp4);
+      return serve(url, init);
+    },
+  });
+  await m.call("POST", "/api/dsh-cliproxyapi/refresh", {});
+  await m.call("POST", "/api/dsh-cliproxyapi/media/save", { agentTool: true, imageConfirm: "ask" });
+  let n = 0;
+  const tool = m.tools[0];
+  const call = (args = {}, agent = child, signal = new AbortController().signal) =>
+    tool.execute({ kind: "video", prompt: "北方大雪", seconds: 4, ...args }, { agent, signal, callId: `toolu_${++n}` });
+  const until = async (predicate) => {
+    for (let i = 0; i < 100; i += 1) {
+      if (predicate()) return;
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    assert.fail("confirmation did not arrive");
+  };
+  const question = async (index = questions.requests.length) => {
+    await until(() => questions.requests.length > index);
+    return questions.requests[index];
+  };
+  const session = async (id = root.id) => (await m.call("GET", `/api/dsh-cliproxyapi/media/session${id === undefined ? "" : `?sessionId=${id}`}`)).body.session;
+  const row = async (id = `toolu_${n}`, sessionId = child.id) => (await m.call("GET", `/api/dsh-cliproxyapi/media/command?sessionId=${sessionId}&commandId=${id}`)).body;
+  return { m, services, questions, root, child, appended, posts, call, until, question, session, row };
+}
 
 describe("media models", () => {
   it("keeps image and video models out of the chat routes, recommendations and seeding", async () => {
@@ -1900,8 +1996,8 @@ it("generate_media: off by default, then image / video with approval, budget, re
       if (/^\/openai\/v1\/videos\/req-\d+\/content$/.test(path)) return new Response(mp4);
       return serve(url, init);
     };
-    const approvals = [];
-    let answer = "allowed-once";
+    const questions = [];
+    let answer = "Allow / 允许";
     let policy = "ask";
     const saved = [];
     const root = { id: "s-root", options: { provider: "cli-proxy", model: "claude-opus-5-5" }, session: { id: "s-root", requestHeader: () => undefined } };
@@ -1917,7 +2013,10 @@ it("generate_media: off by default, then image / video with approval, budget, re
         },
         approval: {
           effectivePolicy: () => policy,
-          request: async (req) => (approvals.push(req), answer),
+          request: async () => { throw new Error("execution approval must not be used for cost consent"); },
+        },
+        userQuestions: {
+          ask: async (req) => (questions.push(req), { answers: [{ id: req.questions[0].id, selected: [answer] }] }),
         },
         llm: { resolveModelInfo: async () => ({ inputModalities: ["text", "image"] }) },
         agents: { list: () => [root, child], isOwnedBy: (id, owner) => id === "s-child" && owner === root },
@@ -1941,7 +2040,7 @@ it("generate_media: off by default, then image / video with approval, budget, re
       assert.equal(out.status, "done");
       assert.equal(out.files.length, 2);
       assert.equal(out.previews.length, 2);
-      assert.equal(approvals.length, 0);
+      assert.equal(questions.length, 0);
       assert.equal(posts[0].path, "/v1/images/edits");
       assert.equal(posts[0].body.prompt, "a lighthouse");
       assert.equal(posts[0].body.n, 2);
@@ -1956,10 +2055,11 @@ it("generate_media: off by default, then image / video with approval, budget, re
       // then on first-frame without images. It must use the selected model and
       // reach confirmation exactly once as a text-to-video request.
       out = await call({ kind: "video", prompt: "10秒 竖屏 一只猫", mode: "generate", model: "", images: [], frames: "first-frame", video: "", aspect: "16:9", seconds: 4, resolution: "480p", count: 1 });
-      assert.equal(approvals.length, 1, "videos ask by default");
-      assert.match(approvals[0].displayReason.zh, /4 秒视频/);
-      assert.match(approvals[0].displayReason.en, /cannot be cancelled/);
-      assert.equal(approvals[0].toolName, "generate_media");
+      assert.equal(questions.length, 1, "videos ask by default");
+      assert.match(questions[0].questions[0].question, /4 秒视频/);
+      assert.match(questions[0].questions[0].question, /cannot be cancelled/);
+      assert.equal(questions[0].agent, root);
+      assert.equal(Object.hasOwn(questions[0], "wait"), false, "anonymous questions block at the composer");
       assert.equal(posts[1].body.prompt, "10秒 竖屏 一只猫");
       assert.equal(posts[1].body.duration, 4);
       assert.equal(posts[1].body.model, "grok-imagine-video-1.5", "an empty model uses the user's selected model");
@@ -1971,58 +2071,35 @@ it("generate_media: off by default, then image / video with approval, budget, re
       assert.equal((await session()).agent.used, 4, "confirmed videos are counted too");
 
       // Declined: nothing is sent or counted.
-      answer = "rejected";
+      answer = "Decline / 拒绝";
       const before = posts.length;
       await assert.rejects(call({ kind: "video", prompt: "x", seconds: 4 }), /the user declined this video; do not retry/);
       assert.equal(posts.length, before);
       assert.equal((await session()).agent.used, 4);
-      answer = "allowed-once";
+      answer = "Allow / 允许";
 
-      // DSH's approval prompts are off for the session ("danger-full-access" pairs with
-      // approval "never"): the plugin asks in the call's own chat row instead.
+      // Permission presets do not waive media cost consent. A child asks its
+      // live root, but its generation record remains in its own session.
       policy = "never";
-      const askedBefore = approvals.length;
-      const rowOf = async (id) => (await m.call("GET", `/api/dsh-cliproxyapi/media/command?sessionId=s-root&commandId=${id}`)).body;
-      const waitConfirm = async (id) => {
-        for (let i = 0; i < 200; i += 1) {
-          const row = await rowOf(id);
-          if (row.confirm) return row;
-          await new Promise((r) => setTimeout(r, 5));
-        }
-        throw new Error("no confirmation shown");
-      };
-      let pendingCall = call({ kind: "video", prompt: "in row", seconds: 4 });
-      let shown = await waitConfirm(`toolu_${n}`);
-      assert.equal(shown.run, null, "nothing recorded while waiting");
-      assert.equal(shown.confirm.kind, "video");
-      assert.match(shown.confirm.zh, /4 秒视频.*无法取消/);
-      assert.equal(posts.length, before, "nothing sent while waiting");
-      const wrong = await m.call("POST", "/api/dsh-cliproxyapi/media/confirm", { sessionId: "s-other", commandId: `toolu_${n}`, allow: true });
-      assert.equal(wrong.code, 400, "only the call's own session can answer");
-      await m.call("POST", "/api/dsh-cliproxyapi/media/confirm", { sessionId: "s-root", commandId: `toolu_${n}`, allow: false });
-      await assert.rejects(pendingCall, /the user declined this video; do not retry/);
-      assert.equal(posts.length, before);
-      pendingCall = call({ kind: "video", prompt: "in row", mode: null, model: null, images: null, frames: null, video: null, aspect: null, seconds: 4, resolution: null, count: null });
-      shown = await waitConfirm(`toolu_${n}`);
-      const ok = await m.call("POST", "/api/dsh-cliproxyapi/media/confirm", { sessionId: "s-root", commandId: `toolu_${n}`, allow: true });
-      assert.equal(ok.code, 200);
-      out = await pendingCall;
+      const askedBefore = questions.length;
+      out = await call({ kind: "video", prompt: "native composer", mode: null, model: null, images: null, frames: null, video: null, aspect: null, seconds: 4, resolution: null, count: null }, child);
       assert.equal(out.status, "done");
-      assert.equal(posts.at(-1).body.prompt, "in row");
-      assert.equal(approvals.length, askedBefore, "DSH's approval service is not used when its prompts are off");
-      assert.equal((await rowOf(out.run)).confirm, undefined);
+      assert.equal(posts.at(-1).body.prompt, "native composer");
+      assert.equal(questions.length, askedBefore + 1, "approval never still asks for cost consent");
+      assert.equal(questions.at(-1).agent, root, "sub-agent questions target the live root");
+      assert.deepEqual((await session()).pendingConfirmations, [], "native questions do not create a fallback dialog");
       assert.equal((await session()).agent.used, 8);
-      const late = await m.call("POST", "/api/dsh-cliproxyapi/media/confirm", { sessionId: "s-root", commandId: out.run, allow: true });
-      assert.equal(late.code, 400, "an answered confirmation cannot be answered again");
+      const late = await m.call("POST", "/api/dsh-cliproxyapi/media/confirm", { sessionId: "s-child", commandId: out.run, allow: true });
+      assert.equal(late.code, 400, "a native confirmation cannot be answered through the fallback route");
       policy = "ask";
 
       // Auto for this session with a 10 s limit: switching to auto starts the count again.
       let sent = await m.call("POST", "/api/dsh-cliproxyapi/media/session/save", { sessionId: "s-root", videoConfirm: "auto", videoBudget: { mode: "limited", seconds: 10 } });
       assert.equal(sent.body.session.agent.used, 0);
       assert.equal(sent.body.session.agent.sources.videoConfirm, "session");
-      const asked = approvals.length;
+      const asked = questions.length;
       out = await call({ kind: "video", prompt: "a", seconds: 6 }, child);
-      assert.equal(approvals.length, asked, "auto does not ask");
+      assert.equal(questions.length, asked, "auto does not ask");
       assert.equal((await session()).agent.used, 6, "a sub-agent counts against its root session");
       row = await m.call("GET", `/api/dsh-cliproxyapi/media/command?sessionId=s-child&commandId=${out.run}`);
       assert.equal(row.body.run.status, "done", "the row lives in the sub-agent's own session");
@@ -2071,68 +2148,324 @@ it("generate_media: off by default, then image / video with approval, budget, re
       m.dispose();
     }
   });
-  it("generate_media mirrors its call as a top-level command row for the confirmation and the output", async () => {
-    const serve = fakeServers(MEDIA_SERVERS);
-    const workDir = mkdtempSync(join(tmpdir(), "cpa-work-"));
-    const mp4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypisom"), Buffer.alloc(16)]);
-    const fetchImpl = async (url, init) => {
-      const path = new URL(String(url)).pathname;
-      if (init?.method === "POST" && path === "/v1/videos/generations") return json({ request_id: "req-1" });
-      if (path === "/v1/videos/req-1") return json({ status: "done", video: { url: "https://vidgen.x.ai/v.mp4", duration: 5 } });
-      if (path === "/openai/v1/videos/req-1/content") return new Response(mp4);
-      return serve(url, init);
-    };
-    const appended = [];
-    const root = {
-      id: "s-root",
-      options: { provider: "cli-proxy", model: "claude-opus-5-5" },
-      session: {
-        id: "s-root",
-        requestHeader: () => undefined,
-        append: (type, data) => appended.push({ type, data }),
-      },
-    };
-    const m = mountPlugin({
-      state: { version: 2, accounts: [{ id: "default", baseURL: "http://m.test", selectedModels: [] }] },
-      fetchImpl,
-      extraServices: {
-        workingDirectory: { ensure: async () => workDir },
-        approval: { effectivePolicy: () => "never", request: async () => { throw new Error("approval must not be used"); } },
-      },
-    });
+  it("generate_media blocks at the root native composer without command mirroring or an upstream request", async () => {
+    const f = await mediaConsentFixture();
     try {
-      await m.call("POST", "/api/dsh-cliproxyapi/refresh", {});
-      await m.call("POST", "/api/dsh-cliproxyapi/media/save", { agentTool: true });
-      const tool = m.tools.find((candidate) => candidate.name === "generate_media");
-      const pending = tool.execute(
-        { kind: "video", prompt: "北方大雪", seconds: 5, resolution: "480p", model: "grok-imagine-video-1.5" },
-        { agent: root, callId: "toolu_1", signal: new AbortController().signal }
-      );
-      let row;
-      for (let attempt = 0; attempt < 100; attempt += 1) {
-        row = await m.call("GET", "/api/dsh-cliproxyapi/media/command?sessionId=s-root&commandId=toolu_1");
-        if (row.body.confirm !== undefined) break;
-        await new Promise((resolve) => setTimeout(resolve, 10));
-      }
-      assert.equal(appended[0]?.type, "command/run", "the generative call is mirrored before the confirmation");
-      assert.deepEqual(
-        { name: appended[0].data.name, commandId: appended[0].data.commandId },
-        { name: "cpa-video", commandId: "toolu_1" }
-      );
-      assert.match(appended[0].data.args, /北方大雪/);
-      assert.equal(row.body.confirm.kind, "video");
-      assert.match(row.body.confirm.zh, /北方大雪/);
-      const answer = await m.call("POST", "/api/dsh-cliproxyapi/media/confirm", { sessionId: "s-root", commandId: "toolu_1", allow: true });
-      assert.equal(answer.code, 200, JSON.stringify(answer.body));
+      const pending = f.call();
+      const entry = await f.question(0);
+      const { request } = entry;
+      assert.equal(request.agent, f.root, "only the live human root may answer");
+      assert.equal(Object.hasOwn(request, "wait"), false, "no continued/folded callId card");
+      assert.equal(Object.hasOwn(request, "callId"), false);
+      assert.equal(request.questions.length, 1);
+      const question = request.questions[0];
+      assert.match(question.header, /Video.*视频/);
+      assert.match(question.question, /4 秒视频.*无法取消/);
+      assert.match(question.question, /cannot be cancelled/);
+      assert.deepEqual(question.options, [{ label: "Allow / 允许" }, { label: "Decline / 拒绝" }]);
+      assert.equal(question.multiSelect, false);
+      assert.notEqual(request.signal, undefined);
+      assert.equal(request.signal.aborted, false);
+      assert.deepEqual(f.posts, [], "no paid request before an exact allow");
+      assert.equal((await f.row()).run, null, "no run is recorded before consent");
+      assert.equal((await f.row()).confirm, undefined, "native consent never creates a second row dialog");
+      assert.deepEqual((await f.session()).pendingConfirmations, []);
+      assert.deepEqual((await f.session(f.child.id)).pendingConfirmations, []);
+      assert.equal((await f.session()).agent.used, 0);
+      entry.select("Allow / 允许");
       const out = await pending;
       assert.equal(out.status, "done");
+      assert.equal(out.commandRow, false, "deprecated output flag remains false");
       assert.equal(out.files.length, 1);
-      const done = appended.find((entry) => entry.type === "command/done");
-      assert.equal(done?.data.kind, "success", "the mirrored row settles for the same run");
+      assert.equal(f.posts.length, 1);
+      assert.equal((await f.session()).agent.used, 4, "confirmed videos still count against the root");
+      assert.equal((await f.session(f.child.id)).agent.used, 0);
+      assert.equal((await f.row()).run.status, "done", "the run belongs to the child session");
+      assert.deepEqual(f.appended, [], "the host never impersonates a user slash command");
+      assert.equal(request.signal.aborted, true, "native pending UI is removed after settlement");
+      assert.equal(f.questions.active.size, 0);
     } finally {
-      m.dispose();
+      f.m.dispose();
     }
   });
+
+  it("generate_media requires one exact allow; declines missing, custom and ambiguous native answers", async () => {
+    const f = await mediaConsentFixture();
+    try {
+      const cases = [
+        ["explicit decline", (id) => ({ answers: [{ id, selected: ["Decline / 拒绝"] }] })],
+        ["missing batch", () => undefined],
+        ["empty batch", () => ({ answers: [] })],
+        ["missing selection", (id) => ({ answers: [{ id }] })],
+        ["empty selection", (id) => ({ answers: [{ id, selected: [] }] })],
+        ["custom allow", (id) => ({ answers: [{ id, selected: [], custom: "Allow / 允许" }] })],
+        ["custom with selected allow", (id) => ({ answers: [{ id, selected: ["Allow / 允许"], custom: "yes" }] })],
+        ["empty custom with selected allow", (id) => ({ answers: [{ id, selected: ["Allow / 允许"], custom: "" }] })],
+        ["allow and decline", (id) => ({ answers: [{ id, selected: ["Allow / 允许", "Decline / 拒绝"] }] })],
+        ["duplicate allow", (id) => ({ answers: [{ id, selected: ["Allow / 允许", "Allow / 允许"] }] })],
+        ["wrong label", (id) => ({ answers: [{ id, selected: ["Allow"] }] })],
+        ["wrong question", () => ({ answers: [{ id: "other", selected: ["Allow / 允许"] }] })],
+        ["extra answer", (id) => ({ answers: [{ id, selected: ["Allow / 允许"] }, { id: "other", selected: [] }] })],
+      ];
+      for (const [label, answer] of cases) {
+        const index = f.questions.requests.length;
+        const pending = f.call();
+        const denied = assert.rejects(pending, /the user declined this video; do not retry/, label);
+        const entry = await f.question(index);
+        entry.answer(answer(entry.request.questions[0].id));
+        await denied;
+        assert.equal(entry.request.signal.aborted, true, `${label}: pending question is removed`);
+        assert.equal(f.questions.active.size, 0, label);
+        assert.deepEqual((await f.session(f.child.id)).pendingConfirmations, [], label);
+      }
+      assert.equal(f.posts.length, 0);
+      assert.equal((await f.session()).agent.used, 0);
+      assert.deepEqual(f.appended, []);
+    } finally {
+      f.m.dispose();
+    }
+  });
+
+  it("generate_media asks for images too and skips native questions only in media auto mode", async () => {
+    const f = await mediaConsentFixture();
+    try {
+      const pending = f.call({ kind: "image", seconds: null });
+      const entry = await f.question(0);
+      assert.match(entry.request.questions[0].header, /Image.*图像/);
+      assert.match(entry.request.questions[0].question, /北方大雪/);
+      assert.equal(f.posts.length, 0);
+      entry.select("Allow / 允许");
+      assert.equal((await pending).status, "done");
+      await f.m.call("POST", "/api/dsh-cliproxyapi/media/session/save", { sessionId: f.root.id, imageConfirm: "auto", videoConfirm: "auto" });
+      assert.equal((await f.call({ kind: "image", seconds: null })).status, "done");
+      assert.equal((await f.call()).status, "done");
+      assert.equal(f.questions.requests.length, 1, "auto generates without any question");
+      assert.equal(f.posts.length, 3);
+    } finally {
+      f.m.dispose();
+    }
+  });
+
+  it("generate_media never opens a fallback consent dialog after native question failure", async () => {
+    const f = await mediaConsentFixture();
+    try {
+      let pending = f.call();
+      let refused = assert.rejects(pending, /confirmation.*could not be shown/);
+      const entry = await f.question(0);
+      entry.reject();
+      await refused;
+      assert.equal(entry.request.signal.aborted, true);
+      for (const service of [
+        { ask: () => { throw new Error("native synchronous failure"); } },
+        {},
+      ]) {
+        f.services.userQuestions = service;
+        pending = f.call();
+        refused = assert.rejects(pending, /confirmation.*could not be shown/);
+        await refused;
+      }
+      assert.deepEqual((await f.session(f.child.id)).pendingConfirmations, []);
+      assert.equal((await f.row()).confirm, undefined);
+      const late = await f.m.call("POST", "/api/dsh-cliproxyapi/media/confirm", { sessionId: f.child.id, commandId: "toolu_1", allow: true });
+      assert.equal(late.code, 400);
+      assert.equal(f.posts.length, 0);
+      assert.equal((await f.session()).agent.used, 0);
+    } finally {
+      f.m.dispose();
+    }
+  });
+
+  it("generate_media cancels native consent on the calling child's signal and ignores late allow", async () => {
+    const f = await mediaConsentFixture();
+    try {
+      const controller = new AbortController();
+      const signal = controller.signal;
+      const listeners = new Set();
+      const add = signal.addEventListener.bind(signal);
+      const remove = signal.removeEventListener.bind(signal);
+      signal.addEventListener = (type, listener, options) => {
+        if (type === "abort") listeners.add(listener);
+        return add(type, listener, options);
+      };
+      signal.removeEventListener = (type, listener, options) => {
+        if (type === "abort") listeners.delete(listener);
+        return remove(type, listener, options);
+      };
+      const pending = f.call({}, f.child, signal);
+      const cancelled = assert.rejects(pending, /confirmation.*cancelled/);
+      const entry = await f.question(0);
+      assert.notEqual(entry.request.signal, signal, "question has an owned cancellable signal");
+      assert.equal(entry.request.agent, f.root);
+      assert.equal(listeners.size, 1);
+      controller.abort();
+      await cancelled;
+      assert.equal(entry.request.signal.aborted, true);
+      assert.equal(listeners.size, 0, "calling signal listener is removed");
+      assert.equal(f.questions.active.size, 0);
+      entry.select("Allow / 允许");
+      await Promise.resolve();
+      assert.equal(f.posts.length, 0);
+      assert.equal((await f.session()).agent.used, 0);
+      assert.deepEqual((await f.session(f.child.id)).pendingConfirmations, []);
+
+      const preAborted = new AbortController();
+      preAborted.abort();
+      await assert.rejects(f.call({}, f.child, preAborted.signal));
+      assert.equal(f.questions.requests.length, 1, "pre-aborted calls do not publish a question");
+    } finally {
+      f.m.dispose();
+    }
+  });
+
+  for (const teardown of ["disable", "scope", "plugin"]) {
+    it(`generate_media removes native consent on ${teardown} teardown`, async () => {
+      const f = await mediaConsentFixture();
+      try {
+        const pending = f.call();
+        const cancelled = assert.rejects(pending, /confirmation.*cancelled/);
+        const entry = await f.question(0);
+        if (teardown === "disable") await f.m.call("POST", "/api/dsh-cliproxyapi/media/save", { agentTool: false });
+        else if (teardown === "scope") f.m.disposeEffect("cpa: agent tool");
+        else f.m.dispose();
+        await cancelled;
+        assert.equal(entry.request.signal.aborted, true);
+        assert.equal(f.questions.active.size, 0);
+        entry.select("Allow / 允许");
+        await Promise.resolve();
+        assert.equal(f.posts.length, 0);
+        assert.equal(f.m.tools.length, 0);
+        if (teardown !== "plugin") assert.deepEqual((await f.session(f.child.id)).pendingConfirmations, []);
+      } finally {
+        f.m.dispose();
+      }
+    });
+  }
+
+  it("generate_media bounds native consent to ten minutes and clears its timeout after answers", async (t) => {
+    const f = await mediaConsentFixture();
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    try {
+      const pending = f.call();
+      const expired = assert.rejects(pending, /did not answer.*within 10 minutes/);
+      const entry = await f.question(0);
+      t.mock.timers.tick(10 * 60_000 - 1);
+      assert.equal(entry.request.signal.aborted, false);
+      t.mock.timers.tick(1);
+      await expired;
+      assert.equal(entry.request.signal.aborted, true);
+      assert.equal(f.questions.active.size, 0);
+      entry.select("Allow / 允许");
+      await Promise.resolve();
+      assert.equal(f.posts.length, 0);
+      assert.equal((await f.session()).agent.used, 0);
+      assert.deepEqual((await f.session(f.child.id)).pendingConfirmations, []);
+
+      const next = f.call();
+      const denied = assert.rejects(next, /the user declined/);
+      const answered = await f.question(1);
+      answered.select("Decline / 拒绝");
+      await denied;
+      t.mock.timers.tick(10 * 60_000);
+      assert.equal(f.questions.active.size, 0);
+      assert.equal(f.posts.length, 0);
+    } finally {
+      t.mock.timers.reset();
+      f.m.dispose();
+    }
+  });
+
+  it("generate_media keeps root-owned session-isolated composer fallback only without userQuestions", async () => {
+    const f = await mediaConsentFixture({ native: false });
+    try {
+      const pending = f.call();
+      const denied = assert.rejects(pending, /the user declined/);
+      let own;
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        own = await f.session();
+        if (own.pendingConfirmations.length > 0) break;
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+      assert.equal(own.pendingConfirmations.length, 1);
+      const confirmation = own.pendingConfirmations[0];
+      assert.deepEqual(Object.keys(confirmation).sort(), ["commandId", "en", "expiresAt", "kind", "zh"]);
+      assert.equal(confirmation.commandId, "toolu_1");
+      assert.equal(confirmation.kind, "video");
+      assert.match(confirmation.zh, /4 秒视频.*无法取消/);
+      assert.match(confirmation.en, /cannot be cancelled/);
+      assert.deepEqual((await f.session(f.child.id)).pendingConfirmations, [], "the child does not own the human root's consent");
+      assert.deepEqual((await f.session("s-other")).pendingConfirmations, []);
+      const anonymous = await f.m.call("GET", "/api/dsh-cliproxyapi/media/session");
+      assert.deepEqual(anonymous.body.session.pendingConfirmations, [], "no session means no leaked pending questions");
+      assert.equal((await f.row()).confirm, undefined, "the child's media row cannot show root-owned consent");
+      assert.equal((await f.row("toolu_1", f.root.id)).confirm.kind, "video", "old API remains compatible for the root owner");
+      assert.equal(f.posts.length, 0);
+      const wrong = await f.m.call("POST", "/api/dsh-cliproxyapi/media/confirm", { sessionId: f.child.id, commandId: "toolu_1", allow: true });
+      assert.equal(wrong.code, 400, "the calling child cannot answer root-owned consent");
+      const unrelated = await f.m.call("POST", "/api/dsh-cliproxyapi/media/confirm", { sessionId: "s-other", commandId: "toolu_1", allow: true });
+      assert.equal(unrelated.code, 400);
+      const answer = await f.m.call("POST", "/api/dsh-cliproxyapi/media/confirm", { sessionId: f.root.id, commandId: "toolu_1", allow: false });
+      assert.equal(answer.code, 200);
+      await denied;
+      assert.deepEqual((await f.session()).pendingConfirmations, []);
+      assert.deepEqual((await f.session(f.child.id)).pendingConfirmations, []);
+      assert.equal((await f.row("toolu_1", f.root.id)).confirm, undefined);
+      assert.equal(f.questions.requests.length, 0);
+      assert.equal(f.posts.length, 0);
+      assert.equal((await f.session()).agent.used, 0);
+
+      const allowed = f.call();
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        if ((await f.session()).pendingConfirmations.length > 0) break;
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+      const ok = await f.m.call("POST", "/api/dsh-cliproxyapi/media/confirm", { sessionId: f.root.id, commandId: "toolu_2", allow: true });
+      assert.equal(ok.code, 200);
+      assert.equal((await allowed).status, "done");
+      assert.equal(f.posts.length, 1);
+      assert.equal((await f.session()).agent.used, 4);
+      assert.deepEqual((await f.session()).pendingConfirmations, []);
+      assert.deepEqual((await f.session(f.child.id)).pendingConfirmations, []);
+      assert.equal((await f.row()).run.status, "done", "generation records remain in the calling child's session");
+      const late = await f.m.call("POST", "/api/dsh-cliproxyapi/media/confirm", { sessionId: f.root.id, commandId: "toolu_2", allow: true });
+      assert.equal(late.code, 400, "settled fallback cannot be answered twice");
+    } finally {
+      f.m.dispose();
+    }
+  });
+
+  for (const ending of ["abort", "disable", "scope", "timeout"]) {
+    it(`generate_media cleans missing-service fallback after ${ending}`, async (t) => {
+      const f = await mediaConsentFixture({ native: false });
+      if (ending === "timeout") t.mock.timers.enable({ apis: ["setTimeout"] });
+      try {
+        const stop = new AbortController();
+        const pending = f.call({}, f.child, stop.signal);
+        const refused = assert.rejects(pending, ending === "timeout" ? /within 10 minutes/ : /confirmation.*cancelled/);
+        for (let attempt = 0; attempt < 100; attempt += 1) {
+          if ((await f.session()).pendingConfirmations.length > 0) break;
+          await new Promise((resolve) => setImmediate(resolve));
+        }
+        assert.equal((await f.session()).pendingConfirmations.length, 1);
+        assert.deepEqual((await f.session(f.child.id)).pendingConfirmations, []);
+        if (ending === "abort") stop.abort();
+        else if (ending === "disable") await f.m.call("POST", "/api/dsh-cliproxyapi/media/save", { agentTool: false });
+        else if (ending === "scope") f.m.disposeEffect("cpa: agent tool");
+        else t.mock.timers.tick(10 * 60_000);
+        await refused;
+        assert.deepEqual((await f.session()).pendingConfirmations, []);
+        assert.deepEqual((await f.session(f.child.id)).pendingConfirmations, []);
+        assert.equal((await f.row("toolu_1", f.root.id)).confirm, undefined);
+        assert.equal((await f.row()).confirm, undefined);
+        const late = await f.m.call("POST", "/api/dsh-cliproxyapi/media/confirm", { sessionId: f.root.id, commandId: "toolu_1", allow: true });
+        assert.equal(late.code, 400);
+        assert.equal(f.posts.length, 0);
+        assert.equal((await f.session()).agent.used, 0);
+      } finally {
+        if (ending === "timeout") t.mock.timers.reset();
+        f.m.dispose();
+      }
+    });
+  }
 
   it("asks the session's chat model for parameters the rules missed; explicit options win and the prompt only loses words", async () => {
     const serve = fakeServers(MEDIA_SERVERS);

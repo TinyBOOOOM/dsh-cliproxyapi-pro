@@ -68,11 +68,11 @@ describe("plugin update client", () => {
     h.apply(ctx);
     const byName = Object.fromEntries(registrations.map((r) => [r.meta.name, r]));
     // Without modelDirectories only the generation-model button joins the composer and hero.
-    assert.deepEqual(Object.keys(byName).sort(), ["conversation.chat.commandview", "conversation.hero.options", "conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section", "tool.call.toolview"]);
+    assert.deepEqual(Object.keys(byName).sort(), ["conversation.chat.commandview", "conversation.composer.dock", "conversation.hero.options", "conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section", "tool.call.toolview"]);
     const row = byName["conversation.chat.commandview"];
     assert.deepEqual(registrations.filter((r) => r.meta.name === "conversation.chat.commandview").map((r) => r.meta.key), ["cpa-image", "cpa-video", "cpa-video-edit", "cpa-video-extend"], "only the generation command rows are replaced");
     assert.equal(JSON.stringify(row.meta.inject("s-1")), JSON.stringify({ sessionId: "s-1" }));
-    assert.equal(row.render({ sessionId: "s-1", node: { name: "cpa-image" } }).type, h.ImageCommandCard);
+    assert.equal(row.render({ sessionId: "s-1", node: { name: "cpa-image" } }).type, h.MediaCommandRow);
     const chip = byName["conversation.input.right"];
     assert.equal(chip.meta.id, "dsh-cliproxyapi-pro:media");
     assert.ok(chip.meta.order < 10000, "left of the quota badge");
@@ -520,6 +520,7 @@ describe("quota client", () => {
       locale: { register: () => () => {}, bind: () => (key) => h.zh[key] ?? key },
       slots: { inject(_n, fn) { fn(); }, register(meta, render) { registrations.push({ meta, render }); return () => {}; } },
       inject(names, fn) {
+        if (names.length === 1 && names[0] === "uiConversation") return;
         assert.deepEqual([...names], ["slots", "modelDirectories"]);
         fn({ slots: ctx.slots, modelDirectories: { directoryFor: (id) => { const store = directories.get(id); if (!store) throw new Error("no scope"); return { store }; } } });
       },
@@ -1144,7 +1145,7 @@ describe("hot reload", () => {
     const disposeNew = activation(); // overlaps: the old entries still hold the stable ids
     disposeOld();
     const names = [...live.values()].map((e) => e.meta.name).sort();
-    assert.deepEqual(names, ["conversation.chat.commandview", "conversation.chat.commandview", "conversation.chat.commandview", "conversation.chat.commandview", "conversation.hero.options", "conversation.hero.options", "conversation.input.right", "conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section", "tool.call.toolview"]);
+    assert.deepEqual(names, ["conversation.chat.commandview", "conversation.chat.commandview", "conversation.chat.commandview", "conversation.chat.commandview", "conversation.composer.dock", "conversation.hero.options", "conversation.hero.options", "conversation.input.right", "conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section", "tool.call.toolview"]);
     const chip = [...live.values()].find((e) => e.meta.id === "dsh-cliproxyapi-pro:media");
     assert.equal(chip.meta.priority, 1, "the generation button also shadows one priority lower");
     const badge = [...live.values()].find((e) => e.meta.id === "dsh-cliproxyapi-pro:quota");
@@ -1366,6 +1367,102 @@ describe("video modes, edit and extend in the chat row", () => {
   });
 });
 
+describe("agent media conversation placement", () => {
+  it("folds real tool events into one turn-level node outside both process folds", () => {
+    const h = clientHarness();
+    const def = h.mediaConversationDefinition;
+    const location = { kind: "step", step: { status: "open", step: 1 }, turn: { status: "open", turn: 1 } };
+    const call = { type: "tool/call", seq: 8, data: { name: "generate_media", callId: "toolu|01", arguments: JSON.stringify({ kind: "video", prompt: "南方大雨", seconds: 8, resolution: "480p" }) } };
+    const identity = def.match["tool/call"](call);
+    assert.equal(identity.role, "start");
+    assert.equal(identity.exclusive, undefined, "does not steal other definitions' events");
+    const start = { event: call, location };
+    const context = { key: "media:toolu|01", id: identity.id, start, matches: [start], state: def.start({}, start) };
+    const running = def.buildViewNode(context);
+    assert.equal(running.kind, h.MEDIA_NODE_KIND);
+    assert.equal(running.groupTree, "turn", "turn escapes inner AND whole-turn process folding; process alone does not");
+    assert.equal(running.location, location);
+    assert.equal(running.anchorSeq, 8);
+    assert.equal(running.key, context.key);
+    assert.equal(running.data.phase, "start");
+    const card = h.MediaToolRow({ t: (key) => h.zh[key] ?? key, owner: running.data, standalone: true });
+    assert.equal(card.props.pending, true);
+    assert.equal(card.props.node.commandId, "toolu_01");
+    assert.equal(card.props.showConfirm, false);
+    const result = { type: "tool/result", surfaceOp: "append", seq: 10, data: { message: { source: { callId: identity.id }, content: [{ type: "text", text: "saved" }] }, meta: { run: "toolu_01" } } };
+    const update = def.match["tool/result"](result);
+    assert.equal(update.id, identity.id);
+    context.state = def.update(context, { event: result, location });
+    const done = def.buildViewNode(context);
+    assert.equal(done.key, running.key, "completion updates the existing row, not another row");
+    assert.equal(done.data.phase, "result");
+    assert.equal(done.data.block.meta.run, "toolu_01");
+    assert.equal(done.groupTree, "turn");
+    const snapshot = { order: ["m"], nodes: new Map([["m", done]]) };
+    assert.equal(h.hasMediaNode(snapshot, "toolu_01"), true);
+    assert.equal(h.MediaToolRow({ owner: done.data, useChat: (selector) => selector(snapshot) }), null);
+  });
+
+  it("ignores replacements, unrelated calls and paged orphan results until their own start is loaded", () => {
+    const h = clientHarness();
+    const def = h.mediaConversationDefinition;
+    assert.equal(def.match["tool/call"]({ data: { name: "pwsh", callId: "other" } }), null);
+    assert.equal(def.match["tool/result"]({ surfaceOp: "replace", data: { message: { source: { callId: "x" } } } }), null);
+    assert.equal(def.buildViewNode({ state: undefined, start: undefined }), null);
+    assert.equal(def.buildViewNode({ state: null, start: undefined }), null);
+    assert.equal(def.update({ state: null }, { event: {} }), null, "never return forbidden undefined from update");
+    assert.equal(h.hasMediaNode({ order: ["m"], nodes: new Map([["m", { kind: "command", data: { commandId: "x" } }]]) }, "x"), false);
+    const start = { event: { seq: 1, data: { callId: "x", arguments: "{}" } }, location: { kind: "step", step: { status: "closed" }, turn: { status: "open" } } };
+    const node = def.buildViewNode({ key: "x", id: "x", start, state: def.start({}, start) });
+    assert.equal(node.data.block.isError, true, "interrupted calls must not look pending forever");
+  });
+
+  it("renders nested PTC generations outside their parent process, including final-only pages", () => {
+    const h = clientHarness();
+    const def = h.mediaConversationDefinition;
+    const location = { kind: "step", step: { status: "open" }, turn: { status: "open" } };
+    const start = { event: { type: "tool/ptc-dispatch-start", seq: 3, data: { name: "generate_media", subCallId: "nested|1", rootCallId: "workflow-1", arguments: { kind: "video", prompt: "大雨" } } }, location };
+    assert.equal(def.match["tool/ptc-dispatch-start"](start.event).id, "nested|1");
+    const context = { key: "nested-1", id: "nested|1", start, state: def.start({}, start) };
+    assert.equal(def.buildViewNode(context).data.block.phase, "start");
+    const final = { event: { type: "tool/ptc-dispatch", seq: 4, data: { ...start.event.data, content: [{ type: "text", text: "saved" }], meta: { run: "nested_1" }, isError: false } }, location };
+    assert.equal(def.match["tool/ptc-dispatch"](final.event).role, "start", "final-only windows can reconstruct their own named call");
+    context.state = def.update(context, final);
+    const done = def.buildViewNode(context);
+    assert.equal(done.groupTree, "turn");
+    assert.equal(done.data.phase, "result");
+    assert.equal(done.data.block.meta.run, "nested_1");
+    const finalOnly = def.buildViewNode({ key: "final-only", id: "nested|1", start: final, state: def.start({}, final) });
+    assert.equal(finalOnly.data.phase, "result");
+    assert.equal(finalOnly.data.callId, "nested|1");
+    assert.equal(def.match["tool/ptc-dispatch"]({ data: { name: "read", subCallId: "other" } }), null);
+  });
+
+  it("registers and disposes the official conversation definition and renderer together", () => {
+    const h = clientHarness();
+    const definitions = [], registrations = [], disposers = [];
+    let removed = 0;
+    const ctx = {
+      effect(fn) { const off = fn(); if (typeof off === "function") disposers.push(off); return off; },
+      locale: { register: () => () => {}, bind: () => (key) => h.zh[key] ?? key },
+      slots: { inject: (_name, fn) => { const off = fn(); if (typeof off === "function") disposers.push(off); }, register: (meta, render) => (registrations.push({ meta, render }), () => {}) },
+      uiConversation: { events: { register: (def) => (definitions.push(def), () => { removed++; }) } },
+      inject(names, fn) { if (names.length === 1 && names[0] === "uiConversation") fn(ctx); },
+    };
+    h.apply(ctx);
+    assert.equal(definitions.length, 1);
+    const renderer = registrations.find((entry) => entry.meta.name === "conversation.chat.node");
+    assert.equal(renderer.meta.key, definitions[0].kind);
+    const row = renderer.render({ sessionId: "s-1", node: { data: { callId: "call-1" } } });
+    assert.equal(row.props.owner.callId, "call-1");
+    assert.equal(row.props.standalone, true);
+    assert.ok(registrations.some((entry) => entry.meta.name === "conversation.composer.dock"));
+    for (const off of disposers.reverse()) off();
+    assert.equal(removed, 1);
+    assert.equal(h.timers.size, 0);
+  });
+});
+
 describe("generate_media in the chat and the composer button", () => {
   const okJson = (body) => new Response(JSON.stringify({ ok: true, ...body }));
 
@@ -1381,42 +1478,57 @@ describe("generate_media in the chat and the composer button", () => {
       t,
       sessionId: "s-1",
       owner,
-      useChat: (selector) => selector({ order: ["c"], nodes: new Map([["c", { kind: "command", commandId: "toolu_01", name: "cpa-video-extend" }]]) }),
+      useChat: (selector) => selector({ order: ["c"], nodes: new Map([["c", { kind: h.MEDIA_NODE_KIND, data: { callId: "toolu|01" } }]]) }),
     });
     assert.equal(mirrored, null, "the mirrored command row already shows this run");
     const completedMirrored = h.MediaToolRow({ t, sessionId: "s-1", owner: { callId: "c3", phase: "result", block: { kind: "result", callId: "c3", meta: { commandRow: true }, call: { name: "generate_media", argsRaw: JSON.stringify({ kind: "image", prompt: "猫" }) }, content: [] } } });
-    assert.equal(completedMirrored, null, "the mirrored command row already shows the result");
+    assert.equal(completedMirrored.type, h.ImageCommandCard, "metadata alone must not hide a call without a loaded custom counterpart");
+    assert.equal(completedMirrored.props.showConfirm, false);
+    const ownSnapshot = (selector) => selector({ order: ["c"], nodes: new Map([["c", { kind: h.MEDIA_NODE_KIND, data: { callId: "toolu|01" } }]]) });
+    assert.equal(h.MediaCommandRow({ node: { commandId: "toolu_01" }, useChat: ownSnapshot }), null, "only correlated old mirrors are hidden");
+    assert.equal(h.MediaCommandRow({ node: { commandId: "slash-command-uuid" }, useChat: ownSnapshot }).type, h.ImageCommandCard, "real slash commands remain");
     // An old settled call has no mirrored row: keep its own card.
     const failed = h.MediaToolRow({ t, sessionId: "s-1", owner: { callId: "c1", phase: "result", block: { kind: "result", callId: "c1", isError: true, call: { name: "generate_media", argsRaw: JSON.stringify({ kind: "image", prompt: "猫" }) }, content: [{ type: "text", text: "Error: the user declined these images; do not retry unless the user asks" }] } } });
     assert.equal(failed.props.node.name, "cpa-image");
     assert.equal(failed.props.pending, false);
     assert.deepEqual(JSON.parse(JSON.stringify(failed.props.node.outcome)), { kind: "error", text: "the user declined these images; do not retry unless the user asks" });
+    const malformed = h.MediaToolRow({ t, standalone: true, owner: { callId: "bad-json", phase: "result", block: { kind: "tool-result", isError: true, call: { argsRaw: "{" }, content: [{ type: "text", text: "Error: invalid arguments" }] } } });
+    assert.equal(malformed.props.node.outcome.kind, "error", "terminal errors take priority over malformed JSON arguments");
+    assert.equal(malformed.props.pending, false);
     assert.equal(h.toolRunId("--"), null);
   });
 
-  it("asks in the tool row when DSH's approval prompts are off, and sends the answer", async () => {
+  it("keeps cost confirmation at the composer, never inside a media chat card", async () => {
     const posts = [];
     const confirm = { kind: "video", en: "Generate a 4 s video with grok (BCPA): \"waves\".", zh: "用 grok（BCPA）生成 4 秒视频：「waves」。", expiresAt: "2026-10-22T13:00:00.000Z" };
+    const session = { sessionId: "s-1", pendingConfirmations: [{ ...confirm, commandId: "toolu_9" }] };
     const h = clientHarness({
-      update: { run: null, files: [], confirm },
-      loading: false,
-      fetch: async (url, options = {}) => (options.method === "POST" && posts.push({ url: String(url), body: JSON.parse(options.body) }), okJson({})),
+      fetch: async (url, options = {}) => {
+        if (options.method === "POST") posts.push({ url: String(url), body: JSON.parse(options.body) });
+        return okJson({ session });
+      },
     });
-    const node = { name: "cpa-video", commandId: "toolu_9", args: "-- waves", outcome: { kind: "success" } };
-    let tree = h.renderCard({ node, sessionId: "s-1", pending: true, label: "generate_media", showCopy: false }, "zh", false);
-    assert.equal(content(nodes(tree, (n) => n.props.className === "dcpa-chat-status")[0]), h.zh.mediaConfirmWaiting);
-    const box = nodes(tree, (n) => n.props.className === "dcpa-chat-confirm")[0];
-    assert.ok(box, "the confirmation shows in the row");
-    assert.ok(content(box).includes(confirm.zh), "in the page's language");
-    assert.ok(content(box).includes(h.zh.mediaConfirmTitleVideo));
-    nodes(box, (n) => n.type === "button" && content(n) === h.zh.mediaConfirmAllow)[0].props.onClick();
+    h.renderConfirmationDock({ sessionId: "s-1" });
     await flushClient();
-    assert.deepEqual(posts, [{ url: "api/dsh-cliproxyapi/media/confirm", body: { sessionId: "s-1", commandId: "toolu_9", allow: true } }]);
-    tree = h.renderCard({ node, sessionId: "s-1", pending: true, label: "generate_media", showCopy: false }, "en", false);
-    assert.equal(nodes(tree, (n) => n.props.className === "dcpa-chat-confirm").length, 0, "gone once answered");
-    const en = clientHarness({ update: { run: null, files: [], confirm }, loading: false, fetch: async () => okJson({}) });
-    tree = en.renderCard({ node, sessionId: "s-1", pending: true }, "en", false);
-    assert.ok(content(nodes(tree, (n) => n.props.className === "dcpa-chat-confirm")[0]).includes(confirm.en));
+    let tree = h.renderConfirmationDock({ sessionId: "s-1" });
+    const box = nodes(tree, (n) => n.props.className === "dcpa-chat-confirm")[0];
+    assert.ok(box, "confirmation is mounted independently of the chat at the composer dock");
+    assert.ok(content(box).includes(confirm.zh));
+    button(tree, h.zh.mediaConfirmAllow).props.onClick();
+    button(tree, h.zh.mediaConfirmAllow).props.onClick();
+    await flushClient();
+    assert.deepEqual(posts, [{ url: "api/dsh-cliproxyapi/media/confirm", body: { sessionId: "s-1", commandId: "toolu_9", allow: true } }], "double click only answers once");
+    assert.equal(h.renderConfirmationDock({ sessionId: "s-1" }), null);
+    h.unmount();
+    assert.equal(h.timers.size, 0);
+    assert.equal(h.afterUnmountWrites, 0);
+    const en = clientHarness({ update: session, loading: false });
+    tree = en.renderConfirmationDock({ sessionId: "s-1" }, "en", false);
+    assert.ok(content(tree).includes(confirm.en));
+    assert.equal(en.renderConfirmationDock({ sessionId: "s-other" }, "en", false), null, "never display another session's question");
+    const card = clientHarness({ update: { run: null, files: [], confirm }, loading: false });
+    tree = card.renderCard({ node: { name: "cpa-video", commandId: "toolu_9", args: "-- waves", outcome: { kind: "success" } }, sessionId: "s-1", pending: true }, "zh", false);
+    assert.equal(nodes(tree, (n) => n.props.className === "dcpa-chat-confirm").length, 0, "a folded chat row has no consent controls");
   });
 
   it("sets this session's confirmation and limit in the composer button while the tool is on", async () => {
