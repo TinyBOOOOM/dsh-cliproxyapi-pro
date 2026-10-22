@@ -1369,29 +1369,21 @@ describe("video modes, edit and extend in the chat row", () => {
 describe("generate_media in the chat and the composer button", () => {
   const okJson = (body) => new Response(JSON.stringify({ ok: true, ...body }));
 
-  it("draws the tool call like the matching command row, keyed by the call id", () => {
+  it("leaves new calls to their top-level command row and keeps a fallback for old settled calls", () => {
     const h = clientHarness({ update: null, loading: false, fetch: async () => okJson({}) });
     const t = (key) => h.zh[key] ?? key;
     const running = h.MediaToolRow({ t, sessionId: "s-1", owner: { callId: "toolu|01", phase: "start", block: { callId: "toolu|01", phase: "start", argsRaw: JSON.stringify({ kind: "video", mode: "extend", prompt: "镜头拉远", seconds: 4 }) } } });
-    assert.equal(running.type, h.ImageCommandCard);
-    assert.deepEqual(JSON.parse(JSON.stringify(running.props.node)), { name: "cpa-video-extend", commandId: "toolu_01", args: "-- 镜头拉远", outcome: { kind: "success" } });
-    assert.equal(running.props.pending, true);
-    assert.equal(running.props.label, "generate_media");
-    assert.equal(running.props.showCopy, false);
+    assert.equal(running, null, "a running call is shown by its mirrored command row, not here");
+    const preparing = h.MediaToolRow({ t, sessionId: "s-1", owner: { callId: "c2", phase: "preparing", block: { callId: "c2", phase: "preparing" } } });
+    assert.equal(preparing, null);
+    const mirrored = h.MediaToolRow({ t, sessionId: "s-1", owner: { callId: "c3", phase: "result", block: { kind: "result", callId: "c3", meta: { commandRow: true }, call: { name: "generate_media", argsRaw: JSON.stringify({ kind: "image", prompt: "猫" }) }, content: [] } } });
+    assert.equal(mirrored, null, "the mirrored command row already shows the result");
+    // An old settled call has no mirrored row: keep its own card.
     const failed = h.MediaToolRow({ t, sessionId: "s-1", owner: { callId: "c1", phase: "result", block: { kind: "result", callId: "c1", isError: true, call: { name: "generate_media", argsRaw: JSON.stringify({ kind: "image", prompt: "猫" }) }, content: [{ type: "text", text: "Error: the user declined these images; do not retry unless the user asks" }] } } });
     assert.equal(failed.props.node.name, "cpa-image");
     assert.equal(failed.props.pending, false);
     assert.deepEqual(JSON.parse(JSON.stringify(failed.props.node.outcome)), { kind: "error", text: "the user declined these images; do not retry unless the user asks" });
-    const preparing = h.MediaToolRow({ t, sessionId: "s-1", owner: { callId: "c2", phase: "preparing", block: { callId: "c2", phase: "preparing" } } });
-    assert.equal(preparing.props.node.outcome, null);
     assert.equal(h.toolRunId("--"), null);
-
-    // While the call runs and no run record exists yet (e.g. waiting for approval), the row keeps asking.
-    const card = clientHarness({ update: { run: null, files: [] }, loading: false, fetch: async () => okJson({ run: null, files: [] }) });
-    const { t: _unused, ...cardProps } = running.props;
-    const tree = card.renderCard(cardProps, "zh", false);
-    assert.equal(content(nodes(tree, (n) => n.props.className === "dcpa-chat-status")[0]), card.zh.mediaCardSubmitting);
-    assert.equal(content(nodes(tree, (n) => n.props.className === "dcpa-chat-tags")[0]), "generate_media", "no copy button for tool rows");
   });
 
   it("asks in the tool row when DSH's approval prompts are off, and sends the answer", async () => {

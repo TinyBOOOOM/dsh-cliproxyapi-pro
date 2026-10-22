@@ -24,7 +24,7 @@ All notable changes to this plugin. Versions follow [Semantic Versioning](https:
 
 ### Changed
 - **Image and video models are picked separately.** The composer now shows two buttons: the image button opens only image models and the video button only video models. The agent confirmations and video seconds limit moved behind **Agent generation settings** in the model menu footer as a secondary menu, no longer mixed into the model lists.
-- **Agent-generated confirmations and results are no longer buried in the folded thinking.** `generate_media` now mirrors the call as a top-level command row (`command/run` / `command/done`), so **Allow** / **Decline**, progress, image / video previews and the context menu match `/cpa-image` / `/cpa-video` exactly without expanding the thinking process.
+- **Agent-generated confirmations and results are no longer buried in the folded thinking.** `generate_media` now mirrors the call as a top-level command row (`command/run` / `command/done`), so **Allow** / **Decline**, progress, image / video previews and the context menu match `/cpa-image` / `/cpa-video` exactly without expanding the thinking process; the tool call row no longer renders a second copy of the same result.
 - **The agent no longer expands prompts into long scene descriptions.** `generate_media`'s description and `prompt` parameter now require the user's own wording and level of detail, without expanding, translating or adding camera, lighting, style, character or environment details the user did not ask for; slash commands already use the prompt verbatim.
 
 ### Fixed
