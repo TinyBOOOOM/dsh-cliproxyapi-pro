@@ -128,7 +128,8 @@ CPA 就在本机默认端口 `8317` 且没有设置密钥时，什么都不用�
 
 - 服务地址可以是本地或远程，`/v1`、`/v1/chat/completions`、`/v1/messages` 等后缀会自动去掉。
 - 地址留空时，依次尝试：已有路由的地址、环境变量 `CLIPROXYAPI_BASE_URL`、本机 `127.0.0.1:8317`。
-- 读取 `/v1/models?client_version=pi` 的富元数据目录（也兼容标准 OpenAI `data[]` 格式），并用 `/v1/models` 的 `owned_by` 判断模型家族。
+- 读取 `/v1/models?client_version=pi` 的富元数据目录（也兼容标准 OpenAI `data[]` 格式），并用 `/v1/models` 的 `owned_by` 判断模型家族、用其中的 `type` 识别生图模型。
+- 生图 / 生视频模型不会写入对话路由，见 [生图 / 生视频模型](#生图--生视频模型生成标签页)。
 - 所有账号按统一间隔自动刷新（默认 300 秒）；模型目录没有变化时不写入任何设置。
 
 ### 模型勾选
@@ -146,7 +147,7 @@ CPA 就在本机默认端口 `8317` 且没有设置密钥时，什么都不用�
 - 每个账号写入自己的一组路由：第一个账号为 `cli-proxy` / `cli-proxy-responses` / `cli-proxy-messages`，之后依次为 `cli-proxy-2*`、`cli-proxy-3*`……；密钥引用名依次为 `CLI_PROXY_API_KEY`、`CLI_PROXY_API_KEY_2`……。模型选择器按账号名称分组。
 - **停用**账号：保留全部配置，但移除它的路由，模型从选择器中消失；其他账号不受影响。
 - **新增**账号：「+ 添加账号」先用填写的地址和密钥测试连接，成功才创建并启用；也可以选择「仍然添加（不启用）」。
-- 每个账号的页面分 **连接 / 模型 / 额度** 三个标签，顶部账号栏对三个标签共用。账号标题旁的「启用」开关立即生效；「⋯」菜单里是「立即探测刷新」和「删除此账号」。
+- 每个账号的页面分 **连接 / 模型 / 生成 / 额度** 四个标签，顶部账号栏对所有标签共用。账号标题旁的「启用」开关立即生效；「⋯」菜单里是「立即探测刷新」和「删除此账号」。
 - 连接和模型的改动统一记录，底部出现「有未保存的更改 · 放弃更改 / 保存并应用」；切换账号前会提醒未保存的更改。「测试连接」用正在编辑的地址和密钥探测，不保存任何内容。
 - 次要说明收进标签旁的 ⓘ 提示（悬停、键盘聚焦或点击打开）。
 - 填写了服务地址的账号**只连接该地址**，连不上就报错，不会悄悄改连本地 `:8317`，避免两个账号指向同一个服务。
@@ -171,7 +172,7 @@ CPA 对每个模型同时提供 OpenAI Chat、OpenAI Responses、Anthropic Messa
 
 ### 渠道额度（「额度」标签页与对话框额度徽标）
 
-每个账号的 **额度** 标签（与 **连接**、**模型** 并列）显示该账号的渠道额度；标签上显示该账号可用凭证中最低的剩余额度。
+每个账号的 **额度** 标签（与 **连接**、**模型**、**生成** 并列）显示该账号的渠道额度；标签上显示该账号可用凭证中最低的剩余额度。
 
 - **填写管理密钥**：在「额度」标签里为每个账号填写 CPA 的管理密钥（CPA 配置里的 `remote-management.secret-key`；远程 CPA 还需开启 `remote-management.allow-remote`）。密钥保存在 DSH 凭证服务中，引用名第一个账号为 `CLI_PROXY_MANAGEMENT_KEY`，其他账号为 `CLI_PROXY_MANAGEMENT_KEY_<账号 ID>`（如 `CLI_PROXY_MANAGEMENT_KEY_ACCOUNT_2`）；不会写入 `state.json`、设置或日志，也不会返回给页面。
 - **由宿主读取**：宿主用管理接口读取该 CPA 的全部凭证（`/v0/management/auth-files`）、每个凭证服务的模型列表，并经 `/v0/management/api-call` 查询上游额度：Codex、Claude、Antigravity、Gemini CLI、Kimi（含 Kimi 国际版 kimi.ai）、xAI、Devin、Meta。CPA 插件提供的渠道（凭证标记了 `supports_quota`）改走 CPA 自己的 `/v0/management/quota/fetch`。Devin 的每日 / 每周额度是整个账号共用的，所有 `devin/…` 模型显示同一组额度。Meta 的额度接口需要凭证文件里的 `dca_token`，宿主每次查询时经管理接口读取，只用于这一次请求，不保存、不记录。API Key 类渠道（OpenAI 兼容、Gemini / Claude / Codex API Key）和 Vertex 没有额度接口（CPA 自带面板同样不显示），只显示账号状态与近期请求数；xAI 付费账号也没有额度计数（CPA 面板为此会真实发一次对话请求探测，本插件不这样做，以免后台刷新产生费用）。
@@ -180,6 +181,41 @@ CPA 对每个模型同时提供 OpenAI Chat、OpenAI Responses、Anthropic Messa
 - **精确匹配**：只在所选模型所属的账号（按路由 `cli-proxy*`、`cli-proxy-2*`…）里找凭证；带前缀的模型（如 `devin/claude-opus-5-5`）只匹配该前缀的凭证；不带前缀的同名模型（如 `claude-opus-5-5`）优先匹配不带前缀的凭证，Claude 渠道与 Devin 渠道不会混用。Antigravity 等按模型分组的额度窗口只取与当前模型相符的那一组。
 - **排查**：`/cpa-status` 会附带额度摘要：每个账号的管理密钥状态、额度状态、凭证数，以及模型选择器中每个模型匹配到的凭证和剩余额度（不输出密钥）。
 - **刷新**：结果在宿主端缓存 5 分钟；有页面在看时才在后台刷新过期账号，也可手动「刷新额度」。管理密钥被拒（401/403）后暂停该账号的自动刷新，直到更新密钥或手动刷新，避免触发 CPA 的错误密钥封禁。
+
+### 生图 / 生视频模型（「生成」标签页）
+
+CPA 通过 `/v1/images/*` 和 `/v1/videos/*` 提供生图、生视频模型（如 Grok Imagine）。这些模型不能用于对话，所以插件会把它们识别出来，不放进对话模型选择器。
+
+- **识别规则**（按顺序）：你在「生成」标签里手动指定的类型；模型目录里的 `type`（`openai-image` 为生图）或输出模态（只输出图片为生图，输出视频为生视频）；CPA 分流到图片 / 视频接口的模型族，按前缀匹配：以 `grok-imagine-image` 或 `gpt-image-` 开头为生图，以 `grok-imagine-video` 开头或 `sora-2*` 为生视频。其余都是对话模型（如 `gemini-3.1-flash-image`：CPA 只通过对话接口提供它，DSH 也不能显示对话中返回的图片）。只出现在 `/v1/models` 普通列表里的生成模型也会被收录。模型目录可能列出 CPA 生成接口暂不接受的变体（例如 `grok-imagine-video-1.5-lite`），它们同样不能对话，因此归为生成模型；用它们生成时会显示 CPA 返回的错误。
+- **不进入模型选择器**：生成模型不会写入任何对话路由，也不参与首次推荐勾选；即使旧的勾选里含有它们，也不会被同步（勾选本身保持不变）。「模型」标签只列对话模型。
+- **「生成」标签**（与 连接 / 模型 / 额度 并列）：分「生图模型」「生视频模型」两组列出，修改立即保存。每个模型可以用开关决定是否提供给生成功能（新出现的模型默认开启），用类型下拉框改为生图 / 生视频 / 对话模型；手动指定的类型可以恢复为自动识别。识别漏掉的模型可以在「把其他模型标记为生成模型」里手动标记。改动类型会立即重新同步该账号的路由。`sora-2*` 标注为「→ grok-imagine-video」：CPA 会把它改写为 Grok 视频模型调用。
+- **只读诊断**：「运行诊断」只发送 GET 请求：用该账号的 Key 读取两份模型目录，列出疑似生成模型及其 `type`、模态等描述字段；再**不带 Key** 探测 `GET /v1/videos/{id}` 和 `GET /openai/v1/videos/{id}/content` 是否存在（存在的接口直接返回 401，不存在时返回 CPA 的 404）。不会生成内容，也不会消耗额度；CPA 未要求 Key 时，探测会用一个不存在的任务 id 查询一次，仍是只读请求。结果可复制，不含 Key。
+- **保存位置**：「生成」标签底部可以修改生成文件的保存位置（默认 `generated`），相对路径以会话的工作目录为基准，也可以填写绝对路径；所有账号共用。
+
+#### 生成图片（`/cpa-image`）
+
+在对话输入框里输入：
+
+```text
+/cpa-image 一只橘猫在雨夜的霓虹街头
+/cpa-image -m quality --aspect 16:9 -n 2 一只橘猫在雨夜的霓虹街头
+```
+
+- **选项**（写在提示词前面）：`-m <模型>` 临时指定模型，可以写完整的 `账号id/模型id`、模型 id，或能唯一匹配的片段（如 `quality`），匹配到多个时报错并列出候选，不会替你猜；`--aspect <比例>` 可选 `1:1`、`16:9`、`9:16`、`4:3`、`3:4`、`3:2`、`2:3`、`9:20`、`20:9`；`-n <1-4>` 生成张数。`--` 之后的内容一律当作提示词。
+- **改图**：在输入框附带 1–4 张图片再执行命令，会改用 CPA 的 `/v1/images/edits`，图片作为参考图发送。只接受图片附件。
+- **保存**：文件写入会话工作目录下的保存位置，文件名形如 `20261022-133000-grok-imagine-image-一只橘猫在雨夜的霓虹街头.png`（取提示词前 24 个字符）；同名文件不会被覆盖，而是加序号。会话的工作目录必须是本机文件夹。
+- **提交后**：命令检查完选项、模型、保存目录和参考图就立即返回，输入框随即清空；生成在后台继续，期间工作区的会话列表把这个会话显示为「进行中」，在其他会话时完成会显示「已完成」提示。DSH 本身只把智能体的对话轮次算作运行中，所以插件在生成期间自己发送 DSH 的会话状态事件（`api-session/status`），每 5 秒重发一次。生成期间输入框会出现「停止」按钮，但它停不下生成（上游也不支持取消）；这时照常发消息即可，智能体会正常回复。插件重新加载或 DSH 关闭会中断进行中的生成。
+- **结果**：对话里 `/cpa-image` 这一行显示成一问一答：右侧气泡是你的提示词（下方标出比例、张数、参考图数量），左侧是回复：模型和账号、状态，生成中显示按比例排好的占位框和计时，完成后显示图片（单张按原比例显示，多张为方形缩略图），点击放大；底部写着耗时和保存目录（工作目录内的相对路径，或文件夹名），展开「详情」可以看到保存目录的完整路径和文件名（点击即用系统打开），上游改写过提示词时也会显示；失败时以红字显示原因。之前的生成记录同样会显示，前提是文件还在、记录还没被挤出（每个会话保留最近 48 次生成和 48 个文件）。图片只在页面上显示，不会发送给对话模型。
+- **图片操作**：在图片上点右键，菜单列出本机能打开这张图片的应用（默认应用排在最前，带「默认」标记，和右侧文档预览的「打开」菜单一致），然后是「在文件资源管理器中显示」（macOS 为「在访达中显示」，Linux 为「在文件管理器中显示」），最后是「复制图片」「复制文件路径」。放大图片后下方按钮提供「用默认应用打开」、在文件管理器中显示和两个复制操作。打开和显示位置通过 DSH 自己的会话接口完成（与文档预览相同，由 DSH 再次校验路径），DSH 不支持打开本机路径时这些项不显示；复制图片总是以 PNG 写入剪贴板（其他格式会先转成 PNG）。的 CPA 发送一次 `POST /v1/images/generations`（或 `/edits`），只用这个账号的地址和 Key，不跨账号重试；要求返回 `b64_json`。如果 CPA 只返回图片链接，插件会下载它：只接受 `data:` 或 HTTPS 链接，单张最多 32 MiB，下载请求不带 Key。最多等待 3 分钟。失败时显示 CPA 的错误摘要（截断，并去掉其中的链接）。生图会消耗该账号上游的额度。
+
+#### 输入框旁的生成模型按钮
+
+有可用的生图模型时，输入框里模型选择器左侧会出现一个生图按钮，显示当前用于生图的模型。
+
+- 点开后按账号分组列出所有启用的生图模型，点一下就切换。**选择按会话保存**，同时记为「上一次选择」：还没单独选过的会话（包括新建会话）沿用上一次的选择。
+- `/cpa-image` 选模型的顺序：`-m` 指定的模型 → 本会话的选择 → 上一次的选择 → 只有一个可用模型时用它；有多个模型却都没选过时，命令会报错并提示先选择。
+- 按钮在加载、切换会话和每次打开弹层时读取数据，不在后台轮询；读取时如果还没有可用生图模型、而某个启用的账号还没读到模型目录（例如 DSH 刚启动），插件会先同步一次；仍然没有时按 3 秒、10 秒、之后每 30 秒重试，读到后停止。
+- `/cpa-image` 找不到生图模型、而某个启用的账号还没读到模型目录时，会先同步一次再判断；仍然没有时，错误信息会列出每个账号的状态和模型数量。
 
 ## 插件自身更新
 
@@ -233,8 +269,9 @@ CPA 对每个模型同时提供 OpenAI Chat、OpenAI Responses、Anthropic Messa
 
 ### 斜杠命令
 
-- `/cpa-status`：显示所有账号的状态。
+- `/cpa-status`：显示所有账号的状态（含识别出的生图 / 生视频模型数量）。
 - `/cpa-refresh`：立即刷新所有账号（也会探测停用账号的模型列表）。
+- `/cpa-image [-m 模型] [--aspect 比例] [-n 1-4] 提示词`：生成图片；附带图片时改图。见 [生成图片](#生成图片cpa-image)。
 
 ### HTTP 接口
 
@@ -255,6 +292,13 @@ CPA 对每个模型同时提供 OpenAI Chat、OpenAI Responses、Anthropic Messa
 | GET | `/api/dsh-cliproxyapi/quota/status` | — | `{ ok, quota }`：缓存的额度快照；过期账号在后台刷新 |
 | POST | `/api/dsh-cliproxyapi/quota/refresh` | `{ accountId? }` | 开始刷新一个或全部账号的额度并立即返回（快照中 `refreshing` 为真） |
 | POST | `/api/dsh-cliproxyapi/quota/save` | `{ accountId, managementKey?, clear? }` | 保存或清除该账号的管理密钥，并开始刷新额度；响应不含密钥 |
+| GET | `/api/dsh-cliproxyapi/media/status` | — | `{ ok, media }`：生成设置与每个账号识别出的生图 / 生视频模型；不联网 |
+| POST | `/api/dsh-cliproxyapi/media/save` | `{ account: { accountId, disabledModels?, kindOverrides? } }` | 保存某账号关闭的生成模型（整表替换）或类型覆盖（按模型合并，`null` 表示恢复自动识别）；类型变化时重新同步该账号并在响应中附带 `status`。无效值返回 400 和错误码，如 `invalid-account`、`invalid-kind` |
+| POST | `/api/dsh-cliproxyapi/media/diagnose` | `{ accountId }` | 只读诊断（见上文），返回 `{ ok, diagnostic }`，不含 Key |
+| GET | `/api/dsh-cliproxyapi/media/session?sessionId=` | — | `{ ok, session }`：可选的生图 / 生视频模型、当前选择及其来源（`session` / `last` / `only`）、本会话最近生成的文件（只有文件名和 id，不含路径）；不联网 |
+| POST | `/api/dsh-cliproxyapi/media/session/save` | `{ sessionId?, kind: "image" \| "video", ref }` | 为会话选择模型（`ref` 为 `账号id/模型id`，`null` 清除本会话的选择），并记为上一次选择；不在可选列表里的模型返回 400 `invalid-model` |
+| GET | `/api/dsh-cliproxyapi/media/file?sessionId=&id=` | — | 返回插件为该会话记录过的生成文件；其他文件或其他会话一律 404 |
+| GET | `/api/dsh-cliproxyapi/media/command?sessionId=&commandId=` | — | `{ ok, run, files }`：该会话中某次命令的生成记录（状态 `running` / `done` / `error`、模型、提示词、比例、张数、参考图数量、起止时间、保存目录的显示名、错误代码和摘要）和生成的文件（id、文件名和完整路径，以及保存目录 `folderPath`、Host 的文件管理器类型 `desktop`：`explorer` / `finder` / `filemanager`），供对话里的命令行显示和打开文件；记录为进行中、但当前没有对应后台任务的（插件重载或崩溃）报告为 `interrupted` |
 
 更新接口的操作响应采用 `{ ok, update }`，状态包含 `currentVersion`、`latestVersion`、`available`、`channel`、`region`、`effectiveRegion`、`autoCheck`、`autoDownload`、`autoInstall`、`checking`、`downloading`、`lastCheckedAt`、`error` / `errorCode`、`blockedReason`、`downloadedVersion`、`downloadPath` 与 `upgradeCommand`。未检查或未下载的相关字段为 `null`。`channel` 为 `stable` / `beta` / `dev`，`region` 为 `auto` / `global` / `cn`；`effectiveRegion` 为本次成功检查使用的 `global` / `cn`（此前为 `null`）。
 
@@ -296,6 +340,26 @@ CPA 对每个模型同时提供 OpenAI Chat、OpenAI Responses、Anthropic Messa
   ```
 
   设置通过面板保存后立即应用。手动编辑此文件后需重载插件或重启 DSH 才会重新读取；文件损坏、结构 / 字段无效或无法读取时采用关闭自动联网检查的安全默认值。版本检查结果、候选版本、下载完成提示与命令只在内存中，插件重载后重新检查；下载包仍位于独立的 `updates` 子目录，由用户按需清理。
+- **生成设置**：独立保存在 `<Profile 目录>/.dsh-cliproxyapi/media-settings.json`，不改动 `state.json`。没有此文件时使用默认值；文件损坏时也使用默认值并在日志中提示，下次保存前会把损坏的文件另存为 `media-settings.corrupt-<时间>.json`。目前生效的是 `outputDir`（保存位置）、`lastSelection`（上一次选择的模型）以及每个账号的 `disabledModels`（关闭的生成模型）和 `kindOverrides`（手动指定的类型）；其余字段为后续生成功能预留，现在没有效果：
+
+  ```json
+  {
+    "version": 1,
+    "agentTool": false,
+    "outputDir": "generated",
+    "defaultVideoSeconds": 6,
+    "defaultVideoResolution": "720p",
+    "imageConfirm": "auto",
+    "videoConfirm": "ask",
+    "videoBudget": { "mode": "limited", "seconds": 60 },
+    "lastSelection": {},
+    "accounts": {
+      "default": { "disabledModels": [], "kindOverrides": { "my-painter": "image" } }
+    }
+  }
+  ```
+
+- **会话生成记录**：`<Profile 目录>/.dsh-cliproxyapi/media-sessions.json` 保存每个会话选择的生成模型、最近 48 次生成的记录（状态、模型、提示词、选项、起止时间、保存目录显示名、错误摘要），以及最近生成的最多 48 个文件路径和生成它们的命令 id（供对话里的命令行显示图片），只保留最近更新的 500 个会话。删除它只会清空这些选择和记录，不会删除已生成的文件。文件损坏时按空记录处理，下次写入前另存为 `media-sessions.corrupt-<时间>.json`。
 - **密钥**：通过 DSH 的 `credentials` 服务按引用名存取；凭证服务里没有时，回退读取同名环境变量。
 - **环境变量**：`CLIPROXYAPI_BASE_URL` 只用于服务地址留空的账号的自动发现。
 - **插件行配置**：`cordis.patch.yml` 中本插件行的 `config` 会在启动时叠加到状态文件上：包含 `accounts` 时替换账号列表，否则其中的字段作用于第一个账号。一般保持 `{}`，用设置面板配置即可。

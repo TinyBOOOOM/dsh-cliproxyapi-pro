@@ -128,7 +128,8 @@ The panel follows the DSH display language; the screenshots show the Chinese UI.
 
 - The base URL can be local or remote; suffixes such as `/v1`, `/v1/chat/completions` and `/v1/messages` are stripped.
 - With an empty URL, the plugin tries, in order: the existing route's URL, the `CLIPROXYAPI_BASE_URL` environment variable, and local `127.0.0.1:8317`.
-- The enriched catalog comes from `/v1/models?client_version=pi` (standard OpenAI `data[]` catalogs work too); `owned_by` from `/v1/models` identifies each model's family.
+- The enriched catalog comes from `/v1/models?client_version=pi` (standard OpenAI `data[]` catalogs work too); `owned_by` from `/v1/models` identifies each model's family and its `type` marks image models.
+- Image and video models are never written to chat routes; see [Image and video models](#image-and-video-models-the-generation-tab).
 - All accounts refresh on a shared interval (300 s by default); an unchanged catalog writes no settings.
 
 ### Model selection
@@ -146,7 +147,7 @@ The panel follows the DSH display language; the screenshots show the Chinese UI.
 - Each account writes its own set of routes: the first account uses `cli-proxy` / `cli-proxy-responses` / `cli-proxy-messages`, later ones `cli-proxy-2*`, `cli-proxy-3*`, …; credential refs are `CLI_PROXY_API_KEY`, `CLI_PROXY_API_KEY_2`, …. The model picker groups models by account name.
 - **Disabling** an account keeps its settings but removes its routes, so its models leave the picker; other accounts are unaffected.
 - **New** accounts: **+ Add Account** first tests the entered URL and key and creates an enabled account only when that works; **Add Anyway (Disabled)** is also offered.
-- Each account page has **Connection / Models / Quota** tabs under one shared account bar. The **Enabled** switch next to the account title applies at once; the **⋯** menu holds **Probe & Refresh** and **Delete Account**.
+- Each account page has **Connection / Models / Generation / Quota** tabs under one shared account bar. The **Enabled** switch next to the account title applies at once; the **⋯** menu holds **Probe & Refresh** and **Delete Account**.
 - Connection and model changes are tracked together; a bar at the bottom shows **Unsaved changes · Discard / Save & Apply**, and switching accounts asks before dropping unsaved changes. **Test Connection** probes the address and key being edited without saving anything.
 - Secondary explanations live in ⓘ tips next to the labels (open on hover, keyboard focus or click).
 - An account with a base URL **only connects to that URL** and reports an error when it is unreachable; it never silently falls back to local `:8317`, so two accounts cannot end up on the same server.
@@ -171,7 +172,7 @@ CPA serves every model on OpenAI Chat, OpenAI Responses and Anthropic Messages, 
 
 ### Channel quota (the "Quota" tab and the composer badge)
 
-Each account's **Quota** tab (next to **Connection** and **Models**) shows that account's channel quota; the tab label shows the lowest remaining quota among its usable credentials.
+Each account's **Quota** tab (next to **Connection**, **Models** and **Generation**) shows that account's channel quota; the tab label shows the lowest remaining quota among its usable credentials.
 
 - **Management key**: on an account's Quota tab, enter its CPA management key (`remote-management.secret-key` in the CPA config; a remote CPA also needs `remote-management.allow-remote`). It is stored in the DSH credentials service under `CLI_PROXY_MANAGEMENT_KEY` for the first account and `CLI_PROXY_MANAGEMENT_KEY_<ACCOUNT_ID>` for the others (for example `CLI_PROXY_MANAGEMENT_KEY_ACCOUNT_2`); it is never written to `state.json`, settings or logs, and never sent back to the page.
 - **Read by the Host**: the Host reads every credential on that CPA (`/v0/management/auth-files`), the models each credential serves, and the upstream quota through `/v0/management/api-call`: Codex, Claude, Antigravity, Gemini CLI, Kimi (including Kimi International, kimi.ai), xAI, Devin and Meta. Channels provided by CPA plugins (credentials marked `supports_quota`) use CPA's own `/v0/management/quota/fetch` instead. Devin's daily / weekly quota belongs to the whole account, so every `devin/…` model shows the same windows. Meta's quota endpoint needs the `dca_token` from the credential file; the Host reads it through the management API for each query, uses it for that one request only, and never stores or logs it. API-key channels (OpenAI-compatible, Gemini / Claude / Codex API keys) and Vertex have no quota endpoint (CPA's own panel shows none either) and show their status and recent request counts only; paid xAI accounts expose no quota counters either (CPA's panel probes them with a real chat request; this plugin does not, so background refreshes never cost money).
@@ -180,6 +181,41 @@ Each account's **Quota** tab (next to **Connection** and **Models**) shows that 
 - **Exact matching**: credentials are looked up only in the account the selected route belongs to (`cli-proxy*`, `cli-proxy-2*`, …); a prefixed model (such as `devin/claude-opus-5-5`) matches only credentials with that prefix; a bare id (such as `claude-opus-5-5`) prefers un-prefixed credentials, so the Claude and Devin channels never mix. Per-model-group windows (for example Antigravity) count only the group that fits the current model.
 - **Troubleshooting**: `/cpa-status` includes a quota summary: each account's key state, quota state, credential count, and which credentials each picker model maps to with its remaining quota (never the key).
 - **Refreshing**: results are cached on the Host for 5 minutes; stale accounts refresh in the background only while a page is asking, or on **Refresh Quota**. A rejected management key (401/403) pauses that account's automatic refresh until the key changes or you refresh manually, so CPA's bad-key protection is not triggered.
+
+### Image and video models (the "Generation" tab)
+
+CPA serves image and video generators (such as Grok Imagine) through `/v1/images/*` and `/v1/videos/*`. They cannot chat, so the plugin recognizes them and keeps them out of the chat model picker.
+
+- **Recognition**, in order: a kind you set on the Generation tab; the catalog's `type` (`openai-image` is an image model) or output modalities (image-only output is an image model, video output a video model); the model families CPA routes to its image / video handlers, matched by prefix: ids starting with `grok-imagine-image` or `gpt-image-` are image models, ids starting with `grok-imagine-video` and `sora-2*` are video models. Everything else is a chat model (for example `gemini-3.1-flash-image`: CPA serves it only through chat, and DSH cannot show images returned in a chat reply). A media model that only the plain `/v1/models` listing carries is included too. A catalog may list variants CPA's generation endpoints do not accept yet (for example `grok-imagine-video-1.5-lite`); they cannot chat either, so they count as media models, and generating with one shows CPA's error.
+- **Not in the model picker**: media models are written to no chat route and take no part in the first-run recommendation; an older selection that names them does not synchronize them (the selection itself is kept). The Models tab lists chat models only.
+- **The Generation tab** (next to Connection / Models / Quota) lists "Image models" and "Video models"; changes are saved at once. A switch decides whether each model is offered for generation (models that appear later start switched on), and a kind menu changes it to image / video / chat; a kind you set can be reset to the detected one. A model detection missed can be marked under "Mark another model as a media model". Changing a kind re-synchronizes that account's routes immediately. `sora-2*` is labelled "→ grok-imagine-video": CPA rewrites it to the Grok video model.
+- **Read-only diagnostic**: **Run diagnostic** sends GET requests only: it reads both model catalogs with the account's key and lists media-looking entries with descriptive fields such as `type` and modalities, then probes `GET /v1/videos/{id}` and `GET /openai/v1/videos/{id}/content` **without the key** (a route that exists answers 401 at once; a missing one gets CPA's 404). It generates nothing and spends no quota; if CPA does not require a key, the probe looks up one nonexistent job id, which is still read-only. The result can be copied and never contains the key.
+- **Save location**: the bottom of the Generation tab sets where generated files go (default `generated`); a relative path is resolved against the session's working directory, an absolute path also works. Shared by all accounts.
+
+#### Generating images (`/cpa-image`)
+
+Type in the composer:
+
+```text
+/cpa-image a ginger cat on a neon street on a rainy night
+/cpa-image -m quality --aspect 16:9 -n 2 a ginger cat on a neon street on a rainy night
+```
+
+- **Options** (before the prompt): `-m <model>` picks a model for this run — a full `accountId/modelId`, a model id, or a fragment that matches exactly one model (such as `quality`); several matches are an error that lists them, never a guess. `--aspect <ratio>` is one of `1:1`, `16:9`, `9:16`, `4:3`, `3:4`, `3:2`, `2:3`, `9:20`, `20:9`. `-n <1-4>` sets the number of images. Everything after `--` is prompt text.
+- **Editing**: attach 1–4 images in the composer and run the command; it then uses CPA's `/v1/images/edits` with the images as references. Only image attachments are accepted.
+- **Saving**: files are written to the save location under the session's working directory, named like `20261022-133000-grok-imagine-image-a-ginger-cat-on-a-neon-s.png` (the first 24 characters of the prompt); an existing file is never replaced, a number is appended instead. The working directory must be a local folder.
+- **After you submit**: the command checks the options, model, save folder and references, then returns at once, so the composer clears right away; the generation continues in the background. Meanwhile the workspace session list shows the session as running, and as completed if it finishes while you are in another session. DSH itself counts only agent turns as running, so during a generation the plugin sends DSH's own session status event (`api-session/status`) and repeats it every 5 seconds. During a generation the composer shows a Stop button that cannot stop it (the upstream cannot cancel either); just keep sending messages, the agent answers as usual. Reloading the plugin or closing DSH interrupts a running generation.
+- **Result**: the `/cpa-image` row in the conversation reads like an exchange: on the right, a bubble with your prompt (ratio, count and reference images noted below it); on the left, the reply: model and account, the status, placeholders in the requested ratio with a timer while generating, then the images (one image at its own ratio, several as square thumbnails); click one to enlarge it. Below are the time taken and the save folder (relative to the working directory, or the folder's name); **Details** expands the full folder path and the file names (click to open them with the system) and, when the upstream rewrote the prompt, the revised prompt; a failure shows its reason in red. Earlier runs show their images too, as long as the files exist and their records were not pushed out (the last 48 runs and 48 files per session are kept). The images are only shown on the page; they are never sent to the chat model.
+- **Image actions**: right-click an image for a menu listing the applications on this computer that open it (the default application first and marked "(default)", like the Open menu of the document preview), then **Show in File Explorer** (**Show in Finder** on macOS, **Show in Files** on Linux), then **Copy image** and **Copy file path**. Under an enlarged image, buttons offer **Open with default app**, the file-manager item and both copy actions. Opening and showing the location go through DSH's own session interface (the same as the document preview; DSH re-verifies the path), and are hidden when DSH cannot open local paths; Copy image always puts a PNG on the clipboard (other formats are converted first). /v1/images/generations` (or `/edits`) to the CPA of the model's account, with only that account's address and key and no retry on another account; it asks for `b64_json`. When CPA returns a link instead, the plugin downloads it: only `data:` or HTTPS links, at most 32 MiB per image, and the download carries no key. It waits at most 3 minutes. Failures show a short CPA error summary (truncated, links removed). Generating images spends that account's upstream quota.
+
+#### The generation-model button next to the composer
+
+When an image model is available, an image button appears in the composer left of the model selector, showing the model used for images.
+
+- Open it to see every enabled image model grouped by account and switch with one click. **The pick is saved per session** and also becomes your "last pick": a session without a pick of its own (including a new session) uses the last pick.
+- `/cpa-image` chooses its model in this order: the `-m` model → this session's pick → the last pick → the only available model; with several models and no pick, the command fails and asks you to pick one.
+- The button reads its data on load, on a session switch and each time the popover opens; it does not poll in the background. When no image model is available yet while an enabled account has not read its catalog (for example right after DSH starts), the plugin syncs once during that read; if there is still none, it retries after 3 and 10 seconds, then every 30 seconds until one appears.
+- When `/cpa-image` finds no image model while an enabled account has not read its catalog yet, it syncs once before deciding; if there is still none, the error lists each account's state and model counts.
 
 ## Updating this plugin
 
@@ -233,8 +269,9 @@ This plugin registers no agent tool, so it adds nothing to model context. Accoun
 
 ### Slash commands
 
-- `/cpa-status` — show every account's status.
+- `/cpa-status` — show every account's status (including how many image / video models were recognized).
 - `/cpa-refresh` — refresh every account now, including a catalog probe of disabled ones.
+- `/cpa-image [-m model] [--aspect ratio] [-n 1-4] prompt` — generate images; with attached images, edit them. See [Generating images](#generating-images-cpa-image).
 
 ### HTTP API
 
@@ -255,6 +292,13 @@ Used by the settings panel. Requires the DSH Web session's authentication; POST 
 | GET | `/api/dsh-cliproxyapi/quota/status` | — | `{ ok, quota }`: the cached quota snapshot; stale accounts refresh in the background |
 | POST | `/api/dsh-cliproxyapi/quota/refresh` | `{ accountId? }` | Start refreshing the quota of one or every account and return at once (`refreshing` is set in the snapshot) |
 | POST | `/api/dsh-cliproxyapi/quota/save` | `{ accountId, managementKey?, clear? }` | Store or clear the account's management key and start refreshing its quota; the response never contains the key |
+| GET | `/api/dsh-cliproxyapi/media/status` | — | `{ ok, media }`: generation settings and each account's recognized image / video models; no network access |
+| POST | `/api/dsh-cliproxyapi/media/save` | `{ account: { accountId, disabledModels?, kindOverrides? } }` | Save an account's switched-off media models (replaces the list) or kind overrides (merged per model; `null` restores detection); a kind change re-synchronizes that account and adds `status` to the response. Invalid values return 400 with a code such as `invalid-account` or `invalid-kind` |
+| POST | `/api/dsh-cliproxyapi/media/diagnose` | `{ accountId }` | Read-only diagnostic (see above); returns `{ ok, diagnostic }` without the key |
+| GET | `/api/dsh-cliproxyapi/media/session?sessionId=` | — | `{ ok, session }`: the image / video models to choose from, the current pick and where it comes from (`session` / `last` / `only`), and this session's recent files (names and ids only, no paths); no network access |
+| POST | `/api/dsh-cliproxyapi/media/session/save` | `{ sessionId?, kind: "image" \| "video", ref }` | Pick a session's model (`ref` is `accountId/modelId`; `null` clears the session's pick) and remember it as the last pick; a model that is not offered returns 400 `invalid-model` |
+| GET | `/api/dsh-cliproxyapi/media/file?sessionId=&id=` | — | Serves a generated file the plugin recorded for that session; anything else, or another session, gets 404 |
+| GET | `/api/dsh-cliproxyapi/media/command?sessionId=&commandId=` | — | `{ ok, run, files }`: one command run's record in that session (status `running` / `done` / `error`, model, prompt, ratio, count, number of references, start and end times, a display name for the save folder, error code and summary) and the files it produced (id, name and full path, plus the save folder `folderPath` and the Host's file manager kind `desktop`: `explorer` / `finder` / `filemanager`), so its row in the conversation can show and open them; a run recorded as running that no background job owns (after a reload or crash) is reported as `interrupted` |
 
 Update operation responses use `{ ok, update }`. State includes `currentVersion`, `latestVersion`, `available`, `channel`, `region`, `effectiveRegion`, `autoCheck`, `autoDownload`, `autoInstall`, `checking`, `downloading`, `lastCheckedAt`, `error` / `errorCode`, `blockedReason`, `downloadedVersion`, `downloadPath` and `upgradeCommand`. Fields without a check or download result are `null`. `channel` is `stable` / `beta` / `dev`; `region` is `auto` / `global` / `cn`; `effectiveRegion` is the `global` / `cn` source used by the last successful check (`null` before one).
 
@@ -296,6 +340,26 @@ Failures use a top-level `errorCode` or `update.errorCode`; HTTP status or `ok` 
   ```
 
   Panel saves take effect immediately. After editing this file manually, reload the plugin or restart DSH to re-read it. Corrupt, structurally invalid, invalid-field or unreadable files use safe defaults with automatic network checks disabled. Check results, the candidate version, download notices and commands are in-memory only and reset on plugin reload; downloaded packages remain in the separate `updates` subdirectory for you to clean up when needed.
+- **Generation settings**: stored separately at `<profile dir>/.dsh-cliproxyapi/media-settings.json`; `state.json` is not changed. Without this file the defaults apply; a damaged file also falls back to the defaults with a log warning, and the next save first keeps the damaged file as `media-settings.corrupt-<time>.json`. Currently `outputDir` (save location), `lastSelection` (the last picked models) and each account's `disabledModels` (switched-off media models) and `kindOverrides` (kinds you set) take effect; the other fields are reserved for the generation features still to come and have no effect yet:
+
+  ```json
+  {
+    "version": 1,
+    "agentTool": false,
+    "outputDir": "generated",
+    "defaultVideoSeconds": 6,
+    "defaultVideoResolution": "720p",
+    "imageConfirm": "auto",
+    "videoConfirm": "ask",
+    "videoBudget": { "mode": "limited", "seconds": 60 },
+    "lastSelection": {},
+    "accounts": {
+      "default": { "disabledModels": [], "kindOverrides": { "my-painter": "image" } }
+    }
+  }
+  ```
+
+- **Per-session generation records**: `<profile dir>/.dsh-cliproxyapi/media-sessions.json` keeps each session's picked generation models, records of its last 48 runs (status, model, prompt, options, start and end times, a display name for the save folder, error summary), and the paths of its last 48 generated files with the command id that produced them (for the command rows in the conversation), for the 500 most recently updated sessions. Deleting it only clears those picks and records, never generated files. A damaged file is treated as empty and kept as `media-sessions.corrupt-<time>.json` before the next write.
 - **Keys**: stored and resolved by ref through the DSH `credentials` service, falling back to an environment variable of the same name.
 - **Environment**: `CLIPROXYAPI_BASE_URL` is used only for auto-discovery of accounts without a base URL.
 - **Plugin row config**: the plugin row's `config` in `cordis.patch.yml` is overlaid on the state file at startup: `accounts` replaces the account list, other fields apply to the first account. Normally keep it `{}` and configure through the Settings panel.

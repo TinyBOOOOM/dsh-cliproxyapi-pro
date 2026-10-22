@@ -51,7 +51,18 @@ describe("plugin update client", () => {
     };
     h.apply(ctx);
     const byName = Object.fromEntries(registrations.map((r) => [r.meta.name, r]));
-    assert.deepEqual(Object.keys(byName).sort(), ["plugins.bundle.config", "settings.plugins.tab", "settings.section"]);
+    // Without modelDirectories only the generation-model button joins the composer and hero.
+    assert.deepEqual(Object.keys(byName).sort(), ["conversation.chat.commandview", "conversation.hero.options", "conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section"]);
+    const row = byName["conversation.chat.commandview"];
+    assert.equal(row.meta.key, "cpa-image", "only the /cpa-image row is replaced");
+    assert.equal(JSON.stringify(row.meta.inject("s-1")), JSON.stringify({ sessionId: "s-1" }));
+    assert.equal(row.render({ sessionId: "s-1", node: { name: "cpa-image" } }).type, h.ImageCommandCard);
+    const chip = byName["conversation.input.right"];
+    assert.equal(chip.meta.id, "dsh-cliproxyapi-pro:media");
+    assert.ok(chip.meta.order < 10000, "left of the quota badge");
+    assert.equal(JSON.stringify(chip.meta.inject("s-1")), JSON.stringify({ sessionId: "s-1" }));
+    assert.equal(chip.render({ sessionId: "s-1" }).type, h.MediaChip);
+    assert.equal(byName["conversation.hero.options"].meta.id, "dsh-cliproxyapi-pro:media-hero");
     const section = byName["settings.section"];
     assert.equal(section.meta.id, "cliproxyapi");
     assert.equal(typeof section.meta.order, "number");
@@ -586,6 +597,407 @@ describe("quota client", () => {
   });
 });
 
+describe("generation tab", () => {
+  const media = (overrides = {}) => ({
+    settings: { agentTool: false, videoConfirm: "ask" },
+    accounts: [
+      {
+        id: "default",
+        displayName: "BCPA",
+        discovered: 4,
+        disabledModels: [],
+        kindOverrides: {},
+        chatModelIds: ["grok-4.6"],
+        models: [
+          { id: "grok-imagine-image", kind: "image", detectedKind: "image", enabled: true, overridden: false },
+          { id: "sora-2", kind: "video", detectedKind: "video", aliasOf: "grok-imagine-video", enabled: true, overridden: false },
+        ],
+        ...overrides,
+      },
+    ],
+  });
+  const account = { id: "default", status: { refreshedAt: "2026-10-22T06:00:00.000Z", totalDiscovered: 4 } };
+  const okJson = (body) => new Response(JSON.stringify({ ok: true, ...body }));
+
+  it("lists image and video models with accessible switches in both languages", () => {
+    const h = clientHarness({ update: media(), loading: false, fetch: async () => okJson({ media: media() }) });
+    for (const language of ["zh", "en"]) {
+      const tree = h.renderMedia({ account }, language, false);
+      const text = content(tree);
+      assert.ok(text.includes(h[language].mediaImageGroup));
+      assert.ok(text.includes(h[language].mediaVideoGroup));
+      assert.ok(text.includes("→ grok-imagine-video"), "the Sora alias is labelled");
+      const switches = nodes(tree, (n) => n.props.role === "switch");
+      assert.equal(switches.length, 2);
+      assert.equal(switches[0].props["aria-checked"], true);
+      assert.equal(switches[0].props["aria-label"], h[language].mediaEnabledLabel.replace("{model}", "grok-imagine-image"));
+      assert.ok(button(tree, h[language].diagRun), "the diagnostic is offered");
+      assert.equal(nodes(tree, (n) => n.props.title !== undefined).length, 0, "help text uses InfoTip, not title attributes");
+    }
+  });
+
+  it("saves switches and kinds at once and hands a re-synced status to the account page", async () => {
+    const requests = [];
+    const adopted = [];
+    const h = clientHarness({
+      update: media(),
+      loading: false,
+      fetch: async (url, options = {}) => {
+        if (options.method === "POST") {
+          const body = JSON.parse(options.body);
+          requests.push({ url, body });
+          if (url.endsWith("media/diagnose")) {
+            return okJson({ diagnostic: { keyConfigured: true, catalogs: { enriched: { ok: true, count: 4, media: [] }, listing: { ok: false, status: 401 } }, routes: [{ route: "GET /v1/videos/{id}", status: 401, verdict: "present" }] } });
+          }
+          const kindChange = body.account.kindOverrides !== undefined;
+          return okJson({ media: media(), ...(kindChange ? { status: { ok: true, accounts: [] } } : {}) });
+        }
+        return okJson({ media: media() });
+      },
+    });
+    let tree = h.renderMedia({ account, onStatus: (s) => adopted.push(s) });
+    await flushClient();
+    tree = h.renderMedia({ account, onStatus: (s) => adopted.push(s) });
+    nodes(tree, (n) => n.props.role === "switch")[1].props.onClick();
+    await flushClient();
+    assert.deepEqual(requests[0].body, { account: { accountId: "default", disabledModels: ["sora-2"] } });
+    assert.equal(adopted.length, 0, "a switch does not re-sync routes");
+
+    tree = h.renderMedia({ account, onStatus: (s) => adopted.push(s) });
+    const select = nodes(tree, (n) => n.type === "select" && n.props["aria-label"] === h.zh.mediaKindFor.replace("{model}", "grok-imagine-image"))[0];
+    select.props.onChange({ target: { value: "chat" } });
+    await flushClient();
+    assert.deepEqual(requests[1].body, { account: { accountId: "default", kindOverrides: { "grok-imagine-image": "chat" } } });
+    assert.equal(adopted.length, 1, "a kind change passes the re-synced status up");
+
+    tree = h.renderMedia({ account, onStatus: (s) => adopted.push(s) });
+    nodes(tree, (n) => n.type === "select" && n.props["aria-label"] === h.zh.mediaKindFor.replace("{model}", "sora-2"))[0]
+      .props.onChange({ target: { value: "video" } });
+    await flushClient();
+    assert.deepEqual(requests[2].body.account.kindOverrides, { "sora-2": null }, "choosing the detected kind clears the override");
+
+    tree = h.renderMedia({ account, onStatus: (s) => adopted.push(s) });
+    button(tree, h.zh.diagRun).props.onClick();
+    await flushClient();
+    assert.deepEqual(requests[3], { url: "api/dsh-cliproxyapi/media/diagnose", body: { accountId: "default" } });
+    tree = h.renderMedia({ account, onStatus: (s) => adopted.push(s) });
+    const text = content(tree);
+    assert.ok(text.includes(h.zh.diagPresent));
+    assert.ok(text.includes("HTTP 401"));
+  });
+
+  it("explains an empty or unread catalog and localizes error codes", async () => {
+    const empty = clientHarness({ update: media({ models: [], discovered: 0 }), loading: false, fetch: async () => okJson({ media: media({ models: [], discovered: 0 }) }) });
+    assert.ok(content(empty.renderMedia({ account }, "en", false)).includes(empty.en.mediaNoCatalog));
+    const none = clientHarness({ update: media({ models: [] }), loading: false, fetch: async () => okJson({ media: media({ models: [] }) }) });
+    assert.ok(content(none.renderMedia({ account }, "en", false)).includes(none.en.mediaNone));
+
+    const failing = clientHarness({
+      update: media(),
+      loading: false,
+      fetch: async (_url, options = {}) =>
+        options.method === "POST" ? new Response(JSON.stringify({ ok: false, error: "invalid-account" }), { status: 400 }) : okJson({ media: media() }),
+    });
+    let tree = failing.renderMedia({ account });
+    await flushClient();
+    tree = failing.renderMedia({ account });
+    nodes(tree, (n) => n.props.role === "switch")[0].props.onClick();
+    await flushClient();
+    tree = failing.renderMedia({ account });
+    assert.ok(content(tree).includes(failing.zh.mediaErrInvalidAccount));
+  });
+
+  it("aborts its load and writes no state after unmount", async () => {
+    let signal;
+    let resolve;
+    const h = clientHarness({ fetch: (_url, options) => { signal = options.signal; return new Promise((r) => { resolve = r; }); } });
+    h.renderMedia({ account });
+    h.unmount();
+    assert.equal(signal.aborted, true);
+    resolve(new Response(JSON.stringify({ ok: true, media: media() })));
+    await flushClient();
+    assert.equal(h.afterUnmountWrites, 0);
+  });
+});
+
+describe("generation-model button", () => {
+  const session = (overrides = {}) => ({
+    sessionId: "s-1",
+    options: {
+      image: [
+        { ref: "default/grok-imagine-image", accountId: "default", accountName: "BCPA", modelId: "grok-imagine-image" },
+        { ref: "account-2/gpt-image-2", accountId: "account-2", accountName: "ZZ", modelId: "gpt-image-2" },
+      ],
+      video: [],
+    },
+    current: { image: { ref: "default/grok-imagine-image", source: "last" }, video: null },
+    recent: [{ id: "abcdef0123456789", kind: "image", name: "20261022-x.png", model: "default/grok-imagine-image", createdAt: "" }],
+    ...overrides,
+  });
+  const okJson = (body) => new Response(JSON.stringify({ ok: true, ...body }));
+
+  it("renders nothing without image models and the current model otherwise", async () => {
+    const empty = session({ options: { image: [], video: [] } });
+    const none = clientHarness({ update: empty, loading: false, fetch: async () => okJson({ session: empty }) });
+    assert.equal(none.renderChip({ sessionId: "s-1" }), null);
+    await flushClient();
+    assert.deepEqual([...none.timers.values()].map((x) => x.ms), [3000], "retries soon while no image model is known");
+    none.unmount();
+    assert.equal(none.timers.size, 0, "the retry is cleared on unmount");
+    const h = clientHarness({ update: session(), loading: false, fetch: async () => okJson({ session: session() }) });
+    for (const language of ["zh", "en"]) {
+      const tree = h.renderChip({ sessionId: "s-1" }, language, false);
+      const button = nodes(tree, (n) => n.type === "button")[0];
+      assert.equal(button.props["aria-label"], h[language].mediaChipLabel.replace("{model}", "grok-imagine-image"));
+      assert.equal(button.props["aria-haspopup"], "dialog");
+      assert.equal(button.props.title, undefined, "no title attribute");
+    }
+  });
+
+  it("opens a model list grouped by account, and switches the session's model", async () => {
+    const posts = [];
+    const h = clientHarness({
+      update: session(),
+      loading: false,
+      fetch: async (url, options = {}) => {
+        if (options.method === "POST") {
+          posts.push({ url, body: JSON.parse(options.body) });
+          return okJson({ session: session({ current: { image: { ref: "account-2/gpt-image-2", source: "session" }, video: null } }) });
+        }
+        return okJson({ session: session() });
+      },
+    });
+    let tree = h.renderChip({ sessionId: "s-1" }, "zh", false);
+    nodes(tree, (n) => n.type === "button")[0].props.onClick();
+    tree = h.renderChip({ sessionId: "s-1" }, "zh", false);
+    const dialog = nodes(tree, (n) => n.props.role === "dialog")[0];
+    assert.ok(dialog, "the popover opens");
+    assert.ok(content(dialog).includes(h.zh.mediaChipInherited), "explains an inherited pick");
+    assert.deepEqual(nodes(dialog, (n) => n.props.role === "group").map((g) => g.props["aria-label"]), ["BCPA", "ZZ"]);
+    const items = nodes(dialog, (n) => n.props.role === "menuitemradio");
+    assert.deepEqual(items.map((i) => i.props["aria-checked"]), [true, false]);
+    items[1].props.onClick();
+    await flushClient();
+    assert.deepEqual(posts[0], { url: "api/dsh-cliproxyapi/media/session/save", body: { sessionId: "s-1", kind: "image", ref: "account-2/gpt-image-2" } });
+    tree = h.renderChip({ sessionId: "s-1" }, "zh", false);
+    assert.equal(nodes(tree, (n) => n.type === "button")[0].props["aria-label"], h.zh.mediaChipLabel.replace("{model}", "gpt-image-2"));
+
+    assert.ok(nodes(tree, (n) => n.props.role === "dialog")[0], "still open");
+    assert.equal(nodes(tree, (n) => n.type === "img").length, 0, "no recent thumbnails in the picker");
+  });
+
+  it("without a session it still picks the default model and shows no files", async () => {
+    const posts = [];
+    const h = clientHarness({
+      update: session({ sessionId: null }),
+      loading: false,
+      fetch: async (url, options = {}) => {
+        if (options.method === "POST") posts.push(JSON.parse(options.body));
+        return okJson({ session: session({ sessionId: null }) });
+      },
+    });
+    let tree = h.renderChip({ sessionId: null, placement: "hero" }, "zh", false);
+    nodes(tree, (n) => n.type === "button")[0].props.onClick();
+    tree = h.renderChip({ sessionId: null, placement: "hero" }, "zh", false);
+    assert.equal(nodes(tree, (n) => n.type === "img").length, 0);
+    nodes(tree, (n) => n.props.role === "menuitemradio")[1].props.onClick();
+    await flushClient();
+    assert.deepEqual(posts[0], { kind: "image", ref: "account-2/gpt-image-2" });
+  });
+
+  it("aborts its load on unmount", async () => {
+    let signal;
+    let resolve;
+    const h = clientHarness({ fetch: (_url, options) => { signal = options.signal; return new Promise((r) => { resolve = r; }); } });
+    h.renderChip({ sessionId: "s-1" });
+    h.unmount();
+    assert.equal(signal.aborted, true);
+    resolve(new Response(JSON.stringify({ ok: true, session: session() })));
+    await flushClient();
+    assert.equal(h.afterUnmountWrites, 0);
+  });
+});
+
+describe("/cpa-image chat row", () => {
+  const okJson = (body) => new Response(JSON.stringify({ ok: true, ...body }));
+  const done = {
+    name: "cpa-image",
+    commandId: "cmd-abc-7",
+    args: "--aspect 16:9 -n 2 一只橘猫",
+    outcome: { kind: "success", text: "Generating 2 image(s) with gpt-image-2 (BCPA); files go to D:\\x\\generated" },
+  };
+  const run = (overrides = {}) => ({
+    commandId: "cmd-abc-7",
+    kind: "image",
+    status: "done",
+    model: "default/gpt-image-2",
+    modelName: "gpt-image-2",
+    accountName: "BCPA",
+    prompt: "一只橘猫",
+    aspect: "16:9",
+    count: 2,
+    references: 0,
+    files: 2,
+    startedAt: "2026-10-22T07:00:00.000Z",
+    finishedAt: "2026-10-22T07:00:09.000Z",
+    folder: "generated",
+    ...overrides,
+  });
+  const files = [
+    { id: "aaaaaaaaaaaaaaaa", kind: "image", name: "a-1.png", path: "D:\\x\\generated\\a-1.png" },
+    { id: "bbbbbbbbbbbbbbbb", kind: "image", name: "a-2.png", path: "D:\\x\\generated\\a-2.png" },
+  ];
+
+  it("shows the request as a user bubble and the images as the reply, and enlarges one on click", async () => {
+    const urls = [];
+    const h = clientHarness({ fetch: async (url) => (urls.push(url), okJson({ run: run(), files })) });
+    let tree = h.renderCard({ node: done, sessionId: "s-1" });
+    await flushClient();
+    assert.deepEqual(urls, ["api/dsh-cliproxyapi/media/command?sessionId=s-1&commandId=cmd-abc-7"]);
+    tree = h.renderCard({ node: done, sessionId: "s-1" }, "zh", false);
+    const bubble = nodes(tree, (n) => n.props.className === "dcpa-chat-bubble")[0];
+    assert.equal(content(bubble), "一只橘猫", "the prompt without options");
+    assert.equal(content(nodes(tree, (n) => n.props.className === "dcpa-chat-tags")[0]), "/cpa-image16:92 张");
+    assert.ok(content(tree).includes("gpt-image-2 · BCPA"));
+    assert.ok(content(tree).includes("用时 9 秒 · 已保存到 generated"));
+    const thumbs = nodes(tree, (n) => n.props.className === "dcpa-chat-thumb");
+    assert.deepEqual(thumbs.map((b) => b.props["aria-label"]), ["图片 1", "图片 2"]);
+    assert.equal(nodes(thumbs[1], (n) => n.type === "img")[0].props.src, "api/dsh-cliproxyapi/media/file?sessionId=s-1&id=bbbbbbbbbbbbbbbb");
+    assert.equal(h.timers.size, 0, "a finished run is not polled");
+    thumbs[1].props.onClick();
+    tree = h.renderCard({ node: done, sessionId: "s-1" }, "zh", false);
+    assert.equal(nodes(tree, (n) => n.props.className === "dcpa-chat-thumb").length, 0);
+    assert.equal(nodes(tree, (n) => n.type === "a").length, 0, "no new-window link (the desktop shell opens it without the session)");
+    assert.equal(nodes(tree, (n) => n.props.className === "dcpa-chat-full-btn").length, 1);
+    assert.equal(nodes(tree, (n) => n.type === "details").length, 1, "file names stay available");
+  });
+
+  it("opens, reveals and copies through the context menu, and links the folder and files", async () => {
+    const opened = [];
+    const asked = [];
+    const fileActions = {
+      available: async () => true,
+      applications: async (path) => (asked.push(path), [
+        { id: "C:\\paint.exe", name: "Paint", icon: "javascript:alert(1)", default: false },
+        { id: "C:\\photos.exe", name: "Photos", icon: "data:image/png;base64,AAAA", default: true },
+      ]),
+      open: async (path, action, application) => (opened.push([path, action, application]), true),
+    };
+    const h = clientHarness({ fetch: async () => okJson({ run: run(), files, folderPath: "D:\\x\\generated", desktop: "explorer" }) });
+    h.renderCard({ node: done, sessionId: "s-1", fileActions });
+    await flushClient();
+    let tree = h.renderCard({ node: done, sessionId: "s-1", fileActions }, "zh");
+    await flushClient();
+    tree = h.renderCard({ node: done, sessionId: "s-1", fileActions }, "zh", false);
+    let prevented = false;
+    nodes(tree, (n) => n.props.className === "dcpa-chat-thumb")[1].props.onContextMenu({ preventDefault: () => (prevented = true), clientX: 40, clientY: 50 });
+    assert.equal(prevented, true, "replaces the browser menu");
+    tree = h.renderCard({ node: done, sessionId: "s-1", fileActions }, "zh", false);
+    assert.deepEqual(nodes(nodes(tree, (n) => n.props.role === "menu")[0], (n) => n.props.role === "menuitem").map(content), [h.zh.mediaActOpen, "在文件资源管理器中显示", h.zh.mediaActCopyImage, h.zh.mediaActCopyPath], "a stand-in while the applications load");
+    await flushClient();
+    assert.deepEqual(asked, ["D:\\x\\generated\\a-2.png"]);
+    tree = h.renderCard({ node: done, sessionId: "s-1", fileActions }, "zh", false);
+    const menu = nodes(tree, (n) => n.props.role === "menu")[0];
+    const items = nodes(menu, (n) => n.props.role === "menuitem");
+    assert.deepEqual(items.map(content), ["用 Photos 打开（默认）", "用 Paint 打开", "在文件资源管理器中显示", h.zh.mediaActCopyImage, h.zh.mediaActCopyPath]);
+    assert.equal(nodes(menu, (n) => n.props.role === "separator").length, 2);
+    const icons = nodes(menu, (n) => n.type === "img").map((n) => n.props.src);
+    assert.deepEqual(icons, ["data:image/png;base64,AAAA"], "only image icons are rendered");
+    items[1].props.onClick();
+    await flushClient();
+    assert.deepEqual(opened, [["D:\\x\\generated\\a-2.png", "open", "C:\\paint.exe"]]);
+    nodes(tree, (n) => n.props.className === "dcpa-chat-thumb")[1].props.onContextMenu({ clientX: 40, clientY: 50 });
+    tree = h.renderCard({ node: done, sessionId: "s-1", fileActions }, "zh", false);
+    nodes(tree, (n) => n.props.role === "menuitem")[2].props.onClick();
+    await flushClient();
+    assert.deepEqual(opened[1], ["D:\\x\\generated\\a-2.png", "reveal", undefined]);
+    assert.equal(asked.length, 1, "applications are asked once per file");
+    tree = h.renderCard({ node: done, sessionId: "s-1", fileActions }, "zh", false);
+    assert.equal(nodes(tree, (n) => n.props.role === "menu").length, 0, "a pick closes the menu");
+    const links = nodes(tree, (n) => n.props.className === "dcpa-chat-link");
+    assert.deepEqual(links.map(content), ["D:\\x\\generated", "a-1.png", "a-2.png"]);
+    links[0].props.onClick();
+    await flushClient();
+    assert.deepEqual(opened[2], ["D:\\x\\generated", "open", undefined]);
+    // No clipboard in this harness: the copy reports its failure instead of throwing.
+    nodes(tree, (n) => n.props.className === "dcpa-chat-thumb")[0].props.onContextMenu({ clientX: 1, clientY: 1 });
+    tree = h.renderCard({ node: done, sessionId: "s-1", fileActions }, "zh", false);
+    await flushClient();
+    tree = h.renderCard({ node: done, sessionId: "s-1", fileActions }, "zh", false);
+    nodes(tree, (n) => n.props.role === "menuitem").find((n) => content(n) === h.zh.mediaActCopyImage).props.onClick();
+    await flushClient();
+    tree = h.renderCard({ node: done, sessionId: "s-1", fileActions }, "zh", false);
+    assert.equal(nodes(tree, (n) => n.props.role === "status" && n.props["data-tone"] === "error").length, 1);
+    // The buttons under an enlarged image name the file manager too.
+    nodes(tree, (n) => n.props.className === "dcpa-chat-thumb")[0].props.onClick();
+    tree = h.renderCard({ node: done, sessionId: "s-1", fileActions }, "zh", false);
+    assert.deepEqual(nodes(nodes(tree, (n) => n.props.className === "dcpa-chat-full")[0], (n) => n.type === "button" && n.props.className === "dcpa-q-btn").map(content), [h.zh.mediaActOpen, "在文件资源管理器中显示", h.zh.mediaActCopyImage, h.zh.mediaActCopyPath, h.zh.mediaClosePreview]);
+
+    const plain = clientHarness({ update: { run: run(), files, folderPath: "D:\\x\\generated" }, loading: false, fetch: async () => okJson({}) });
+    tree = plain.renderCard({ node: done, sessionId: "s-1" }, "en", false);
+    assert.equal(nodes(tree, (n) => n.props.className === "dcpa-chat-link").length, 0, "without a desktop the paths are plain text");
+    nodes(tree, (n) => n.props.className === "dcpa-chat-thumb")[0].props.onContextMenu({ clientX: 1, clientY: 1 });
+    tree = plain.renderCard({ node: done, sessionId: "s-1" }, "en", false);
+    assert.deepEqual(nodes(tree, (n) => n.props.role === "menuitem").map(content), [plain.en.mediaActCopyImage, plain.en.mediaActCopyPath]);
+  });
+
+  it("polls a running run with placeholders, then shows its result", async () => {
+    let body = { run: run({ status: "running", finishedAt: undefined, folder: undefined, files: 0 }), files: [] };
+    const h = clientHarness({ fetch: async () => okJson(body) });
+    let tree = h.renderCard({ node: done, sessionId: "s-1" });
+    assert.ok(content(tree).includes(h.zh.mediaCardSubmitting));
+    await flushClient();
+    tree = h.renderCard({ node: done, sessionId: "s-1" }, "zh");
+    assert.equal(nodes(tree, (n) => n.props.className === "dcpa-chat-skeleton").length, 2);
+    assert.equal(nodes(tree, (n) => n.props.className === "dcpa-chat-skeleton")[0].props.style.aspectRatio, "16 / 9");
+    assert.ok(content(tree).includes(h.zh.mediaCardNoStop));
+    assert.equal(nodes(tree, (n) => n.props["data-tone"] === "running").length, 1);
+    const poll = [...h.timers.entries()].find(([, x]) => x.ms === 2000);
+    assert.ok(poll, "looks again in 2 s");
+    body = { run: run(), files };
+    h.timers.delete(poll[0]);
+    poll[1].fn();
+    await flushClient();
+    tree = h.renderCard({ node: done, sessionId: "s-1" }, "zh", false);
+    assert.equal(nodes(tree, (n) => n.props.className === "dcpa-chat-thumb").length, 2);
+    assert.equal(nodes(tree, (n) => n.props.className === "dcpa-chat-skeleton").length, 0);
+  });
+
+  it("shows admission errors, background failures and missing files", async () => {
+    let calls = 0;
+    const h = clientHarness({ fetch: async () => (calls++, okJson({ run: null, files: [] })) });
+    let tree = h.renderCard({ node: { name: "cpa-image", commandId: "cmd-abc-8", args: "x", outcome: null }, sessionId: "s-1" });
+    assert.ok(content(tree).includes(h.zh.mediaCardSubmitting));
+    const failed = h.renderCard({ node: { name: "cpa-image", commandId: "cmd-abc-8", args: "x", outcome: { kind: "error", text: "/cpa-image: add a prompt" } }, sessionId: "s-1" }, "en");
+    assert.equal(content(nodes(failed, (n) => n.props.role === "alert")[0]), "add a prompt");
+    await flushClient();
+    assert.equal(calls, 0, "nothing to load before admission or after an admission error");
+
+    const broken = clientHarness({ update: { run: run({ status: "error", errorCode: "interrupted", error: "stopped" }), files: [] }, loading: false, fetch: async () => okJson({}) });
+    tree = broken.renderCard({ node: done, sessionId: "s-1" }, "zh", false);
+    assert.equal(content(nodes(tree, (n) => n.props.role === "alert")[0]), broken.zh.mediaRunErrInterrupted);
+    const upstream = clientHarness({ update: { run: run({ status: "error", errorCode: "upstream-error", error: "CPA rejected the request (HTTP 429)" }), files: [] }, loading: false, fetch: async () => okJson({}) });
+    tree = upstream.renderCard({ node: done, sessionId: "s-1" }, "en", false);
+    assert.equal(content(nodes(tree, (n) => n.props.role === "alert")[0]), "CPA rejected the request (HTTP 429)");
+
+    const gone = clientHarness({ update: { run: null, files: [] }, loading: false, fetch: async () => okJson({ files: [] }) });
+    tree = gone.renderCard({ node: done, sessionId: "s-1" }, "en", false);
+    assert.ok(content(tree).includes(gone.en.mediaCardMissing));
+  });
+
+  it("aborts its request and timers on unmount", async () => {
+    let signal;
+    let resolve;
+    const h = clientHarness({ fetch: (_url, options) => { signal = options.signal; return new Promise((r) => { resolve = r; }); } });
+    h.renderCard({ node: done, sessionId: "s-1" });
+    h.unmount();
+    assert.equal(signal.aborted, true);
+    assert.equal(h.timers.size, 0);
+    resolve(new Response(JSON.stringify({ ok: true, run: null, files: [] })));
+    await flushClient();
+    assert.equal(h.afterUnmountWrites, 0);
+  });
+});
 describe("settings page text", () => {
   it("every key the UI renders exists in both dictionaries", async () => {
     const { readFileSync } = await import("node:fs");
@@ -630,11 +1042,50 @@ describe("hot reload", () => {
     const disposeNew = activation(); // overlaps: the old entries still hold the stable ids
     disposeOld();
     const names = [...live.values()].map((e) => e.meta.name).sort();
-    assert.deepEqual(names, ["conversation.hero.options", "conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section"]);
-    const badge = [...live.values()].find((e) => e.meta.name === "conversation.input.right");
+    assert.deepEqual(names, ["conversation.chat.commandview", "conversation.hero.options", "conversation.hero.options", "conversation.input.right", "conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section"]);
+    const chip = [...live.values()].find((e) => e.meta.id === "dsh-cliproxyapi-pro:media");
+    assert.equal(chip.meta.priority, 1, "the generation button also shadows one priority lower");
+    const badge = [...live.values()].find((e) => e.meta.id === "dsh-cliproxyapi-pro:quota");
     assert.equal(badge.meta.id, "dsh-cliproxyapi-pro:quota", "the id stays stable");
     assert.equal(badge.meta.priority, 1, "the reloaded entry shadows one priority lower");
     disposeNew();
     assert.equal(live.size, 0);
+  });
+});
+describe("image row file actions", () => {
+  it("reach DSH's remote.session service, ask the desktop once and pass reveal / application requests", async () => {
+    const h = clientHarness();
+    const live = [];
+    const calls = [];
+    let mounted = false;
+    const session = {
+      canOpenWorkspacePath: async () => (calls.push("can"), { ok: true, value: true }),
+      workspacePathApplications: async (request) => (calls.push(["apps", request]), { ok: true, value: [{ id: "x.exe", name: "X", default: true }, { bad: 1 }] }),
+      openWorkspacePath: async (request) => (calls.push(["open", request]), { ok: true, value: { opened: true } }),
+    };
+    const ctx = {
+      effect(fn) { return fn(); },
+      locale: { register: () => () => {}, bind: () => (key) => key },
+      slots: { inject: (_name, fn) => fn(), register: (meta, render) => (live.push({ meta, render }), () => {}) },
+      inject(_names, fn) { fn({ slots: ctx.slots, modelDirectories: { directoryFor: () => ({ store: null }) } }); },
+      get: (name) => (name === "remote.session" && mounted ? session : undefined),
+    };
+    h.apply(ctx);
+    const row = live.find((e) => e.meta.name === "conversation.chat.commandview");
+    const actions = row.render({ node: { name: "cpa-image" }, sessionId: "s-1" }).props.fileActions;
+    assert.equal(await actions.available(), false, "not mounted yet");
+    mounted = true;
+    assert.equal(await actions.available(), true);
+    assert.equal(await actions.available(), true);
+    assert.deepEqual(calls, ["can"], "asked once");
+    assert.deepEqual(JSON.parse(JSON.stringify(await actions.applications("D:\\a.png"))), [{ id: "x.exe", name: "X", default: true }]);
+    assert.equal(await actions.open("D:\\a.png", "reveal"), true);
+    await actions.open("D:\\a.png", "open", "x.exe");
+    await actions.open("D:\\a.png", "open");
+    assert.deepEqual(JSON.parse(JSON.stringify(calls.slice(2))), [
+      ["open", { path: "D:\\a.png", action: "reveal" }],
+      ["open", { path: "D:\\a.png", application: "x.exe" }],
+      ["open", { path: "D:\\a.png" }],
+    ]);
   });
 });

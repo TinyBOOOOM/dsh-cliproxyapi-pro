@@ -19,7 +19,7 @@ import {
   recommendModels,
   apply,
 } from "../lib/index.js";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -310,7 +310,7 @@ function fakeServers(servers) {
   };
 }
 
-function harness(initialState, servers) {
+function harness(initialState, servers, extraDeps = {}) {
   let state = normalizeState(initialState);
   const providers = {};
   const keys = { CLI_PROXY_API_KEY: "key-a" };
@@ -338,6 +338,7 @@ function harness(initialState, servers) {
     },
     readExistingPiAiRoute: (key) => providers[key],
     fetch: fakeServers(servers),
+    ...extraDeps,
   });
   return { controller, providers, keys, state: () => state };
 }
@@ -664,7 +665,8 @@ describe("multi-account", () => {
       // No agent tool: nothing is added to model context.
       assert.equal(injected.includes("tools"), false);
       assert.equal(tools.length, 0);
-      assert.deepEqual(commands.map((c) => c.name).sort(), ["cpa-refresh", "cpa-status"]);
+      assert.deepEqual(commands.map((c) => c.name).sort(), ["cpa-image", "cpa-refresh", "cpa-status"]);
+      assert.equal(commands.find((c) => c.name === "cpa-image").input.attachments, true);
 
       let sent = await post("/api/dsh-cliproxyapi/refresh", {});
       assert.equal(sent.code, 200, JSON.stringify(sent.body));
@@ -729,3 +731,574 @@ describe("test connection", () => {
     assert.deepEqual(Object.keys(providers), [], "no routes are written");
   });
 });
+
+/**
+ * Mount apply() against a temp profile with fake settings/credentials and the
+ * given fetch. `extraServices` adds Host services to ctx.get(). Call
+ * `dispose()` before the next mount (apply is mounted once per process).
+ */
+/** Poll a run's chat-row data until its background job has settled. */
+async function settledRun(m, sessionId, commandId) {
+  for (let i = 0; i < 200; i++) {
+    const row = await m.call("GET", `/api/dsh-cliproxyapi/media/command?sessionId=${sessionId}&commandId=${commandId}`);
+    if (row.body?.run?.status !== "running") return row;
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  throw new Error("the run did not settle");
+}
+
+function mountPlugin({ state, fetchImpl, extraServices = {} }) {
+  const dir = mkdtempSync(join(tmpdir(), "cpa-mount-"));
+  const stateDir = join(dir, ".dsh-cliproxyapi");
+  mkdirSync(stateDir, { recursive: true });
+  writeFileSync(join(stateDir, "state.json"), JSON.stringify(state));
+  const providers = {};
+  const creds = { CLI_PROXY_API_KEY: "key-a" };
+  const disposers = [];
+  const tools = [];
+  const injected = [];
+  const commands = [];
+  const routes = new Map();
+  const emitted = [];
+  const listeners = {};
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = fetchImpl;
+  const ctx = {
+    settings: {
+      describe: () => [{ ns: "llm-pi-ai", value: { providers } }],
+      mutate: async (_ns, ops) => {
+        for (const op of ops) {
+          if (op.op === "set") providers[op.path[1]] = op.value;
+          else delete providers[op.path[1]];
+        }
+      },
+    },
+    get: (name) =>
+      name === "profileContext"
+        ? { dir }
+        : name === "credentials"
+        ? {
+            resolve: async (ref) => (creds[ref] === undefined ? undefined : { value: creds[ref] }),
+            describe: async (ref) => ({ configured: creds[ref] !== undefined, writable: true }),
+            set: async () => {},
+            unset: async () => {},
+          }
+        : extraServices[name],
+    on: (event, fn) => ((listeners[event] ??= []).push(fn), () => {}),
+    emit: (...args) => emitted.push(args),
+    effect: (fn) => {
+      const d = fn();
+      if (typeof d === "function") disposers.push(d);
+    },
+    inject: (deps, fn) => {
+      injected.push(...deps);
+      fn(sub);
+    },
+    logger: { info() {}, warn() {} },
+  };
+  const sub = {
+    ...ctx,
+    commands: { register: (c) => (commands.push(c), () => {}) },
+    tools: { register: (t) => (tools.push(t), () => {}) },
+    webServer: { register: (r) => (routes.set(r.path, r.handler), () => {}) },
+  };
+  const call = async (method, path, payload) => {
+    const body = payload === undefined ? "" : JSON.stringify(payload);
+    const req = {
+      method,
+      url: path,
+      headers: { host: "127.0.0.1:1" },
+      async *[Symbol.asyncIterator]() {
+        if (body !== "") yield Buffer.from(body);
+      },
+    };
+    let sent;
+    const res = {
+      writeHead: (code, headers) => (sent = { code, headers }),
+      end: (data) => {
+        sent.raw = data;
+        try {
+          sent.body = JSON.parse(String(data));
+        } catch {}
+      },
+    };
+    await routes.get(new URL(path, "http://h").pathname)(req, res);
+    return sent;
+  };
+  apply(ctx, {});
+  return {
+    dir,
+    stateDir,
+    providers,
+    tools,
+    injected,
+    commands,
+    call,
+    emitted,
+    listeners,
+    dispose() {
+      globalThis.fetch = realFetch;
+      for (const d of disposers) d();
+    },
+  };
+}
+
+const MEDIA_SERVERS = {
+  "m.test": {
+    key: "key-a",
+    models: [
+      { slug: "grok-4.6", owned_by: "xai" },
+      { slug: "grok-imagine-image", owned_by: "xai" },
+      { slug: "grok-imagine-video-1.5", owned_by: "xai" },
+      { slug: "claude-opus-5-5", owned_by: "anthropic" },
+    ],
+  },
+};
+
+describe("media models", () => {
+  it("keeps image and video models out of the chat routes, recommendations and seeding", async () => {
+    const h = harness({ accounts: [{ id: "default", baseURL: "http://m.test" }] }, MEDIA_SERVERS);
+    const payload = await h.controller.refresh("default");
+    const account = payload.accounts[0];
+    assert.equal(account.status.state, "connected", account.status.error);
+    const routed = Object.values(h.providers).flatMap((r) => r.models.map((m) => m.id)).sort();
+    assert.deepEqual(routed, ["claude-opus-5-5", "grok-4.6"]);
+    assert.deepEqual(h.state().accounts[0].selectedModels, ["grok-4.6", "claude-opus-5-5"], "seeded from chat models only");
+    assert.deepEqual(account.recommendedModels, ["grok-4.6", "claude-opus-5-5"]);
+    const kinds = Object.fromEntries(account.status.allModels.map((m) => [m.id, m.kind]));
+    assert.deepEqual(kinds, {
+      "grok-4.6": "chat",
+      "grok-imagine-image": "image",
+      "grok-imagine-video-1.5": "video",
+      "claude-opus-5-5": "chat",
+    });
+    const [media] = h.controller.mediaAccounts();
+    assert.deepEqual(media.models.map((m) => [m.id, m.kind]), [["grok-imagine-image", "image"], ["grok-imagine-video-1.5", "video"]]);
+    assert.deepEqual(media.chatModelIds.sort(), ["claude-opus-5-5", "grok-4.6"]);
+  });
+
+  it("an explicit selection naming a media model still never routes it", async () => {
+    const h = harness(
+      { accounts: [{ id: "default", baseURL: "http://m.test", selectedModels: ["grok-imagine-image", "grok-4.6"] }] },
+      MEDIA_SERVERS
+    );
+    await h.controller.refreshAll();
+    assert.deepEqual(Object.values(h.providers).flatMap((r) => r.models.map((m) => m.id)), ["grok-4.6"]);
+    assert.deepEqual(h.state().accounts[0].selectedModels, ["grok-imagine-image", "grok-4.6"], "the saved selection is untouched");
+  });
+
+  it("applies kind overrides on the next sync in both directions", async () => {
+    let overrides = {};
+    const h = harness(
+      { accounts: [{ id: "default", baseURL: "http://m.test", selectedModels: [] }] },
+      MEDIA_SERVERS,
+      { mediaKindOverrides: (id) => (id === "default" ? overrides : {}) }
+    );
+    await h.controller.refreshAll();
+    const ids = () => Object.values(h.providers).flatMap((r) => r.models.map((m) => m.id)).sort();
+    assert.deepEqual(ids(), ["claude-opus-5-5", "grok-4.6"]);
+    overrides = { "grok-imagine-image": "chat", "grok-4.6": "video" };
+    await h.controller.refreshAccount("default");
+    assert.deepEqual(ids(), ["claude-opus-5-5", "grok-imagine-image"]);
+    const [media] = h.controller.mediaAccounts();
+    assert.deepEqual(media.models.map((m) => [m.id, m.kind, m.detectedKind]), [
+      ["grok-4.6", "video", "chat"],
+      ["grok-imagine-video-1.5", "video", "video"],
+    ]);
+  });
+
+  it("adds a media model only the plain listing carries and reads its registry type", async () => {
+    const fetchImpl = async (url) => {
+      const enriched = String(url).includes("client_version=pi");
+      return json(
+        enriched
+          ? { models: [{ slug: "grok-4.6" }, { slug: "my-painter" }] }
+          : {
+              data: [
+                { id: "grok-4.6", object: "model", owned_by: "xai" },
+                { id: "my-painter", object: "model", owned_by: "openai", type: "openai-image" },
+                { id: "plain-only-chat", object: "model", owned_by: "openai" },
+                { id: "grok-imagine-video", object: "model", owned_by: "xai" },
+              ],
+            }
+      );
+    };
+    const h = harness({ accounts: [{ id: "default", baseURL: "http://p.test", selectedModels: [] }] }, {}, { fetch: fetchImpl });
+    await h.controller.refreshAll();
+    const [media] = h.controller.mediaAccounts();
+    assert.deepEqual(media.models.map((m) => [m.id, m.kind]), [["my-painter", "image"], ["grok-imagine-video", "video"]]);
+    assert.deepEqual(media.chatModelIds, ["grok-4.6"], "plain-only chat models are not added");
+    assert.deepEqual(Object.values(h.providers).flatMap((r) => r.models.map((m) => m.id)), ["grok-4.6"]);
+  });
+
+  it("re-syncing unchanged media data performs no settings writes", async () => {
+    let writes = 0;
+    const providers = {};
+    const h = harness({ accounts: [{ id: "default", baseURL: "http://m.test", selectedModels: [] }] }, MEDIA_SERVERS, {
+      settings: {
+        mutate: async (_ns, ops) => {
+          writes += 1;
+          for (const op of ops) {
+            if (op.op === "set") providers[op.path[1]] = op.value;
+            else delete providers[op.path[1]];
+          }
+        },
+      },
+      readExistingPiAiRoute: (key) => providers[key],
+    });
+    await h.controller.refreshAll();
+    const after = writes;
+    assert.ok(after > 0);
+    await h.controller.refreshAll();
+    assert.equal(writes, after);
+  });
+
+  it("apply() serves media status, save and the read-only diagnostic, still without an agent tool", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "cpa-media-apply-"));
+    const stateDir = join(dir, ".dsh-cliproxyapi");
+    mkdirSync(stateDir, { recursive: true });
+    writeFileSync(
+      join(stateDir, "state.json"),
+      JSON.stringify({ version: 2, accounts: [{ id: "default", baseURL: "http://m.test", selectedModels: [] }] })
+    );
+    const providers = {};
+    const creds = { CLI_PROXY_API_KEY: "key-a" };
+    const disposers = [];
+    const tools = [];
+    const injected = [];
+    const routes = new Map();
+    const calls = [];
+    const realFetch = globalThis.fetch;
+    const serve = fakeServers(MEDIA_SERVERS);
+    globalThis.fetch = async (url, init) => {
+      calls.push({ url: String(url), auth: init?.headers?.Authorization });
+      if (String(url).includes("dsh-diagnostic-probe")) return new Response("{}", { status: 401 });
+      return serve(url, init);
+    };
+    const ctx = {
+      settings: {
+        describe: () => [{ ns: "llm-pi-ai", value: { providers } }],
+        mutate: async (_ns, ops) => {
+          for (const op of ops) {
+            if (op.op === "set") providers[op.path[1]] = op.value;
+            else delete providers[op.path[1]];
+          }
+        },
+      },
+      get: (name) =>
+        name === "profileContext"
+          ? { dir }
+          : name === "credentials"
+          ? {
+              resolve: async (ref) => (creds[ref] === undefined ? undefined : { value: creds[ref] }),
+              describe: async (ref) => ({ configured: creds[ref] !== undefined, writable: true }),
+              set: async () => {},
+              unset: async () => {},
+            }
+          : undefined,
+      on: () => {},
+      effect: (fn) => {
+        const d = fn();
+        if (typeof d === "function") disposers.push(d);
+      },
+      inject: (deps, fn) => {
+        injected.push(...deps);
+        fn(sub);
+      },
+      logger: { info() {}, warn() {} },
+    };
+    const sub = {
+      ...ctx,
+      commands: { register: () => () => {} },
+      tools: { register: (t) => (tools.push(t), () => {}) },
+      webServer: { register: (r) => (routes.set(r.path, r.handler), () => {}) },
+    };
+    const call = async (method, path, payload) => {
+      const body = payload === undefined ? "" : JSON.stringify(payload);
+      const req = {
+        method,
+        headers: { host: "127.0.0.1:1" },
+        async *[Symbol.asyncIterator]() {
+          if (body !== "") yield Buffer.from(body);
+        },
+      };
+      let sent;
+      const res = { writeHead: (code) => (sent = { code }), end: (text) => (sent.body = JSON.parse(text)) };
+      await routes.get(path)(req, res);
+      return sent;
+    };
+    try {
+      apply(ctx, {});
+      assert.equal(injected.includes("tools"), false);
+      assert.equal(tools.length, 0);
+      await call("POST", "/api/dsh-cliproxyapi/refresh", {});
+
+      let sent = await call("GET", "/api/dsh-cliproxyapi/media/status");
+      assert.equal(sent.code, 200, JSON.stringify(sent.body));
+      assert.equal(sent.body.media.settings.agentTool, false);
+      assert.equal(sent.body.media.settings.videoConfirm, "ask");
+      const account = sent.body.media.accounts[0];
+      assert.deepEqual(account.models.map((m) => [m.id, m.kind, m.enabled]), [
+        ["grok-imagine-image", "image", true],
+        ["grok-imagine-video-1.5", "video", true],
+      ]);
+
+      sent = await call("POST", "/api/dsh-cliproxyapi/media/save", {
+        account: { accountId: "default", disabledModels: ["grok-imagine-video-1.5"] },
+      });
+      assert.equal(sent.code, 200, JSON.stringify(sent.body));
+      assert.equal(sent.body.status, undefined, "no re-sync without a kind change");
+      assert.equal(sent.body.media.accounts[0].models[1].enabled, false);
+      const saved = JSON.parse(readFileSync(join(stateDir, "media-settings.json"), "utf8"));
+      assert.deepEqual(saved.accounts.default.disabledModels, ["grok-imagine-video-1.5"]);
+      assert.equal(JSON.parse(readFileSync(join(stateDir, "state.json"), "utf8")).version, 2, "account state is a separate file");
+
+      sent = await call("POST", "/api/dsh-cliproxyapi/media/save", {
+        account: { accountId: "default", kindOverrides: { "grok-imagine-image": "chat" } },
+      });
+      assert.equal(sent.code, 200, JSON.stringify(sent.body));
+      assert.ok(Array.isArray(sent.body.status.accounts), "a kind change returns the re-synced account status");
+      assert.ok(Object.values(providers).some((r) => r.models.some((m) => m.id === "grok-imagine-image")));
+
+      sent = await call("POST", "/api/dsh-cliproxyapi/media/save", { defaultVideoSeconds: 99 });
+      assert.equal(sent.code, 400);
+      assert.equal(sent.body.error, "invalid-video-seconds");
+      sent = await call("POST", "/api/dsh-cliproxyapi/media/save", { account: { accountId: "ghost", disabledModels: [] } });
+      assert.equal(sent.code, 400);
+      assert.equal(sent.body.error, "invalid-account");
+
+      calls.length = 0;
+      sent = await call("POST", "/api/dsh-cliproxyapi/media/diagnose", { accountId: "default" });
+      assert.equal(sent.code, 200, JSON.stringify(sent.body));
+      assert.equal(sent.body.diagnostic.keyConfigured, true);
+      assert.equal(sent.body.diagnostic.catalogs.enriched.ok, true);
+      assert.deepEqual(sent.body.diagnostic.routes.map((r) => r.verdict), ["present", "present"]);
+      assert.ok(calls.filter((c) => c.url.includes("dsh-diagnostic-probe")).every((c) => c.auth === undefined));
+      assert.ok(!JSON.stringify(sent.body).includes("key-a"), "the key is never returned");
+      sent = await call("POST", "/api/dsh-cliproxyapi/media/diagnose", {});
+      assert.equal(sent.code, 400);
+    } finally {
+      globalThis.fetch = realFetch;
+      for (const d of disposers) d();
+    }
+  });
+
+  it("/cpa-image syncs once when no catalog was read yet, and explains an empty choice per account", async () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1]);
+    const serve = fakeServers(MEDIA_SERVERS);
+    const workDir = mkdtempSync(join(tmpdir(), "cpa-work-"));
+    const fetchImpl = async (url, init) =>
+      new URL(String(url)).pathname.startsWith("/v1/images/")
+        ? new Response(JSON.stringify({ data: [{ b64_json: png.toString("base64") }] }))
+        : serve(url, init);
+    let m = mountPlugin({
+      state: { version: 2, accounts: [{ id: "default", baseURL: "http://m.test", selectedModels: [] }] },
+      fetchImpl,
+      extraServices: { workingDirectory: { ensure: async () => workDir } },
+    });
+    const signal = new AbortController().signal;
+    try {
+      // Right after a start or reload: no sync has run yet. The composer button's read syncs once.
+      const view = await m.call("GET", "/api/dsh-cliproxyapi/media/session?sessionId=s-1");
+      assert.deepEqual(view.body.session.options.image.map((o) => o.ref), ["default/grok-imagine-image"]);
+      const result = await m.commands.find((c) => c.name === "cpa-image").handler({ agent: { id: "s-1" }, rawInput: "fox", attachments: [], signal });
+      assert.equal(result.kind, "success", result.text);
+    } finally {
+      m.dispose();
+    }
+    m = mountPlugin({
+      state: { version: 2, accounts: [{ id: "default", displayName: "BCPA", baseURL: "http://m.test", enabled: false, selectedModels: [] }] },
+      fetchImpl,
+      extraServices: { workingDirectory: { ensure: async () => workDir } },
+    });
+    try {
+      const result = await m.commands.find((c) => c.name === "cpa-image").handler({ agent: { id: "s-1" }, rawInput: "fox", attachments: [], signal });
+      assert.equal(result.kind, "error");
+      assert.match(result.text, /no image model is available \(BCPA: disabled, 0 model\(s\), 0 image\)/);
+    } finally {
+      m.dispose();
+    }
+  });
+
+  it("/cpa-image generates into the session folder, records it and serves only recorded files", async () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9, 9]);
+    const imageCalls = [];
+    const serve = fakeServers(MEDIA_SERVERS);
+    const workDir = mkdtempSync(join(tmpdir(), "cpa-work-"));
+    const m = mountPlugin({
+      state: { version: 2, accounts: [{ id: "default", baseURL: "http://m.test", selectedModels: [] }] },
+      fetchImpl: async (url, init) => {
+        const path = new URL(String(url)).pathname;
+        if (path.startsWith("/v1/images/")) {
+          imageCalls.push({ path, auth: init.headers.Authorization, body: JSON.parse(init.body) });
+          const n = JSON.parse(init.body).n;
+          return new Response(JSON.stringify({ data: Array.from({ length: n }, () => ({ b64_json: png.toString("base64") })) }));
+        }
+        return serve(url, init);
+      },
+      extraServices: {
+        workingDirectory: { ensure: async () => workDir },
+        attachments: { readImage: async (ref) => ({ ref, data: png }) },
+      },
+    });
+    try {
+      assert.equal(m.injected.includes("tools"), false, "still no agent tool");
+      await m.call("POST", "/api/dsh-cliproxyapi/refresh", {});
+      let sent = await m.call("GET", "/api/dsh-cliproxyapi/media/session?sessionId=s-1");
+      assert.equal(sent.code, 200, JSON.stringify(sent.body));
+      assert.deepEqual(sent.body.session.options.image.map((o) => o.ref), ["default/grok-imagine-image"]);
+      assert.deepEqual(sent.body.session.current.image, { ref: "default/grok-imagine-image", source: "only" });
+
+      const image = m.commands.find((c) => c.name === "cpa-image");
+      const signal = new AbortController().signal;
+      let result = await image.handler({ agent: { id: "s-1" }, rawInput: "-n 2 a red fox", attachments: [], signal, commandId: "cmd-t-1" });
+      assert.equal(result.kind, "success", result.text);
+      assert.match(result.text, /^Generating 2 image\(s\) with grok-imagine-image/, "returns once admitted");
+      // The session shows as running while the job runs, and idle after it.
+      assert.deepEqual(m.emitted[0], ["api-session/status", "s-1", true]);
+      let row = await settledRun(m, "s-1", "cmd-t-1");
+      assert.deepEqual(m.emitted.at(-1), ["api-session/status", "s-1", false]);
+      assert.equal(row.code, 200, JSON.stringify(row.body));
+      assert.equal(row.body.run.status, "done");
+      assert.equal(row.body.run.prompt, "a red fox");
+      assert.equal(row.body.run.count, 2);
+      assert.equal(row.body.run.folder, "generated", "a display label, not a path");
+      // The chat row finds this run's files by command id, in generation order.
+      assert.deepEqual(row.body.files.map((f) => f.name.slice(-6)), ["-1.png", "-2.png"]);
+      // Paths let the page open / reveal a file through DSH's Session Remote.
+      assert.deepEqual(row.body.files.map((f) => f.path), row.body.files.map((f) => join(workDir, "generated", f.name)));
+      assert.equal(row.body.folderPath, join(workDir, "generated"));
+      assert.equal(row.body.desktop, process.platform === "win32" ? "explorer" : process.platform === "darwin" ? "finder" : "filemanager");
+      row = await m.call("GET", "/api/dsh-cliproxyapi/media/command?sessionId=s-2&commandId=cmd-t-1");
+      assert.deepEqual(row.body.files, [], "another session sees nothing");
+      assert.equal(row.body.run, null);
+      row = await m.call("GET", "/api/dsh-cliproxyapi/media/command?sessionId=s-1&commandId=bad%20id");
+      assert.equal(row.code, 400);
+
+      assert.deepEqual(imageCalls[0], {
+        path: "/v1/images/generations",
+        auth: "Bearer key-a",
+        body: { model: "grok-imagine-image", prompt: "a red fox", n: 2, response_format: "b64_json" },
+      });
+      const files = readdirSync(join(workDir, "generated"));
+      assert.equal(files.length, 2);
+      assert.ok(files.every((f) => /^\d{8}-\d{6}-grok-imagine-image-a-red-fox-[12]\.png$/.test(f)), files.join(", "));
+      assert.ok(!result.text.includes("key-a"));
+
+      sent = await m.call("GET", "/api/dsh-cliproxyapi/media/session?sessionId=s-1");
+      const recent = sent.body.session.recent;
+      assert.equal(recent.length, 2);
+      assert.ok(!JSON.stringify(recent).includes(workDir), "the page gets file names, not paths");
+      sent = await m.call("GET", `/api/dsh-cliproxyapi/media/file?sessionId=s-1&id=${recent[0].id}`);
+      assert.equal(sent.code, 200);
+      assert.equal(sent.headers["content-type"], "image/png");
+      assert.deepEqual([...sent.raw], [...png]);
+      sent = await m.call("GET", `/api/dsh-cliproxyapi/media/file?sessionId=s-2&id=${recent[0].id}`);
+      assert.equal(sent.code, 404, "another session cannot read it");
+      sent = await m.call("GET", "/api/dsh-cliproxyapi/media/file?sessionId=s-1&id=0000000000000000");
+      assert.equal(sent.code, 404);
+
+      result = await image.handler({
+        agent: { id: "s-1" },
+        rawInput: "--aspect 1:1 make it blue",
+        attachments: [{ type: "image", attachment: { mediaType: "image/png" } }],
+        signal,
+        commandId: "cmd-t-2",
+      });
+      assert.equal(result.kind, "success", result.text);
+      row = await settledRun(m, "s-1", "cmd-t-2");
+      assert.equal(row.body.run.references, 1);
+      assert.equal(imageCalls[1].path, "/v1/images/edits");
+      assert.match(imageCalls[1].body.images[0].image_url, /^data:image\/png;base64,/);
+      assert.equal(imageCalls[1].body.size, "1024x1024");
+
+      result = await image.handler({ agent: { id: "s-1" }, rawInput: "", attachments: [], signal });
+      assert.equal(result.kind, "error");
+      assert.match(result.text, /add a prompt/);
+      result = await image.handler({ agent: { id: "s-1" }, rawInput: "cat", attachments: [{ type: "file", attachment: {} }], signal });
+      assert.match(result.text, /only image attachments/);
+      result = await image.handler({ agent: { id: "s-1" }, rawInput: "-m dall-e cat", attachments: [], signal });
+      assert.match(result.text, /no enabled image model matches; available: default\/grok-imagine-image/);
+
+      sent = await m.call("POST", "/api/dsh-cliproxyapi/media/session/save", { sessionId: "s-1", kind: "image", ref: "default/grok-imagine-image" });
+      assert.equal(sent.code, 200, JSON.stringify(sent.body));
+      assert.equal(sent.body.session.current.image.source, "session");
+      const media = JSON.parse(readFileSync(join(m.stateDir, "media-settings.json"), "utf8"));
+      assert.equal(media.lastSelection.image, "default/grok-imagine-image", "the pick is remembered for new sessions");
+      sent = await m.call("POST", "/api/dsh-cliproxyapi/media/session/save", { sessionId: "s-1", kind: "image", ref: "default/grok-imagine-video-1.5" });
+      assert.equal(sent.code, 400);
+      assert.equal(sent.body.error, "invalid-model");
+      sent = await m.call("GET", "/api/dsh-cliproxyapi/media/session?sessionId=../x");
+      assert.equal(sent.code, 400);
+
+      sent = await m.call("POST", "/api/dsh-cliproxyapi/media/save", { outputDir: "art/out" });
+      assert.equal(sent.code, 200, JSON.stringify(sent.body));
+      result = await image.handler({ agent: { id: "s-3" }, rawInput: "skyline", attachments: [], signal, commandId: "cmd-t-3" });
+      assert.equal(result.kind, "success", result.text);
+      row = await settledRun(m, "s-3", "cmd-t-3");
+      assert.equal(row.body.run.folder, "art/out");
+      assert.equal(readdirSync(join(workDir, "art", "out")).length, 1);
+    } finally {
+      m.dispose();
+    }
+  });
+  it("/cpa-image reports background failures, keeps the session running across agent turns and marks cut-off runs", async () => {
+    const serve = fakeServers(MEDIA_SERVERS);
+    const workDir = mkdtempSync(join(tmpdir(), "cpa-work-"));
+    let release;
+    let mode = "reject";
+    const fetchImpl = async (url, init) => {
+      if (!new URL(String(url)).pathname.startsWith("/v1/images/")) return serve(url, init);
+      if (mode === "reject") return new Response(JSON.stringify({ error: { message: "slow down" } }), { status: 429 });
+      return new Promise((resolve, reject) => {
+        release = resolve;
+        init.signal?.addEventListener("abort", () => reject(init.signal.reason));
+      });
+    };
+    const state = { version: 2, accounts: [{ id: "default", baseURL: "http://m.test", selectedModels: [] }] };
+    let m = mountPlugin({ state, fetchImpl, extraServices: { workingDirectory: { ensure: async () => workDir } } });
+    const signal = new AbortController().signal;
+    const image = () => m.commands.find((c) => c.name === "cpa-image");
+    try {
+      await m.call("POST", "/api/dsh-cliproxyapi/refresh", {});
+      let result = await image().handler({ agent: { id: "s-1" }, rawInput: "fox", attachments: [], signal, commandId: "cmd-f-1" });
+      assert.equal(result.kind, "success", "admitted before the upstream answers");
+      let row = await settledRun(m, "s-1", "cmd-f-1");
+      assert.equal(row.body.run.status, "error");
+      assert.equal(row.body.run.errorCode, "upstream-error");
+      assert.match(row.body.run.error, /CPA rejected the request \(HTTP 429/);
+      assert.deepEqual(row.body.files, []);
+      assert.deepEqual(m.emitted.at(-1), ["api-session/status", "s-1", false]);
+
+      mode = "hang";
+      result = await image().handler({ agent: { id: "s-1" }, rawInput: "owl", attachments: [], signal, commandId: "cmd-f-2" });
+      assert.equal(result.kind, "success");
+      row = await m.call("GET", "/api/dsh-cliproxyapi/media/command?sessionId=s-1&commandId=cmd-f-2");
+      assert.equal(row.body.run.status, "running");
+      // The agent finishing a turn of its own resets the host status to idle; the job republishes it.
+      m.emitted.length = 0;
+      for (const fn of m.listeners["agent/status"] ?? []) fn({ agent: { id: "s-1" }, status: "idle" });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      assert.deepEqual(m.emitted, [["api-session/status", "s-1", true]]);
+    } finally {
+      m.dispose();
+    }
+    assert.ok(release, "the request was in flight");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    assert.deepEqual(m.emitted.at(-1), ["api-session/status", "s-1", false], "reload settles the session as idle");
+    const stored = JSON.parse(readFileSync(join(m.stateDir, "media-sessions.json"), "utf8"));
+    const cut = stored.sessions["s-1"].runs.find((r) => r.commandId === "cmd-f-2");
+    assert.equal(cut.status, "error");
+    assert.equal(cut.errorCode, "interrupted");
+    // A record still marked running that no job of this activation owns (a crash) reads as interrupted.
+    m = mountPlugin({ state, fetchImpl, extraServices: { workingDirectory: { ensure: async () => workDir } } });
+    try {
+      stored.sessions["s-1"].runs[0] = { ...cut, status: "running", errorCode: undefined, error: undefined };
+      writeFileSync(join(m.stateDir, "media-sessions.json"), JSON.stringify(stored));
+      const row = await m.call("GET", "/api/dsh-cliproxyapi/media/command?sessionId=s-1&commandId=cmd-f-2");
+      assert.equal(row.body.run.status, "error");
+      assert.equal(row.body.run.errorCode, "interrupted");
+    } finally {
+      m.dispose();
+    }
+  });});

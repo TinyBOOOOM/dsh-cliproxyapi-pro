@@ -41,6 +41,7 @@
     "lib/client.js",
     "lib/updater.js",
     "lib/quota.js",
+    "lib/media.js",
     "locale/*.json",
     "cordis.patch.yml",
     "icon.svg",
@@ -70,7 +71,7 @@
   },
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check lib/index.js && node --check lib/client.js && node --check lib/updater.js && node --check lib/quota.js && node --test tests/*.test.mjs",
+    "check": "node --check lib/index.js && node --check lib/client.js && node --check lib/updater.js && node --check lib/quota.js && node --check lib/media.js && node --test tests/*.test.mjs",
     "pack:check": "npm pack --dry-run"
   }
 }
