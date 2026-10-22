@@ -943,6 +943,77 @@ describe("media models", () => {
     assert.deepEqual(Object.values(h.providers).flatMap((r) => r.models.map((m) => m.id)), ["grok-4.6"]);
   });
 
+  it("reads the plain listing on its own deadline when the enriched catalog is slow", async () => {
+    const fetchImpl = async (url) => {
+      const enriched = String(url).includes("client_version=pi");
+      await new Promise((resolve) => setTimeout(resolve, enriched ? 140 : 100));
+      return json(
+        enriched
+          ? { models: [{ slug: "grok-4.6" }, { slug: "grok-imagine-video" }] }
+          : {
+              data: [
+                { id: "grok-imagine-video", object: "model", owned_by: "xai" },
+                { id: "grok-imagine-image-2.0", object: "model", owned_by: "openai", type: "openai-image" },
+              ],
+            }
+      );
+    };
+    const h = harness(
+      { version: 2, probeTimeoutMs: 200, accounts: [{ id: "default", baseURL: "http://p.test", selectedModels: [] }] },
+      {},
+      { fetch: fetchImpl }
+    );
+    try {
+      await h.controller.refreshAll();
+      const [media] = h.controller.mediaAccounts();
+      assert.equal(media.listingOk, true);
+      assert.equal(media.catalogIncomplete, false);
+      assert.deepEqual(media.models.map((m) => m.id).sort(), ["grok-imagine-image-2.0", "grok-imagine-video"]);
+    } finally {
+      h.controller.dispose();
+    }
+  });
+
+  it("retries a failed plain listing and reports an incomplete catalog when it keeps failing", async () => {
+    let mode = "recover";
+    let listingCalls = 0;
+    const fetchImpl = async (url) => {
+      if (!String(url).includes("client_version=pi")) {
+        listingCalls += 1;
+        if (listingCalls === 1 || mode === "fail") throw new Error("ETIMEDOUT");
+        return json({ data: [{ id: "grok-imagine-image-2.0", object: "model", type: "openai-image" }] });
+      }
+      return json({ models: [{ slug: "grok-imagine-video" }] });
+    };
+    const state = () => ({ version: 2, probeTimeoutMs: 100, accounts: [{ id: "default", baseURL: "http://p.test", selectedModels: [] }] });
+    const h = harness(state(), {}, { fetch: fetchImpl });
+    try {
+      await h.controller.refreshAll();
+      const [media] = h.controller.mediaAccounts();
+      assert.equal(listingCalls, 2, "the failed listing is tried again");
+      assert.equal(media.listingOk, true);
+      assert.deepEqual(media.models.map((m) => m.id).sort(), ["grok-imagine-image-2.0", "grok-imagine-video"]);
+    } finally {
+      h.controller.dispose();
+    }
+
+    mode = "fail";
+    listingCalls = 0;
+    const timers = [];
+    const failing = harness(state(), {}, { fetch: fetchImpl, setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; } });
+    try {
+      await failing.controller.refreshAll();
+      const [media] = failing.controller.mediaAccounts();
+      assert.equal(media.listingOk, false);
+      assert.equal(media.catalogIncomplete, true);
+      assert.deepEqual(media.models.map((m) => m.id), ["grok-imagine-video"], "the enriched catalog is still usable");
+      assert.equal(timers.length, 1, "an incomplete catalog is re-read soon");
+      assert.equal(timers[0].ms, 4000);
+    } finally {
+      failing.controller.dispose();
+    }
+  });
+
   it("re-syncing unchanged media data performs no settings writes", async () => {
     let writes = 0;
     const providers = {};
@@ -1092,6 +1163,56 @@ describe("media models", () => {
     } finally {
       globalThis.fetch = realFetch;
       for (const d of disposers) d();
+    }
+  });
+
+  it("media/session reports an incomplete catalog while the plain listing is unreadable", async () => {
+    const fetchImpl = async (url) => {
+      if (String(url).includes("client_version=pi")) {
+        return json({ models: [{ slug: "grok-4.6" }, { slug: "grok-imagine-video" }] });
+      }
+      throw new Error("ETIMEDOUT");
+    };
+    const m = mountPlugin({
+      state: { version: 2, probeTimeoutMs: 100, accounts: [{ id: "default", baseURL: "http://m.test", selectedModels: [] }] },
+      fetchImpl,
+    });
+    try {
+      const view = await m.call("GET", "/api/dsh-cliproxyapi/media/session?sessionId=s-1");
+      assert.equal(view.code, 200, JSON.stringify(view.body));
+      assert.equal(view.body.session.catalogIncomplete, true, "the composer button keeps retrying");
+      assert.deepEqual(view.body.session.options.video.map((o) => o.ref), ["default/grok-imagine-video"]);
+      assert.deepEqual(view.body.session.options.image, [], "the enriched catalog alone has no image model");
+    } finally {
+      m.dispose();
+    }
+  });
+
+  it("media/session re-reads a catalog whose plain listing failed and returns the image models", async () => {
+    let listingCalls = 0;
+    const fetchImpl = async (url) => {
+      if (String(url).includes("client_version=pi")) {
+        return json({ models: [{ slug: "grok-4.6" }, { slug: "grok-imagine-video" }] });
+      }
+      listingCalls += 1;
+      if (listingCalls <= 2) throw new Error("ETIMEDOUT");
+      return json({ data: [{ id: "grok-imagine-image-2.0", object: "model", type: "openai-image" }] });
+    };
+    const m = mountPlugin({
+      state: { version: 2, probeTimeoutMs: 100, accounts: [{ id: "default", baseURL: "http://m.test", selectedModels: [] }] },
+      fetchImpl,
+    });
+    try {
+      await m.call("POST", "/api/dsh-cliproxyapi/refresh", {});
+      assert.equal(listingCalls, 2, "the first sync could not read the listing");
+      const view = await m.call("GET", "/api/dsh-cliproxyapi/media/session?sessionId=s-1");
+      assert.equal(view.code, 200, JSON.stringify(view.body));
+      assert.equal(listingCalls, 3, "the composer request syncs once more");
+      assert.equal(view.body.session.catalogIncomplete, false);
+      assert.deepEqual(view.body.session.options.image.map((o) => o.ref), ["default/grok-imagine-image-2.0"]);
+      assert.deepEqual(view.body.session.options.video.map((o) => o.ref), ["default/grok-imagine-video"]);
+    } finally {
+      m.dispose();
     }
   });
 

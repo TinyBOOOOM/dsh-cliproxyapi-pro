@@ -812,6 +812,46 @@ describe("generation-model button", () => {
     }
   });
 
+  it("keeps retrying while the host reports an incomplete catalog", async () => {
+    const video = { ref: "default/grok-imagine-video", accountId: "default", accountName: "BCPA", modelId: "grok-imagine-video", name: "Grok Video" };
+    const partial = session({
+      options: { image: [], video: [video] },
+      current: { image: null, video: { ref: video.ref, source: "last" } },
+      catalogIncomplete: true,
+    });
+    const full = session({
+      options: { image: session().options.image, video: [video] },
+      current: { image: { ref: "default/grok-imagine-image", source: "last" }, video: { ref: video.ref, source: "last" } },
+      catalogIncomplete: false,
+    });
+    let calls = 0;
+    const h = clientHarness({
+      update: partial,
+      loading: false,
+      fetch: async () => okJson({ session: ++calls === 1 ? partial : full }),
+    });
+    let tree = h.renderChip({ sessionId: "s-1" });
+    await flushClient();
+    tree = h.renderChip({ sessionId: "s-1" });
+    assert.equal(
+      nodes(tree, (n) => n.type === "button")[0].props["aria-label"],
+      h.zh.mediaChipVideoLabel.replace("{model}", "Grok Video"),
+      "a video model alone is shown first"
+    );
+    assert.deepEqual([...h.timers.values()].map((x) => x.ms), [3000], "retries although a video model is already known");
+    [...h.timers.values()][0].fn();
+    tree = h.renderChip({ sessionId: "s-1" });
+    await flushClient();
+    tree = h.renderChip({ sessionId: "s-1" });
+    assert.equal(
+      nodes(tree, (n) => n.type === "button")[0].props["aria-label"],
+      `${h.zh.mediaChipLabel.replace("{model}", "grok-imagine-image")}${h.zh.mediaChipJoin}${h.zh.mediaChipVideoLabel.replace("{model}", "Grok Video")}`,
+      "the image model appears once the catalog is complete"
+    );
+    h.unmount();
+    assert.equal(h.timers.size, 0, "the retry is cleared on unmount");
+  });
+
   it("opens a model list grouped by account, and switches the session's model", async () => {
     const posts = [];
     const h = clientHarness({
