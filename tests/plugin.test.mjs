@@ -1849,8 +1849,43 @@ it("generate_media: off by default, then image / video with approval, budget, re
       assert.equal(posts.length, before);
       assert.equal((await session()).agent.used, 4);
       answer = "allowed-once";
+
+      // DSH's approval prompts are off for the session ("danger-full-access" pairs with
+      // approval "never"): the plugin asks in the call's own chat row instead.
       policy = "never";
-      await assert.rejects(call({ kind: "video", prompt: "x" }), /approval prompts are disabled in this session/);
+      const askedBefore = approvals.length;
+      const rowOf = async (id) => (await m.call("GET", `/api/dsh-cliproxyapi/media/command?sessionId=s-root&commandId=${id}`)).body;
+      const waitConfirm = async (id) => {
+        for (let i = 0; i < 200; i += 1) {
+          const row = await rowOf(id);
+          if (row.confirm) return row;
+          await new Promise((r) => setTimeout(r, 5));
+        }
+        throw new Error("no confirmation shown");
+      };
+      let pendingCall = call({ kind: "video", prompt: "in row", seconds: 4 });
+      let shown = await waitConfirm(`toolu_${n}`);
+      assert.equal(shown.run, null, "nothing recorded while waiting");
+      assert.equal(shown.confirm.kind, "video");
+      assert.match(shown.confirm.zh, /4 秒视频.*无法取消/);
+      assert.equal(posts.length, before, "nothing sent while waiting");
+      const wrong = await m.call("POST", "/api/dsh-cliproxyapi/media/confirm", { sessionId: "s-other", commandId: `toolu_${n}`, allow: true });
+      assert.equal(wrong.code, 400, "only the call's own session can answer");
+      await m.call("POST", "/api/dsh-cliproxyapi/media/confirm", { sessionId: "s-root", commandId: `toolu_${n}`, allow: false });
+      await assert.rejects(pendingCall, /the user declined this video; do not retry/);
+      assert.equal(posts.length, before);
+      pendingCall = call({ kind: "video", prompt: "in row", seconds: 4 });
+      shown = await waitConfirm(`toolu_${n}`);
+      const ok = await m.call("POST", "/api/dsh-cliproxyapi/media/confirm", { sessionId: "s-root", commandId: `toolu_${n}`, allow: true });
+      assert.equal(ok.code, 200);
+      out = await pendingCall;
+      assert.equal(out.status, "done");
+      assert.equal(posts.at(-1).body.prompt, "in row");
+      assert.equal(approvals.length, askedBefore, "DSH's approval service is not used when its prompts are off");
+      assert.equal((await rowOf(out.run)).confirm, undefined);
+      assert.equal((await session()).agent.used, 8);
+      const late = await m.call("POST", "/api/dsh-cliproxyapi/media/confirm", { sessionId: "s-root", commandId: out.run, allow: true });
+      assert.equal(late.code, 400, "an answered confirmation cannot be answered again");
       policy = "ask";
 
       // Auto for this session with a 10 s limit: switching to auto starts the count again.

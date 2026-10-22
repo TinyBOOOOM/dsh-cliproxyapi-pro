@@ -1343,6 +1343,31 @@ describe("generate_media in the chat and the composer button", () => {
     assert.equal(content(nodes(tree, (n) => n.props.className === "dcpa-chat-tags")[0]), "generate_media", "no copy button for tool rows");
   });
 
+  it("asks in the tool row when DSH's approval prompts are off, and sends the answer", async () => {
+    const posts = [];
+    const confirm = { kind: "video", en: "Generate a 4 s video with grok (BCPA): \"waves\".", zh: "用 grok（BCPA）生成 4 秒视频：「waves」。", expiresAt: "2026-10-22T13:00:00.000Z" };
+    const h = clientHarness({
+      update: { run: null, files: [], confirm },
+      loading: false,
+      fetch: async (url, options = {}) => (options.method === "POST" && posts.push({ url: String(url), body: JSON.parse(options.body) }), okJson({})),
+    });
+    const node = { name: "cpa-video", commandId: "toolu_9", args: "-- waves", outcome: { kind: "success" } };
+    let tree = h.renderCard({ node, sessionId: "s-1", pending: true, label: "generate_media", showCopy: false }, "zh", false);
+    assert.equal(content(nodes(tree, (n) => n.props.className === "dcpa-chat-status")[0]), h.zh.mediaConfirmWaiting);
+    const box = nodes(tree, (n) => n.props.className === "dcpa-chat-confirm")[0];
+    assert.ok(box, "the confirmation shows in the row");
+    assert.ok(content(box).includes(confirm.zh), "in the page's language");
+    assert.ok(content(box).includes(h.zh.mediaConfirmTitleVideo));
+    nodes(box, (n) => n.type === "button" && content(n) === h.zh.mediaConfirmAllow)[0].props.onClick();
+    await flushClient();
+    assert.deepEqual(posts, [{ url: "api/dsh-cliproxyapi/media/confirm", body: { sessionId: "s-1", commandId: "toolu_9", allow: true } }]);
+    tree = h.renderCard({ node, sessionId: "s-1", pending: true, label: "generate_media", showCopy: false }, "en", false);
+    assert.equal(nodes(tree, (n) => n.props.className === "dcpa-chat-confirm").length, 0, "gone once answered");
+    const en = clientHarness({ update: { run: null, files: [], confirm }, loading: false, fetch: async () => okJson({}) });
+    tree = en.renderCard({ node, sessionId: "s-1", pending: true }, "en", false);
+    assert.ok(content(nodes(tree, (n) => n.props.className === "dcpa-chat-confirm")[0]).includes(confirm.en));
+  });
+
   it("sets this session's confirmation and limit in the composer button while the tool is on", async () => {
     const posts = [];
     const session = (agent) => ({
