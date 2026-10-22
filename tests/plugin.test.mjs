@@ -1473,4 +1473,51 @@ describe("media models", () => {
     } finally {
       m.dispose();
     }
+  });
+  it("/cpa-video shrinks an oversized first frame, or asks DSH for a smaller one, before sending it", async () => {
+    const serve = fakeServers(MEDIA_SERVERS);
+    const workDir = mkdtempSync(join(tmpdir(), "cpa-work-"));
+    const bodies = [];
+    const bigJpeg = new Uint8Array(Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(1_500_000)]));
+    const smallJpeg = new Uint8Array(Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(2000)]));
+    const requests = [];
+    let withRequestImages = true;
+    const m = mountPlugin({
+      state: { version: 2, accounts: [{ id: "default", baseURL: "http://m.test", selectedModels: [] }] },
+      fetchImpl: async (url, init) => {
+        const path = new URL(String(url)).pathname;
+        if (path === "/v1/videos/generations") {
+          bodies.push(init.body);
+          return new Response(JSON.stringify({ error: { message: "stop here" } }), { status: 400 });
+        }
+        return serve(url, init);
+      },
+      extraServices: {
+        workingDirectory: { ensure: async () => workDir },
+        attachments: {
+          readImage: async (ref) => ({ ref: { mediaType: "image/jpeg", width: 3000, height: 2000 }, data: bigJpeg }),
+          get readImageRequest() {
+            return withRequestImages ? async (ref, target) => (requests.push(target), { data: smallJpeg, mediaType: "image/jpeg" }) : undefined;
+          },
+        },
+      },
+    });
+    const signal = new AbortController().signal;
+    const image = { type: "image", attachment: { mediaType: "image/jpeg" } };
+    try {
+      await m.call("POST", "/api/dsh-cliproxyapi/refresh", {});
+      const video = m.commands.find((c) => c.name === "cpa-video");
+      const result = await video.handler({ agent: { id: "s-1" }, rawInput: "move", attachments: [image], signal, commandId: "cmd-v-8" });
+      assert.equal(result.kind, "success", result.text);
+      assert.deepEqual(requests, [{ width: 1280, height: 853, maxBytes: 1_000_000 }]);
+      await settledRun(m, "s-1", "cmd-v-8");
+      assert.ok(bodies[0].length < 1_500_000, `the request body stays small (${bodies[0].length})`);
+      assert.match(JSON.parse(bodies[0]).image.url, /^data:image\/jpeg;base64,/);
+      withRequestImages = false;
+      const refused = await video.handler({ agent: { id: "s-1" }, rawInput: "move", attachments: [image], signal });
+      assert.equal(refused.kind, "error");
+      assert.match(refused.text, /could not be made smaller than 1000 KB/);
+    } finally {
+      m.dispose();
+    }
   });});
