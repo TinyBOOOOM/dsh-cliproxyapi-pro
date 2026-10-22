@@ -889,7 +889,8 @@ describe("/cpa-image chat row", () => {
     tree = h.renderCard({ node: done, sessionId: "s-1" }, "zh", false);
     const bubble = nodes(tree, (n) => n.props.className === "dcpa-chat-bubble")[0];
     assert.equal(content(bubble), "一只橘猫", "the prompt without options");
-    assert.equal(content(nodes(tree, (n) => n.props.className === "dcpa-chat-tags")[0]), "/cpa-image16:92 张");
+    assert.equal(content(nodes(tree, (n) => n.props.className === "dcpa-chat-tags")[0]), "/cpa-image16:92 张复制原始输入", "tags, then a button that copies the line as typed");
+    assert.equal(nodes(tree, (n) => n.props.className === "dcpa-chat-copy" && n.type === "button").length, 1);
     assert.ok(content(tree).includes("gpt-image-2 · BCPA"));
     assert.ok(content(tree).includes("用时 9 秒 · 已保存到 generated"));
     const thumbs = nodes(tree, (n) => n.props.className === "dcpa-chat-thumb");
@@ -1135,7 +1136,7 @@ describe("/cpa-video chat row and video model picker", () => {
     h.renderCard({ node, sessionId: "s-1" });
     await flushClient();
     let tree = h.renderCard({ node, sessionId: "s-1" }, "zh");
-    assert.equal(content(nodes(tree, (n) => n.props.className === "dcpa-chat-tags")[0]), "/cpa-video8 秒480p首帧图");
+    assert.equal(content(nodes(tree, (n) => n.props.className === "dcpa-chat-tags")[0]), "/cpa-video8 秒480p首帧图复制原始输入");
     assert.match(content(tree), /正在生成 40% · 1 分 1[45] 秒/);
     assert.ok(content(tree).includes(h.zh.mediaCardVideoNoStop));
     const skeleton = nodes(tree, (n) => n.props.className === "dcpa-chat-skeleton");
@@ -1202,7 +1203,7 @@ describe("video modes, edit and extend in the chat row", () => {
   it("labels references, pinned frames and extensions", () => {
     const tagsOf = (run, name = "cpa-video") => {
       const h = clientHarness({ update: { run, files }, loading: false, fetch: async () => okJson({}) });
-      return content(nodes(h.renderCard({ node: { ...node, name }, sessionId: "s-1" }, "zh", false), (n) => n.props.className === "dcpa-chat-tags")[0]);
+      return content(nodes(h.renderCard({ node: { ...node, name }, sessionId: "s-1" }, "zh", false), (n) => n.props.className === "dcpa-chat-tags")[0]).replace(/复制原始输入$/, "");
     };
     assert.equal(tagsOf({ ...base, mode: "reference", references: 3 }), "/cpa-video6 秒480p参考图 ×3");
     assert.equal(tagsOf({ ...base, mode: "first-last", references: 2 }), "/cpa-video6 秒480p首尾帧");

@@ -21,6 +21,7 @@
 - 新接口 `/api/dsh-cliproxyapi/media/{status,save,diagnose}`；生成设置独立保存在 `.dsh-cliproxyapi/media-settings.json`，`state.json` 格式不变。`/cpa-status` 显示识别出的生成模型数量。
 
 ### 修复
+- **编辑视频时把写在提示词里的视频路径当成了提示词。** `/cpa-video-edit D:\…\a.mp4 480p 换成雪夜` 会用本会话最新的视频作原视频，并把路径和 `480p` 一起发给 xAI。现在提示词开头或结尾的视频路径（可带引号或 `@`）就是原视频；编辑 / 延长用不上的 `480p`、`16:9`、`竖屏` 等词会去掉并标为「已忽略」。生成行的标签末尾新增「复制原始输入」，可复制当时输入的整条命令。
 - **「测试连接」总是报错 `Failed to execute 'json' on 'Response': Unexpected end of JSON input`。** 设置页（添加账号表单和连接标签页）缺少测试连接接口的地址，请求发到了不存在的路径。现在会正确调用 `/api/dsh-cliproxyapi/accounts/test`；页面收到非 JSON 回复时改为显示 `HTTP <状态码>`。（1.7.0 起存在）
 
 ### 注意

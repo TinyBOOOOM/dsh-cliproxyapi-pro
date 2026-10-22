@@ -458,7 +458,20 @@ describe("video generation", () => {
     // Edit / extend.
     assert.deepEqual(parseVideoEditCommand("--from cmd-a-1 把衣服换成红色", "edit"), { from: "cmd-a-1", prompt: "把衣服换成红色" });
     assert.deepEqual(parseVideoEditCommand("然后转身离开 4秒", "extend"), { seconds: 4, prompt: "然后转身离开" });
-    assert.deepEqual(parseVideoEditCommand("4秒 然后离开", "edit"), { prompt: "4秒 然后离开" }, "an edit has no length");
+    assert.deepEqual(parseVideoEditCommand("4秒 然后离开", "edit"), { ignored: ["4s"], prompt: "然后离开" }, "an edit has no length: the word is taken out and reported");
+    // A path written into the prompt is the source (the 2026-10-22 report: it went to xAI as prompt text).
+    assert.deepEqual(
+      parseVideoEditCommand("D:\\proj\\generated\\20261022-171306-grok-10-秒-480p-跳舞.mp4   480p  这个背景换成中国街头，正在下雪。", "edit"),
+      { video: "D:\\proj\\generated\\20261022-171306-grok-10-秒-480p-跳舞.mp4", ignored: ["480p"], prompt: "这个背景换成中国街头，正在下雪。" }
+    );
+    assert.deepEqual(parseVideoEditCommand("@D:\\my clips\\a b.mp4 换成雪", "edit"), { video: "D:\\my clips\\a b.mp4", prompt: "换成雪" });
+    assert.deepEqual(parseVideoEditCommand("换成雪 D:\\my clips\\a b.mp4", "edit"), { video: "D:\\my clips\\a b.mp4", prompt: "换成雪" });
+    assert.deepEqual(parseVideoEditCommand('"C:\\x y\\v.mov" 16:9 换成雪', "edit"), { video: "C:\\x y\\v.mov", ignored: ["16:9"], prompt: "换成雪" });
+    assert.deepEqual(parseVideoEditCommand("clip.mp4 换成雪", "edit"), { video: "clip.mp4", prompt: "换成雪" });
+    assert.deepEqual(parseVideoEditCommand("-s 4 继续 720p", "extend"), { seconds: 4, ignored: ["720p"], prompt: "继续" });
+    assert.deepEqual(parseVideoEditCommand("--from cmd-a-1 a.mp4 x", "edit"), { from: "cmd-a-1", prompt: "a.mp4 x" }, "an explicit source wins");
+    assert.deepEqual(parseVideoEditCommand("把 demo 换成雪", "edit"), { prompt: "把 demo 换成雪" });
+    assert.throws(() => parseVideoCommand("1080p 跳舞"), (e) => e.code === "invalid-video-resolution");
     assert.throws(() => parseVideoEditCommand("-s 4 x", "edit"), (e) => e.code === "invalid-option");
     assert.throws(() => parseVideoEditCommand("-s 11 x", "extend"), (e) => e.code === "invalid-extend-seconds");
     assert.throws(() => parseVideoEditCommand("--from bad! x", "edit"), (e) => e.code === "invalid-option");

@@ -21,6 +21,7 @@ All notable changes to this plugin. Versions follow [Semantic Versioning](https:
 - New routes `/api/dsh-cliproxyapi/media/{status,save,diagnose}`; generation settings live separately in `.dsh-cliproxyapi/media-settings.json`, and the `state.json` format is unchanged. `/cpa-status` reports how many media models were recognized.
 
 ### Fixed
+- **A video path written in an edit's prompt was treated as prompt text.** `/cpa-video-edit D:\…\a.mp4 480p make it snow` used the session's newest video as the source and sent the path and `480p` to xAI. A video path at the start or end of the prompt (quoted or with `@` if you like) is now the source; words edits and extensions cannot use (`480p`, `16:9`, `portrait`, …) are taken out and shown as ignored. Generation rows gain **Copy original input** at the end of the tag line, copying the command as typed.
 - **"Test connection" always failed with `Failed to execute 'json' on 'Response': Unexpected end of JSON input`.** The Settings page (add-account form and Connection tab) lacked the test route's path, so the request went to a path that does not exist. It now calls `/api/dsh-cliproxyapi/accounts/test`, and a non-JSON reply is shown as `HTTP <status>`. (Present since 1.7.0.)
 
 ### Notes
