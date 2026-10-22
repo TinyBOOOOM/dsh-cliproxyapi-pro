@@ -432,6 +432,18 @@ describe("video generation", () => {
     assert.throws(() => parseVideoCommand("--aspect 9:20 x"), (e) => e.code === "invalid-aspect");
     assert.throws(() => parseVideoCommand("-n 2 x"), (e) => e.code === "invalid-option");
     assert.throws(() => parseVideoCommand("-s 4"), (e) => e.code === "missing-prompt");
+    // Plain-language options at either end of the prompt; explicit flags win.
+    assert.deepEqual(parseVideoCommand("10 秒 480p 这个角色跳社会摇"), { seconds: 10, resolution: "480p", prompt: "这个角色跳社会摇" });
+    assert.deepEqual(parseVideoCommand("跳舞，16:9，6 秒"), { seconds: 6, aspect: "16:9", prompt: "跳舞" });
+    assert.deepEqual(parseVideoCommand("竖屏 8s 一只猫 720P"), { seconds: 8, aspect: "9:16", resolution: "720p", prompt: "一只猫" });
+    assert.deepEqual(parseVideoCommand("-s 4 10秒 跳舞"), { seconds: 4, prompt: "跳舞" });
+    assert.deepEqual(parseVideoCommand("3 秒后爆炸"), { prompt: "3 秒后爆炸" }, "only whole words count");
+    assert.deepEqual(parseVideoCommand("烟花在 10 秒 内绽放"), { prompt: "烟花在 10 秒 内绽放" }, "only at the start or the end");
+    assert.throws(() => parseVideoCommand("20 秒 跳舞"), (e) => e.code === "invalid-video-seconds");
+    assert.throws(() => parseVideoCommand("9:20 跳舞"), (e) => e.code === "invalid-aspect");
+    assert.deepEqual(parseImageCommand("2张 16:9 一只猫"), { aspect: "16:9", count: 2, prompt: "一只猫" });
+    assert.deepEqual(parseImageCommand("一只猫 横屏"), { aspect: "16:9", prompt: "一只猫" });
+    assert.throws(() => parseImageCommand("一只猫 5张"), (e) => e.code === "invalid-count");
   });
 
   it("submits through the native route with the alias resolved and only the given options", async () => {
