@@ -1228,6 +1228,22 @@ describe("video modes, edit and extend in the chat row", () => {
     assert.equal(image.text, "模式：改图 — 2 张附带图片作为参考");
   });
 
+  it("says which parameters the chat model read, and that it is reading them", () => {
+    const linesOf = (run) => {
+      const h = clientHarness({ update: { run, files }, loading: false, fetch: async () => okJson({}) });
+      const tree = h.renderCard({ node, sessionId: "s-1" }, "zh", false);
+      return {
+        interp: nodes(tree, (n) => n.props["data-interpreted"] !== undefined).map((n) => content(n))[0] ?? null,
+        status: content(nodes(tree, (n) => n.props.className === "dcpa-chat-status")[0]),
+      };
+    };
+    assert.equal(linesOf({ ...base, interpreted: { by: "cli-proxy/gpt-5.5", items: ["10s", "9:16"], prompt: true } }).interp, "参数由 cli-proxy/gpt-5.5 从提示词中读出：10s · 9:16；已从提示词中去掉这些参数的说法");
+    assert.equal(linesOf({ ...base, interpreted: { by: "p/m", items: [] } }).interp, "p/m 没有从提示词中读出其他参数");
+    assert.equal(linesOf({ ...base, interpreted: { by: "p/m", items: [], failed: true } }).interp, "参数解读失败（p/m），按命令里的选项和原文发送");
+    assert.equal(linesOf({ ...base }).interp, null);
+    assert.match(linesOf({ ...base, status: "running", phase: "interpreting", finishedAt: undefined }).status, /^正在理解参数 · /);
+  });
+
   it("offers edit / extend while the host still has the video's link, and submits a follow-up command", async () => {
     const lines = [];
     const runCommand = async (sessionId, line) => (lines.push([sessionId, line]), { ok: true });

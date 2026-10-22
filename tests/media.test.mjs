@@ -17,6 +17,10 @@ import {
   submitVideo,
   isMp4,
   mp4Duration,
+  interpretationRequest,
+  parseInterpretation,
+  interpretedPrompt,
+  interpretationLabels,
   videoImageBudget,
   VIDEO_GENERATION_BODY_MAX_BYTES,
   retrieveVideo,
@@ -481,6 +485,28 @@ describe("video generation", () => {
     assert.throws(() => parseVideoEditCommand("--url https://u:p@example.com/a.mp4 x", "edit"), (e) => e.code === "invalid-video-url");
     assert.throws(() => parseVideoEditCommand("--url file:///C:/a.mp4 x", "edit"), (e) => e.code === "invalid-video-url");
     assert.throws(() => parseVideoEditCommand("--from cmd-a-1 --video a.mp4 x", "edit"), (e) => e.code === "one-video-source");
+  });
+
+  it("builds the parameter question for the chat model and validates its answer", () => {
+    const asked = interpretationRequest({ command: "video", text: "十秒钟竖版", images: 2, fixed: ["resolution"] });
+    assert.deepEqual(asked.fields, ["seconds", "aspect", "frames"]);
+    assert.match(asked.system, /exactly one JSON object/);
+    assert.match(asked.user, /Attached images: 2/);
+    assert.deepEqual(interpretationRequest({ command: "video", text: "x" }).fields, ["seconds", "resolution", "aspect"], "no frames without images");
+    assert.deepEqual(interpretationRequest({ command: "edit", text: "x" }).fields, []);
+    const video = parseInterpretation('Sure:\n```json\n{"seconds":"12","resolution":"720P","aspect":"9：16","frames":"reference","count":3,"prompt":"竖版 跳舞"}\n```', {
+      command: "video", text: "十二秒 高清 竖版 跳舞", fields: ["seconds", "resolution", "aspect", "frames"], images: 1,
+    });
+    assert.deepEqual(video, { values: { seconds: 12, resolution: "720p", aspect: "9:16", frames: "reference" }, prompt: "竖版 跳舞" });
+    const bad = parseInterpretation('{"seconds":40,"resolution":"1080p","aspect":"5:4","frames":"first-frame","prompt":"x"}', { command: "video", text: "跳舞跳舞", fields: ["seconds", "resolution", "aspect", "frames"], images: 2 });
+    assert.deepEqual(bad.values, {}, "out-of-range values and a first frame for two images are dropped");
+    assert.equal(bad.prompt, "跳舞跳舞", "a prompt that is not a deletion of the original is ignored");
+    assert.equal(parseInterpretation("I cannot help", { command: "image", text: "x", fields: [] }), undefined);
+    assert.deepEqual(parseInterpretation('{"count":2,"seconds":5}', { command: "image", text: "两张猫", fields: ["aspect", "count"] }).values, { count: 2 }, "fields not asked for are dropped");
+    assert.equal(parseInterpretation('{"frames":"first-frame"}', { command: "video", text: "x", fields: ["frames"], images: 1 }).values.frames, "first");
+    assert.equal(interpretedPrompt("一只猫", "一只猫在一个很大很大的浪上冲浪，夕阳西下，金色的光"), "一只猫在一个很大很大的浪上冲浪，夕阳西下，金色的光", "removing most of the text is not a parameter cleanup");
+    assert.equal(interpretedPrompt("从白天变成黑夜", "做成十秒钟的 从白天变成黑夜"), "从白天变成黑夜");
+    assert.deepEqual(interpretationLabels({ seconds: 10, resolution: "720p", aspect: "9:16", count: 2, frames: "reference" }), ["10s", "720p", "9:16", "×2", "reference"]);
   });
 
   it("reads an MP4's length from moov/mvhd and budgets images for the 1 MiB generation body", () => {

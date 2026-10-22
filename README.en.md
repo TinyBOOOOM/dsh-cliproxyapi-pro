@@ -246,6 +246,16 @@ Type in the composer:
 - **When a server lacks a route**: some CPA servers' upstreams have no extension route (one answered HTTP 405 in testing). That run then reads "the upstream does not offer video extension (HTTP 405)", later extensions on the same account are refused without a request and the **Extend video…** button is hidden until the plugin reloads. After a 405, CPA pauses that credential for the model for about a minute.
 - Edits and extensions likewise cannot be cancelled once submitted and are billed as usual; background waiting, resuming after a reload and the row's buttons work as for `/cpa-video`.
 
+#### Reading plain-language parameters with the chat model
+
+Each time `/cpa-image`, `/cpa-video`, `/cpa-video-edit` or `/cpa-video-extend` runs, the plugin hands the prompt (after the options) to **the chat model the session is using** and asks it for parameters that were not written as options, such as "make it a ten-second portrait video in HD", "use the second image as the ending", "three landscape ones" or "add five more seconds".
+
+- **What it reads**: images — ratio and count; videos — length, resolution, ratio and how attached images are used (first frame / references / first & last frame / last frame); extensions — the added seconds; edits have no parameters to read, only the prompt is tidied.
+- **Priority**: options written in the command (`-s`, `-r`, `--aspect`, `-n`, `--ref`, …) and words recognized at the start or end always win; the chat model only fills in what is missing, and every value it returns is checked against the allowed range (invalid ones are dropped).
+- **The prompt only loses words**: the chat model returns the prompt without the words that stated parameters; the plugin accepts it only if it is the original with some characters deleted (no rewriting, translating or expanding, and not most of it removed), otherwise the original is sent.
+- **Model and cost**: the model of the session's latest request (else the agent's setting or the default model), a few hundred tokens and 2–5 extra seconds each time (30 s at most); only the prompt text and the number of attached images are sent, never the images. It runs in the background, so the composer still clears at once and the row shows "Reading parameters".
+- **Visible result**: the reply says "Parameters <model> read from the prompt: 10s · 9:16 · first-last", and notes when words were taken out of the prompt; if the chat model is unavailable or its answer cannot be read, it says "Reading parameters failed" and the request is sent with the command's options and the prompt as written.
+
 #### The generation-model button next to the composer
 
 When an image or video model is available, a generation-model button appears in the composer left of the model selector, showing the model used for images (picture icon) and for videos (camera icon).
