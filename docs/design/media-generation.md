@@ -343,7 +343,9 @@ submit ──► queued/processing ──► done ──► download ──► s
    - 第二轮反馈：桌面版里 `target="_blank"` 的「在新窗口打开原图」会被交给系统浏览器、没有会话 Cookie，因此去掉；改为右键菜单 / 放大后的按钮：用默认应用打开、在文件夹中显示（走 DSH 会话接口 `session.openWorkspacePath`，与文档预览相同，Host 再次校验路径）、复制图片（PNG）、复制路径。为此 `media/command` 返回文件的绝对路径和 `folderPath`（`media/session` 仍只返回文件名）。输入框按钮刚启动时看不到：`media/session` 在没有生图模型且有账号未读目录时先同步一次，按钮重试改为 3 s / 10 s / 30 s。
    - 弹层只在打开时读取数据；`media/file` 只提供插件为该会话记录过的文件，`media/session` 只返回文件名和 id。
    - 工作目录必须是本机文件夹（插件用 Node 的 fs 写文件；DSH 的 `ctx.fs` 没有写二进制的接口）。
-3. **P3 生视频**：视频提交与轮询、任务持久化、`/cpa-video`、`/cpa-video-status`、视频预览。
+3. **P3 生视频**（✅ 已实现，待真实生成测试）：视频提交与轮询、任务持久化、`/cpa-video`、`/cpa-video-status`、视频预览。
+   - 对照 CPA `dev@9e79552` 的 `openai_videos_handlers.go` 核对：原生 `POST /v1/videos/generations` 原样转给 xAI（字段 `model` / `prompt` / `duration` / `aspect_ratio` / `resolution` / `image.url`，只接受 Grok 视频 id，所以 `sora-2*` 由插件改写为 `grok-imagine-video`），返回 `request_id`；`GET /v1/videos/{id}` 返回 xAI 原样结果（`status`、`video.url` / `duration`、`error`）；原生提交也会登记凭据绑定，所以 `GET /openai/v1/videos/{id}/content` 可以下载（CPA 用凭据的代理去取 `video.url`）。不写比例时交给 xAI（默认 16:9 / 首帧比例），这也是选原生接口而不是 OpenAI 格式接口（那里默认尺寸固定为竖屏 720x1280）的原因。
+   - 视频预览没有用 `documentPreviews`：对话里的命令行直接用 `<video>` 播放，`media/file` 支持 `Range`。§15 第 5 项（完成提示）由命令行本身承担：后台完成后该行自动显示视频；第 6 项因此不再需要。
 4. **P4 agent 工具**：`generate_media`、开关、确认、上限，以及 AGENTS.md / README / CHANGELOG 的修改。
 
 每个阶段结束都要通过 `npm run check`。P4 完成后再一起发布 1.8.0。

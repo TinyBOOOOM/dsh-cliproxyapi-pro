@@ -11,6 +11,14 @@ import {
   matchMediaModel,
   mediaOptions,
   normalizeRun,
+  parseVideoCommand,
+  submitVideo,
+  retrieveVideo,
+  downloadVideo,
+  sniffVideoType,
+  createMediaJobStore,
+  normalizeJob,
+  videoState,
   outputDirectory,
   outputStem,
   parseImageCommand,
@@ -406,5 +414,96 @@ describe("media diagnostic", () => {
     assert.equal(result.catalogs.listing.media[0].kind, "video");
     assert.deepEqual(result.routes.map((r) => r.verdict), ["present", "missing"]);
     assert.ok(!JSON.stringify(result).includes("sk-secret"));
+  });
+});
+
+describe("video generation", () => {
+  const MP4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypisom"), Buffer.alloc(32, 7)]);
+
+  it("parses /cpa-video options and rejects bad ones", () => {
+    assert.deepEqual(parseVideoCommand("-m grok --aspect 9:16 -s 8 -r 480P a cat surfing"), { model: "grok", aspect: "9:16", seconds: 8, resolution: "480p", prompt: "a cat surfing" });
+    assert.deepEqual(parseVideoCommand("-- -s is part of the prompt"), { prompt: "-s is part of the prompt" });
+    assert.throws(() => parseVideoCommand("-s 16 x"), (e) => e.code === "invalid-video-seconds");
+    assert.throws(() => parseVideoCommand("-s 0 x"), (e) => e.code === "invalid-video-seconds");
+    assert.throws(() => parseVideoCommand("-r 1080p x"), (e) => e.code === "invalid-video-resolution");
+    assert.throws(() => parseVideoCommand("--aspect 9:20 x"), (e) => e.code === "invalid-aspect");
+    assert.throws(() => parseVideoCommand("-n 2 x"), (e) => e.code === "invalid-option");
+    assert.throws(() => parseVideoCommand("-s 4"), (e) => e.code === "missing-prompt");
+  });
+
+  it("submits through the native route with the alias resolved and only the given options", async () => {
+    const calls = [];
+    const fetchImpl = async (url, init) => (calls.push({ url, init }), new Response(JSON.stringify({ request_id: "req-1" })));
+    const result = await submitVideo({ fetch: fetchImpl, rootURL: "http://cpa.test", apiKey: "k", model: "sora-2-pro", prompt: "waves", seconds: 6, resolution: "720p" });
+    assert.deepEqual(result, { requestId: "req-1" });
+    assert.equal(calls[0].url, "http://cpa.test/v1/videos/generations");
+    assert.equal(calls[0].init.headers.Authorization, "Bearer k");
+    assert.deepEqual(JSON.parse(calls[0].init.body), { model: "grok-imagine-video", prompt: "waves", duration: 6, resolution: "720p" });
+    await submitVideo({ fetch: fetchImpl, rootURL: "http://cpa.test", model: "grok-imagine-video-1.5", prompt: "p", seconds: 4, aspect: "1:1", image: { mediaType: "image/png", data: new Uint8Array([1, 2]) } });
+    const body = JSON.parse(calls[1].init.body);
+    assert.equal(body.aspect_ratio, "1:1");
+    assert.equal(body.image.url, "data:image/png;base64,AQI=");
+    assert.equal(calls[1].init.headers.Authorization, undefined, "no key, no header");
+    await assert.rejects(
+      submitVideo({ fetch: async () => new Response(JSON.stringify({ error: { message: "Model x is not supported, see https://x" } }), { status: 400 }), rootURL: "http://c", model: "x", prompt: "p", seconds: 4 }),
+      (e) => e.code === "upstream-error" && e.detail === "HTTP 400: Model x is not supported, see [url]"
+    );
+    await assert.rejects(submitVideo({ fetch: async () => new Response("{}"), rootURL: "http://c", model: "x", prompt: "p", seconds: 4 }), (e) => e.code === "invalid-response");
+  });
+
+  it("maps CPA / xAI states and never returns the video URL", async () => {
+    const answer = (payload, status = 200) => async () => new Response(JSON.stringify(payload), { status });
+    const base = { rootURL: "http://c", requestId: "req-1" };
+    assert.deepEqual(await retrieveVideo({ ...base, fetch: answer({ status: "pending" }) }), { state: "queued" });
+    assert.deepEqual(await retrieveVideo({ ...base, fetch: answer({ status: "processing", progress: 41.6 }) }), { state: "running", progress: 42 });
+    const done = await retrieveVideo({ ...base, fetch: answer({ status: "done", video: { url: "https://vidgen.x.ai/secret.mp4", duration: 6 } }) });
+    assert.deepEqual(done, { state: "done", seconds: 6 });
+    assert.deepEqual(await retrieveVideo({ ...base, fetch: answer({ video: { url: "https://v/x.mp4" } }) }), { state: "done" });
+    assert.deepEqual(await retrieveVideo({ ...base, fetch: answer({ status: "expired" }) }), { state: "failed", error: "the video could not be generated" });
+    assert.deepEqual(await retrieveVideo({ ...base, fetch: answer({ error: { message: "moderated, see https://x.ai/p" } }) }), { state: "failed", error: "moderated, see [url]" });
+    await assert.rejects(retrieveVideo({ ...base, fetch: answer({ error: { message: "gone" } }, 404) }), (e) => e.code === "upstream-error" && e.status === 404);
+    assert.equal(videoState("succeeded"), "done");
+    assert.equal(videoState("weird"), undefined);
+  });
+
+  it("streams the download into a new file, recognizes the container and enforces the size limit", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "cpa-video-"));
+    const calls = [];
+    const serve = (bytes, headers = {}) => async (url, init) => (calls.push({ url, auth: init.headers.Authorization }), new Response(bytes, { headers }));
+    const first = await downloadVideo({ fetch: serve(MP4), rootURL: "http://c", apiKey: "k", requestId: "req 1", dir, stem: "clip" });
+    assert.equal(first, join(dir, "clip.mp4"));
+    assert.deepEqual([...readFileSync(first)], [...MP4]);
+    assert.equal(calls[0].url, "http://c/openai/v1/videos/req%201/content", "downloaded through CPA, never from the upstream host");
+    assert.equal(calls[0].auth, "Bearer k");
+    const second = await downloadVideo({ fetch: serve(MP4), rootURL: "http://c", requestId: "r", dir, stem: "clip" });
+    assert.equal(second, join(dir, "clip-2.mp4"), "never replaces a file");
+    await assert.rejects(downloadVideo({ fetch: serve(Buffer.from("<html>nope</html> padding padding")), rootURL: "http://c", requestId: "r", dir, stem: "bad" }), (e) => e.code === "invalid-video");
+    await assert.rejects(downloadVideo({ fetch: serve(MP4), rootURL: "http://c", requestId: "r", dir, stem: "big", maxBytes: 20 }), (e) => e.code === "video-too-large");
+    await assert.rejects(downloadVideo({ fetch: serve(MP4, { "content-length": "999999999" }), rootURL: "http://c", requestId: "r", dir, stem: "big2" }), (e) => e.code === "video-too-large");
+    assert.deepEqual(readdirSync(dir).sort(), ["clip-2.mp4", "clip.mp4"], "nothing partial is left behind");
+    await assert.rejects(
+      downloadVideo({ fetch: async () => new Response("not ready", { status: 502 }), rootURL: "http://c", requestId: "r", dir, stem: "x" }),
+      (e) => e.code === "upstream-error" && e.detail === "HTTP 502: not ready"
+    );
+    assert.deepEqual(sniffVideoType(Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0])), { mediaType: "video/webm", ext: "webm" });
+  });
+
+  it("keeps video jobs without keys or URLs, merges updates and drops old finished jobs", () => {
+    const dir = mkdtempSync(join(tmpdir(), "cpa-jobs-"));
+    let clock = Date.parse("2026-10-22T08:00:00Z");
+    const store = createMediaJobStore(join(dir, "media-jobs.json"), { now: () => clock });
+    const job = { id: "req-1", state: "submitted", accountId: "default", modelId: "grok-imagine-video", ref: "default/grok-imagine-video", sessionId: "s-1", commandId: "cmd-a-1", cwd: dir, outputDir: "generated", prompt: "p", seconds: 6, submittedAt: new Date(clock).toISOString(), apiKey: "secret", url: "https://x" };
+    const saved = store.put(job);
+    assert.equal("apiKey" in saved || "url" in saved, false);
+    assert.equal(store.put({ ...saved, state: "done", finishedAt: new Date(clock).toISOString() }).state, "done");
+    assert.equal(store.list().length, 1);
+    assert.equal(normalizeJob({ ...job, cwd: "relative" }), undefined);
+    assert.equal(normalizeJob({ ...job, id: "bad id" }), undefined);
+    clock += 8 * 24 * 60 * 60 * 1000;
+    assert.equal(store.list().length, 0, "finished jobs are kept 7 days");
+    writeFileSync(join(dir, "media-jobs.json"), "{ broken");
+    assert.deepEqual(store.list(), []);
+    store.put({ ...job, id: "req-2", submittedAt: new Date(clock).toISOString() });
+    assert.ok(readdirSync(dir).some((n) => n.startsWith("media-jobs.corrupt-")));
   });
 });
