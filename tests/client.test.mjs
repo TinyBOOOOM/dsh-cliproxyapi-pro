@@ -1369,15 +1369,23 @@ describe("video modes, edit and extend in the chat row", () => {
 describe("generate_media in the chat and the composer button", () => {
   const okJson = (body) => new Response(JSON.stringify({ ok: true, ...body }));
 
-  it("leaves new calls to their top-level command row and keeps a fallback for old settled calls", () => {
+  it("leaves a mirrored call to its top-level command row and keeps a fallback otherwise", () => {
     const h = clientHarness({ update: null, loading: false, fetch: async () => okJson({}) });
     const t = (key) => h.zh[key] ?? key;
-    const running = h.MediaToolRow({ t, sessionId: "s-1", owner: { callId: "toolu|01", phase: "start", block: { callId: "toolu|01", phase: "start", argsRaw: JSON.stringify({ kind: "video", mode: "extend", prompt: "镜头拉远", seconds: 4 }) } } });
-    assert.equal(running, null, "a running call is shown by its mirrored command row, not here");
-    const preparing = h.MediaToolRow({ t, sessionId: "s-1", owner: { callId: "c2", phase: "preparing", block: { callId: "c2", phase: "preparing" } } });
-    assert.equal(preparing, null);
-    const mirrored = h.MediaToolRow({ t, sessionId: "s-1", owner: { callId: "c3", phase: "result", block: { kind: "result", callId: "c3", meta: { commandRow: true }, call: { name: "generate_media", argsRaw: JSON.stringify({ kind: "image", prompt: "猫" }) }, content: [] } } });
-    assert.equal(mirrored, null, "the mirrored command row already shows the result");
+    const owner = { callId: "toolu|01", phase: "start", block: { callId: "toolu|01", phase: "start", argsRaw: JSON.stringify({ kind: "video", mode: "extend", prompt: "镜头拉远", seconds: 4 }) } };
+    const running = h.MediaToolRow({ t, sessionId: "s-1", owner });
+    assert.equal(running.type, h.ImageCommandCard, "without a mirrored row the tool row is the fallback");
+    assert.deepEqual(JSON.parse(JSON.stringify(running.props.node)), { name: "cpa-video-extend", commandId: "toolu_01", args: "-- 镜头拉远", outcome: { kind: "success" } });
+    assert.equal(running.props.pending, true);
+    const mirrored = h.MediaToolRow({
+      t,
+      sessionId: "s-1",
+      owner,
+      useChat: (selector) => selector({ order: ["c"], nodes: new Map([["c", { kind: "command", commandId: "toolu_01", name: "cpa-video-extend" }]]) }),
+    });
+    assert.equal(mirrored, null, "the mirrored command row already shows this run");
+    const completedMirrored = h.MediaToolRow({ t, sessionId: "s-1", owner: { callId: "c3", phase: "result", block: { kind: "result", callId: "c3", meta: { commandRow: true }, call: { name: "generate_media", argsRaw: JSON.stringify({ kind: "image", prompt: "猫" }) }, content: [] } } });
+    assert.equal(completedMirrored, null, "the mirrored command row already shows the result");
     // An old settled call has no mirrored row: keep its own card.
     const failed = h.MediaToolRow({ t, sessionId: "s-1", owner: { callId: "c1", phase: "result", block: { kind: "result", callId: "c1", isError: true, call: { name: "generate_media", argsRaw: JSON.stringify({ kind: "image", prompt: "猫" }) }, content: [{ type: "text", text: "Error: the user declined these images; do not retry unless the user asks" }] } } });
     assert.equal(failed.props.node.name, "cpa-image");
