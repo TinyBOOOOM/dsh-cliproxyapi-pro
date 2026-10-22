@@ -2071,6 +2071,69 @@ it("generate_media: off by default, then image / video with approval, budget, re
       m.dispose();
     }
   });
+  it("generate_media mirrors its call as a top-level command row for the confirmation and the output", async () => {
+    const serve = fakeServers(MEDIA_SERVERS);
+    const workDir = mkdtempSync(join(tmpdir(), "cpa-work-"));
+    const mp4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypisom"), Buffer.alloc(16)]);
+    const fetchImpl = async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (init?.method === "POST" && path === "/v1/videos/generations") return json({ request_id: "req-1" });
+      if (path === "/v1/videos/req-1") return json({ status: "done", video: { url: "https://vidgen.x.ai/v.mp4", duration: 5 } });
+      if (path === "/openai/v1/videos/req-1/content") return new Response(mp4);
+      return serve(url, init);
+    };
+    const appended = [];
+    const root = {
+      id: "s-root",
+      options: { provider: "cli-proxy", model: "claude-opus-5-5" },
+      session: {
+        id: "s-root",
+        requestHeader: () => undefined,
+        append: (type, data) => appended.push({ type, data }),
+      },
+    };
+    const m = mountPlugin({
+      state: { version: 2, accounts: [{ id: "default", baseURL: "http://m.test", selectedModels: [] }] },
+      fetchImpl,
+      extraServices: {
+        workingDirectory: { ensure: async () => workDir },
+        approval: { effectivePolicy: () => "never", request: async () => { throw new Error("approval must not be used"); } },
+      },
+    });
+    try {
+      await m.call("POST", "/api/dsh-cliproxyapi/refresh", {});
+      await m.call("POST", "/api/dsh-cliproxyapi/media/save", { agentTool: true });
+      const tool = m.tools.find((candidate) => candidate.name === "generate_media");
+      const pending = tool.execute(
+        { kind: "video", prompt: "北方大雪", seconds: 5, resolution: "480p", model: "grok-imagine-video-1.5" },
+        { agent: root, callId: "toolu_1", signal: new AbortController().signal }
+      );
+      let row;
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        row = await m.call("GET", "/api/dsh-cliproxyapi/media/command?sessionId=s-root&commandId=toolu_1");
+        if (row.body.confirm !== undefined) break;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      assert.equal(appended[0]?.type, "command/run", "the generative call is mirrored before the confirmation");
+      assert.deepEqual(
+        { name: appended[0].data.name, commandId: appended[0].data.commandId },
+        { name: "cpa-video", commandId: "toolu_1" }
+      );
+      assert.match(appended[0].data.args, /北方大雪/);
+      assert.equal(row.body.confirm.kind, "video");
+      assert.match(row.body.confirm.zh, /北方大雪/);
+      const answer = await m.call("POST", "/api/dsh-cliproxyapi/media/confirm", { sessionId: "s-root", commandId: "toolu_1", allow: true });
+      assert.equal(answer.code, 200, JSON.stringify(answer.body));
+      const out = await pending;
+      assert.equal(out.status, "done");
+      assert.equal(out.files.length, 1);
+      const done = appended.find((entry) => entry.type === "command/done");
+      assert.equal(done?.data.kind, "success", "the mirrored row settles for the same run");
+    } finally {
+      m.dispose();
+    }
+  });
+
   it("asks the session's chat model for parameters the rules missed; explicit options win and the prompt only loses words", async () => {
     const serve = fakeServers(MEDIA_SERVERS);
     const workDir = mkdtempSync(join(tmpdir(), "cpa-work-"));

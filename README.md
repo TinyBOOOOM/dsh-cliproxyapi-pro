@@ -262,8 +262,8 @@ CPA 通过 `/v1/images/*` 和 `/v1/videos/*` 提供生图、生视频模型（�
 在「生成」标签打开 **允许 agent 生成图片 / 视频** 后，对话里的 agent 可以调用 `generate_media` 工具生图、生视频、编辑或延长视频。关闭时（默认）不注册这个工具，不占用模型上下文；打开后，且至少有一个启用的生成模型时才注册，工具说明保持精简，不列模型清单。
 
 - **能做什么**：参数为 `kind`（image / video）、`prompt`，可选 `mode`（generate / edit / extend）、`model`、`images`（本地图片路径：生图时改图 / 合成，生视频时 1 张为首帧、2 张以上为参考图）、`frames`（首帧 / 参考图 / 首尾帧 / 尾帧）、`video`（编辑 / 延长的原视频：本地 MP4 路径或公开链接，不写时用本会话最新生成的视频）、`aspect`、`seconds`、`resolution`、`count`。可选字段可以省略或填 `null`（兼容 Responses 严格参数模式）；视频的 `count` 应填 `null`，一次只生成一个视频。没写 `model` 或填 `null` / 空字符串时，用输入框旁按钮里本会话选中的模型（子 agent 用其所属会话的选择）。处理方式与对应的斜杠命令相同，但提示词**原样发送**：不识别提示词里的「10秒」「竖屏」等词，也不请对话模型解读参数。
-- **结果**：文件保存到保存位置，工具返回文件路径、模型和实际参数。生图时，如果当前对话模型能看图，还会把生成的图片（DSH 自动缩小）一起交给它。对话里这次工具调用显示成和斜杠命令一样的一问一答（进度、图片 / 可播放的视频、打开 / 显示文件夹 / 复制，视频下方同样有「编辑视频…」「延长视频…」）。
-- **确认**：视频默认**每次先问你**（DSH 自带的确认框，写明账号、模型、时长、分辨率 / 比例、提示词开头、附图数量、「提交后无法取消」和本会话已用秒数）；图片默认直接生成，也可以改成每次先问。你拒绝时 agent 会收到「不要重试」的说明。会话的 DSH 审批弹窗关闭时（「完全访问」权限预设默认如此），插件改为在这次工具调用的对话行里显示确认框（「允许生成」/「拒绝」），等你回答后才发送；10 分钟内没有回答视为不同意，插件重载也会取消等待。
+- **结果**：文件保存到保存位置，工具返回文件路径、模型和实际参数。生图时，如果当前对话模型能看图，还会把生成的图片（DSH 自动缩小）一起交给它。对话里这次工具调用会同时记录为一条**顶层命令行**，和斜杠命令一样显示一问一答（进度、图片 / 可播放的视频、打开 / 显示文件夹 / 复制，视频下方同样有「编辑视频…」「延长视频…」），不需要展开被折叠的思考过程。
+- **确认**：视频默认**每次先问你**（DSH 自带的确认框，写明账号、模型、时长、分辨率 / 比例、提示词开头、附图数量、「提交后无法取消」和本会话已用秒数）；图片默认直接生成，也可以改成每次先问。你拒绝时 agent 会收到「不要重试」的说明。会话的 DSH 审批弹窗关闭时（「完全访问」权限预设默认如此），插件会把这次调用显示成一条顶层命令行（和 `/cpa-video` 一样），确认框（「允许生成」/「拒绝」）就在这条可见的行里，等你回答后才发送；10 分钟内没有回答视为不同意，插件重载也会取消等待。
 - **秒数上限**：agent 提交的视频按秒累计到会话上（子 agent 计入所属会话），默认每个会话 60 秒，可设为 30 秒到 1 小时或不限。只在「直接生成」时拦截超出上限的视频；「每次先问我」时只计数。编辑按原视频时长计、延长按新增秒数计。CPA 当场拒绝（没有建立任务）时退回秒数；上游生成失败不退回。修改上限、或从「每次先问我」改为「直接生成」时重新计数。你手动执行的 `/cpa-video` 等命令不计数、不确认。
 - **按会话单独设置**：工具打开时，任一模型菜单底部的「agent 生成设置」按钮会打开二级菜单：视频 / 图片的确认方式和视频上限可以跟随全局或单独设置，并显示「本会话 agent 已用视频 X / N 秒」。
 - **等待**：工具最多等 10 分钟。超时或你停止这一轮时，视频仍在后台生成（照常计费），完成后保存到保存位置并显示在这一行里；agent 会收到「仍在后台生成」的说明。
@@ -360,7 +360,7 @@ CPA 通过 `/v1/images/*` 和 `/v1/videos/*` 提供生图、生视频模型（�
 | POST | `/api/dsh-cliproxyapi/media/diagnose` | `{ accountId }` | 只读诊断（见上文），返回 `{ ok, diagnostic }`，不含 Key |
 | GET | `/api/dsh-cliproxyapi/media/session?sessionId=` | — | `{ ok, session }`：可选的生图 / 生视频模型、当前选择及其来源（`session` / `last` / `only`）、本会话最近生成的文件（只有文件名和 id，不含路径）；不联网 |
 | POST | `/api/dsh-cliproxyapi/media/session/save` | `{ sessionId?, kind: "image" \| "video", ref }` | 为会话选择模型（`ref` 为 `账号id/模型id`，`null` 清除本会话的选择），并记为上一次选择；不在可选列表里的模型返回 400 `invalid-model`。也可以只传 `{ sessionId, videoConfirm?, imageConfirm?, videoBudget? }`（`ask` / `auto` / `inherit`，上限为 `{ mode: "limited", seconds }` / `{ mode: "unlimited" }` / `inherit`）修改本会话的 agent 生成设置 |
-| POST | `/api/dsh-cliproxyapi/media/confirm` | `{ sessionId, commandId, allow }` | 回答 `generate_media` 在对话行里显示的确认（会话的 DSH 审批弹窗关闭时使用）；只有该调用所在的会话能回答，已回答或已过期返回 400 `confirm-expired` |
+| POST | `/api/dsh-cliproxyapi/media/confirm` | `{ sessionId, commandId, allow }` | 回答 `generate_media` 在顶层命令行里显示的确认（会话的 DSH 审批弹窗关闭时使用）；只有该调用所在的会话能回答，已回答或已过期返回 400 `confirm-expired` |
 | GET | `/api/dsh-cliproxyapi/media/file?sessionId=&id=` | — | 返回插件为该会话记录过的生成文件；其他文件或其他会话一律 404。视频以流的形式返回，支持单个 `Range` 区间（206），便于播放器拖动 |
 | GET | `/api/dsh-cliproxyapi/media/command?sessionId=&commandId=` | — | `{ ok, run, files }`：该会话中某次命令的生成记录（状态 `running` / `done` / `error`、模型、提示词、比例、张数、参考图数量、起止时间、保存目录的显示名、错误代码和摘要）和生成的文件（id、文件名和完整路径，以及保存目录 `folderPath`、Host 的文件管理器类型 `desktop`：`explorer` / `finder` / `filemanager`），供对话里的命令行显示和打开文件；视频记录另有时长、分辨率、请求 id、方式 `mode`（`text` / `first-frame` / `reference` / `first-last` / `last-frame` / `edit` / `extend`）和来源命令 id；还能编辑 / 延长时附带 `actions: { edit, extend, expiresAt }`（不含链接）；进行中时附带阶段 `phase`（`submitting` / `queued` / `running` / `downloading`）和 CPA 返回的进度 `progress`；记录为进行中、但当前没有对应后台任务的（插件重载或崩溃）报告为 `interrupted` |
 
