@@ -1136,7 +1136,8 @@ describe("/cpa-video chat row and video model picker", () => {
     h.renderCard({ node, sessionId: "s-1" });
     await flushClient();
     let tree = h.renderCard({ node, sessionId: "s-1" }, "zh");
-    assert.equal(content(nodes(tree, (n) => n.props.className === "dcpa-chat-tags")[0]), "/cpa-video8 秒480p首帧图复制原始输入");
+    assert.equal(content(nodes(tree, (n) => n.props.className === "dcpa-chat-tags")[0]), "/cpa-video8 秒480p复制原始输入");
+    assert.equal(content(nodes(tree, (n) => n.props.className === "dcpa-chat-mode")[0]), h.zh.mediaSentFirstFrame, "the reply says the image was the first frame");
     assert.match(content(tree), /正在生成 40% · 1 分 1[45] 秒/);
     assert.ok(content(tree).includes(h.zh.mediaCardVideoNoStop));
     const skeleton = nodes(tree, (n) => n.props.className === "dcpa-chat-skeleton");
@@ -1200,15 +1201,31 @@ describe("video modes, edit and extend in the chat row", () => {
   const files = [{ id: "abcdef0123456789", kind: "video", name: "a.mp4", path: "D:\\w\\generated\\a.mp4" }];
   const node = { name: "cpa-video", commandId: "cmd-v-1", args: "跳舞", outcome: { kind: "success", text: "Submitting" } };
 
-  it("labels references, pinned frames and extensions", () => {
-    const tagsOf = (run, name = "cpa-video") => {
+  it("states in the reply which mode was sent and, for edits, where the source came from", () => {
+    const modeOf = (run, name = "cpa-video", lang = "zh") => {
       const h = clientHarness({ update: { run, files }, loading: false, fetch: async () => okJson({}) });
-      return content(nodes(h.renderCard({ node: { ...node, name }, sessionId: "s-1" }, "zh", false), (n) => n.props.className === "dcpa-chat-tags")[0]).replace(/复制原始输入$/, "");
+      const tree = h.renderCard({ node: { ...node, name }, sessionId: "s-1" }, lang, false);
+      const line = nodes(tree, (n) => n.props.className === "dcpa-chat-mode")[0];
+      return { text: line ? content(line) : null, mode: line?.props["data-mode"], tags: content(nodes(tree, (n) => n.props.className === "dcpa-chat-tags")[0]).replace(/复制原始输入$|Copy original input$/, "") };
     };
-    assert.equal(tagsOf({ ...base, mode: "reference", references: 3 }), "/cpa-video6 秒480p参考图 ×3");
-    assert.equal(tagsOf({ ...base, mode: "first-last", references: 2 }), "/cpa-video6 秒480p首尾帧");
-    assert.equal(tagsOf({ ...base, mode: "extend", seconds: 4, resolution: undefined }, "cpa-video-extend"), "/cpa-video-extend延长 +4 秒");
-    assert.equal(tagsOf({ ...base, mode: "edit", resolution: undefined }, "cpa-video-edit"), "/cpa-video-edit编辑视频");
+    let row = modeOf({ ...base, mode: "reference", references: 3 });
+    assert.equal(row.text, "模式：参考图 ×3 — 带入图中的人物、服装、物品，不锁定第一帧");
+    assert.equal(row.tags, "/cpa-video6 秒480p", "the user side keeps only what was asked");
+    assert.equal(modeOf({ ...base, mode: "first-frame", references: 1 }).text, "模式：首帧 — 附带的图片就是视频的第一帧");
+    assert.equal(modeOf({ ...base, references: 1 }).mode, "first-frame", "an old run with an image was a first frame");
+    assert.equal(modeOf({ ...base }).text, "模式：纯文字生成（没有附带图片）");
+    assert.equal(modeOf({ ...base, mode: "first-last", references: 2 }).text, "模式：首尾帧 — 第 1 张图是第一帧，第 2 张图是最后一帧");
+    assert.equal(modeOf({ ...base, mode: "last-frame", references: 1 }).mode, "last-frame");
+    row = modeOf({ ...base, mode: "extend", seconds: 4, resolution: undefined, sourceKind: "link", sourceCommandId: "cmd-v-0" }, "cpa-video-extend");
+    assert.equal(row.text, "模式：延长 +4 秒（grok-imagine-video）— 原视频：本会话生成的视频（xAI 结果链接）");
+    assert.equal(row.tags, "/cpa-video-extend");
+    row = modeOf({ ...base, mode: "edit", resolution: undefined, sourceKind: "upload", sourceName: "clip.mp4", ignored: ["480p"] }, "cpa-video-edit");
+    assert.equal(row.text, "模式：编辑视频（grok-imagine-video）— 原视频：上传本地文件 clip.mp4");
+    assert.match(row.tags, /已忽略 480p/);
+    row = modeOf({ ...base, mode: "edit", resolution: undefined, sourceKind: "url", sourceName: "example.com" }, "cpa-video-edit", "en");
+    assert.equal(row.text, "Mode: video edit (grok-imagine-video) — source: public link (example.com), downloaded by xAI");
+    const image = modeOf({ ...base, kind: "image", references: 2 }, "cpa-image");
+    assert.equal(image.text, "模式：改图 — 2 张附带图片作为参考");
   });
 
   it("offers edit / extend while the host still has the video's link, and submits a follow-up command", async () => {

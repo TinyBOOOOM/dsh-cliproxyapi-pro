@@ -1681,6 +1681,7 @@ describe("media models", () => {
       row = await settledRun(m, "s-1", "cmd-e-4");
       assert.deepEqual(posts[3].body, { model: "grok-imagine-video", prompt: "变成夜晚", video: { url: "https://example.com/v/a.mp4" } });
       assert.equal(row.body.run.sourceName, "example.com");
+      assert.equal(row.body.run.sourceKind, "url");
 
       // A path typed straight into the prompt is the source, not prompt text; 480p is taken out.
       result = await run("cpa-video-edit", `${join(workDir, "clip.mp4")}   480p  这个背景换成中国街头`, [], "cmd-e-path");
@@ -1692,6 +1693,7 @@ describe("media models", () => {
       assert.equal(row.body.run.prompt, "这个背景换成中国街头");
       assert.deepEqual(row.body.run.ignored, ["480p"]);
       assert.equal(row.body.run.sourceName, "clip.mp4");
+      assert.equal(row.body.run.sourceKind, "upload");
 
       const before = posts.length;
       for (const [line, files, pattern] of [
