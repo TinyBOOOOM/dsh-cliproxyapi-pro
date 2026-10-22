@@ -68,7 +68,7 @@ describe("plugin update client", () => {
     h.apply(ctx);
     const byName = Object.fromEntries(registrations.map((r) => [r.meta.name, r]));
     // Without modelDirectories only the generation-model button joins the composer and hero.
-    assert.deepEqual(Object.keys(byName).sort(), ["conversation.chat.commandview", "conversation.hero.options", "conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section"]);
+    assert.deepEqual(Object.keys(byName).sort(), ["conversation.chat.commandview", "conversation.hero.options", "conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section", "tool.call.toolview"]);
     const row = byName["conversation.chat.commandview"];
     assert.deepEqual(registrations.filter((r) => r.meta.name === "conversation.chat.commandview").map((r) => r.meta.key), ["cpa-image", "cpa-video", "cpa-video-edit", "cpa-video-extend"], "only the generation command rows are replaced");
     assert.equal(JSON.stringify(row.meta.inject("s-1")), JSON.stringify({ sessionId: "s-1" }));
@@ -644,12 +644,38 @@ describe("generation tab", () => {
       assert.ok(text.includes(h[language].mediaVideoGroup));
       assert.ok(text.includes("→ grok-imagine-video"), "the Sora alias is labelled");
       const switches = nodes(tree, (n) => n.props.role === "switch");
-      assert.equal(switches.length, 2);
+      assert.equal(switches.length, 3, "two models and the agent switch");
+      assert.equal(switches[2].props["aria-label"], h[language].mediaAgentTitle);
+      assert.equal(switches[2].props["aria-checked"], false, "the agent tool is off by default");
       assert.equal(switches[0].props["aria-checked"], true);
       assert.equal(switches[0].props["aria-label"], h[language].mediaEnabledLabel.replace("{model}", "grok-imagine-image"));
       assert.ok(button(tree, h[language].diagRun), "the diagnostic is offered");
       assert.equal(nodes(tree, (n) => n.props.title !== undefined).length, 0, "help text uses InfoTip, not title attributes");
     }
+  });
+
+  it("switches the agent tool and saves its confirmation and seconds limit", async () => {
+    const posts = [];
+    const on = { ...media(), settings: { ...media().settings, agentTool: true, videoConfirm: "ask", imageConfirm: "auto", videoBudget: { mode: "limited", seconds: 90 } } };
+    const h = clientHarness({ update: media(), loading: false, fetch: async (url, options = {}) => (options.method === "POST" && posts.push(JSON.parse(options.body)), okJson({ media: on })) });
+    let tree = h.renderMedia({ account }, "zh", false);
+    const agentSwitch = nodes(tree, (n) => n.props.role === "switch" && n.props["aria-label"] === h.zh.mediaAgentTitle)[0];
+    assert.ok(nodes(tree, (n) => n.type === "select" && n.props.disabled === true).length >= 3, "its options wait for the switch");
+    agentSwitch.props.onClick();
+    await flushClient();
+    assert.deepEqual(posts[0], { agentTool: true });
+    tree = h.renderMedia({ account }, "zh", false);
+    const budget = nodes(tree, (n) => n.type === "select" && n.props["aria-label"] === h.zh.mediaVideoBudget)[0];
+    assert.equal(budget.props.value, "limited:90");
+    assert.ok(nodes(budget, (n) => n.type === "option").some((o) => o.props.value === "limited:90"), "a custom limit stays listed");
+    budget.props.onChange({ target: { value: "unlimited" } });
+    await flushClient();
+    assert.deepEqual(posts[1], { videoBudget: { mode: "unlimited" } });
+    tree = h.renderMedia({ account }, "zh", false);
+    const confirm = nodes(tree, (n) => n.type === "select" && n.props.value === "ask")[0];
+    confirm.props.onChange({ target: { value: "auto" } });
+    await flushClient();
+    assert.deepEqual(posts[2], { videoConfirm: "auto" });
   });
 
   it("saves the video defaults on their own, only when a video model exists", async () => {
@@ -1075,7 +1101,7 @@ describe("hot reload", () => {
     const disposeNew = activation(); // overlaps: the old entries still hold the stable ids
     disposeOld();
     const names = [...live.values()].map((e) => e.meta.name).sort();
-    assert.deepEqual(names, ["conversation.chat.commandview", "conversation.chat.commandview", "conversation.chat.commandview", "conversation.chat.commandview", "conversation.hero.options", "conversation.hero.options", "conversation.input.right", "conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section"]);
+    assert.deepEqual(names, ["conversation.chat.commandview", "conversation.chat.commandview", "conversation.chat.commandview", "conversation.chat.commandview", "conversation.hero.options", "conversation.hero.options", "conversation.input.right", "conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section", "tool.call.toolview"]);
     const chip = [...live.values()].find((e) => e.meta.id === "dsh-cliproxyapi-pro:media");
     assert.equal(chip.meta.priority, 1, "the generation button also shadows one priority lower");
     const badge = [...live.values()].find((e) => e.meta.id === "dsh-cliproxyapi-pro:quota");
@@ -1286,5 +1312,71 @@ describe("video modes, edit and extend in the chat row", () => {
     assert.equal(JSON.stringify(await runCommand("s-1", "/cpa-video-extend -- go")), JSON.stringify({ ok: true }));
     assert.equal(JSON.stringify(await runCommand("s-1", "/cpa-video-extend -- bad")), JSON.stringify({ ok: false, text: "nope" }));
     assert.deepEqual(JSON.parse(JSON.stringify(executed[0])), ["s-1", "/cpa-video-extend -- go", []]);
+  });
+});
+
+describe("generate_media in the chat and the composer button", () => {
+  const okJson = (body) => new Response(JSON.stringify({ ok: true, ...body }));
+
+  it("draws the tool call like the matching command row, keyed by the call id", () => {
+    const h = clientHarness({ update: null, loading: false, fetch: async () => okJson({}) });
+    const t = (key) => h.zh[key] ?? key;
+    const running = h.MediaToolRow({ t, sessionId: "s-1", owner: { callId: "toolu|01", phase: "start", block: { callId: "toolu|01", phase: "start", argsRaw: JSON.stringify({ kind: "video", mode: "extend", prompt: "镜头拉远", seconds: 4 }) } } });
+    assert.equal(running.type, h.ImageCommandCard);
+    assert.deepEqual(JSON.parse(JSON.stringify(running.props.node)), { name: "cpa-video-extend", commandId: "toolu_01", args: "-- 镜头拉远", outcome: { kind: "success" } });
+    assert.equal(running.props.pending, true);
+    assert.equal(running.props.label, "generate_media");
+    assert.equal(running.props.showCopy, false);
+    const failed = h.MediaToolRow({ t, sessionId: "s-1", owner: { callId: "c1", phase: "result", block: { kind: "result", callId: "c1", isError: true, call: { name: "generate_media", argsRaw: JSON.stringify({ kind: "image", prompt: "猫" }) }, content: [{ type: "text", text: "Error: the user declined these images; do not retry unless the user asks" }] } } });
+    assert.equal(failed.props.node.name, "cpa-image");
+    assert.equal(failed.props.pending, false);
+    assert.deepEqual(JSON.parse(JSON.stringify(failed.props.node.outcome)), { kind: "error", text: "the user declined these images; do not retry unless the user asks" });
+    const preparing = h.MediaToolRow({ t, sessionId: "s-1", owner: { callId: "c2", phase: "preparing", block: { callId: "c2", phase: "preparing" } } });
+    assert.equal(preparing.props.node.outcome, null);
+    assert.equal(h.toolRunId("--"), null);
+
+    // While the call runs and no run record exists yet (e.g. waiting for approval), the row keeps asking.
+    const card = clientHarness({ update: { run: null, files: [] }, loading: false, fetch: async () => okJson({ run: null, files: [] }) });
+    const { t: _unused, ...cardProps } = running.props;
+    const tree = card.renderCard(cardProps, "zh", false);
+    assert.equal(content(nodes(tree, (n) => n.props.className === "dcpa-chat-status")[0]), card.zh.mediaCardSubmitting);
+    assert.equal(content(nodes(tree, (n) => n.props.className === "dcpa-chat-tags")[0]), "generate_media", "no copy button for tool rows");
+  });
+
+  it("sets this session's confirmation and limit in the composer button while the tool is on", async () => {
+    const posts = [];
+    const session = (agent) => ({
+      sessionId: "s-1",
+      options: { image: [{ ref: "default/grok-imagine-image", accountId: "default", accountName: "BCPA", modelId: "grok-imagine-image" }], video: [] },
+      current: { image: { ref: "default/grok-imagine-image", source: "session" }, video: null },
+      agent,
+      recent: [],
+    });
+    const base = { enabled: true, imageConfirm: "auto", videoConfirm: "ask", videoBudget: { mode: "limited", seconds: 60 }, used: 12, sources: { imageConfirm: "global", videoConfirm: "global", videoBudget: "global" }, global: { imageConfirm: "auto", videoConfirm: "ask", videoBudget: { mode: "limited", seconds: 60 } } };
+    const h = clientHarness({ update: session(base), loading: false, fetch: async (url, options = {}) => (options.method === "POST" && posts.push(JSON.parse(options.body)), okJson({ session: session(base) })) });
+    nodes(h.renderChip({ sessionId: "s-1" }, "zh", false), (n) => n.type === "button")[0].props.onClick();
+    let tree = h.renderChip({ sessionId: "s-1" }, "zh", false);
+    const section = nodes(tree, (n) => n.props["data-kind"] === "agent")[0];
+    assert.ok(section, "the agent section shows while the tool is on");
+    assert.ok(content(section).includes("本会话 agent 已用视频 12 / 60 秒"));
+    const selects = nodes(section, (n) => n.type === "select");
+    assert.equal(selects.length, 3);
+    assert.equal(selects[0].props.value, "inherit");
+    assert.ok(content(selects[0]).includes("跟随全局（每次先问我）"));
+    selects[0].props.onChange({ target: { value: "auto" } });
+    await flushClient();
+    selects[2].props.onChange({ target: { value: "limited:300" } });
+    await flushClient();
+    selects[2].props.onChange({ target: { value: "inherit" } });
+    await flushClient();
+    assert.deepEqual(posts, [
+      { sessionId: "s-1", videoConfirm: "auto" },
+      { sessionId: "s-1", videoBudget: { mode: "limited", seconds: 300 } },
+      { sessionId: "s-1", videoBudget: "inherit" },
+    ]);
+    const off = clientHarness({ update: session({ ...base, enabled: false }), loading: false, fetch: async () => okJson({}) });
+    nodes(off.renderChip({ sessionId: "s-1" }, "zh", false), (n) => n.type === "button")[0].props.onClick();
+    tree = off.renderChip({ sessionId: "s-1" }, "zh", false);
+    assert.equal(nodes(tree, (n) => n.props["data-kind"] === "agent").length, 0, "hidden while the tool is off");
   });
 });

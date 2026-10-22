@@ -664,7 +664,7 @@ describe("multi-account", () => {
       assert.ok(existsSync(join(stateDir, "state.v1.json")));
 
       // No agent tool: nothing is added to model context.
-      assert.equal(injected.includes("tools"), false);
+      // The optional agent tool waits for the tools service but registers nothing while switched off.
       assert.equal(tools.length, 0);
       assert.deepEqual(commands.map((c) => c.name).sort(), ["cpa-image", "cpa-refresh", "cpa-status", "cpa-video", "cpa-video-edit", "cpa-video-extend", "cpa-video-status"]);
       assert.equal(commands.find((c) => c.name === "cpa-video").input.attachments, true);
@@ -802,7 +802,15 @@ function mountPlugin({ state, fetchImpl, extraServices = {}, files = {}, dir: re
   const sub = {
     ...ctx,
     commands: { register: (c) => (commands.push(c), () => {}) },
-    tools: { register: (t) => (tools.push(t), () => {}) },
+    tools: {
+      register: (t) => {
+        tools.push(t);
+        return () => {
+          const at = tools.indexOf(t);
+          if (at >= 0) tools.splice(at, 1);
+        };
+      },
+    },
     webServer: { register: (r) => (routes.set(r.path, r.handler), () => {}) },
   };
   const call = async (method, path, payload) => {
@@ -1033,7 +1041,7 @@ describe("media models", () => {
     };
     try {
       apply(ctx, {});
-      assert.equal(injected.includes("tools"), false);
+      // The optional agent tool waits for the tools service but registers nothing while switched off.
       assert.equal(tools.length, 0);
       await call("POST", "/api/dsh-cliproxyapi/refresh", {});
 
@@ -1146,7 +1154,7 @@ describe("media models", () => {
       },
     });
     try {
-      assert.equal(m.injected.includes("tools"), false, "still no agent tool");
+      assert.equal(m.tools.length, 0, "no agent tool while the switch is off");
       await m.call("POST", "/api/dsh-cliproxyapi/refresh", {});
       let sent = await m.call("GET", "/api/dsh-cliproxyapi/media/session?sessionId=s-1");
       assert.equal(sent.code, 200, JSON.stringify(sent.body));
@@ -1744,6 +1752,158 @@ describe("media models", () => {
       assert.equal(post.path, "/v1/videos/extensions");
       assert.equal(post.body.duration, 3);
       assert.deepEqual(dataOf(post), mp4Of(5), "the file CPA downloaded for cmd-e-1");
+    } finally {
+      m.dispose();
+    }
+  });
+it("generate_media: off by default, then image / video with approval, budget, refunds and sub-agents", async () => {
+    const serve = fakeServers(MEDIA_SERVERS);
+    const workDir = mkdtempSync(join(tmpdir(), "cpa-work-"));
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9, 9]);
+    writeFileSync(join(workDir, "ref.png"), png);
+    const mp4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypisom"), Buffer.alloc(16)]);
+    const posts = [];
+    let refuse = false;
+    let pending = false;
+    const fetchImpl = async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (init?.method === "POST" && (path.startsWith("/v1/videos/") || path.startsWith("/v1/images/"))) {
+        const body = JSON.parse(init.body);
+        posts.push({ path, body });
+        if (refuse) return new Response(JSON.stringify({ error: { message: "bad request" } }), { status: 400 });
+        if (path.startsWith("/v1/images/")) return new Response(JSON.stringify({ data: Array.from({ length: body.n }, () => ({ b64_json: png.toString("base64") })) }));
+        return new Response(JSON.stringify({ request_id: `req-${posts.length}` }));
+      }
+      const poll = /^\/v1\/videos\/(req-\d+)$/.exec(path);
+      if (poll) return new Response(JSON.stringify(pending ? { status: "pending" } : { status: "done", video: { url: "https://vidgen.x.ai/v.mp4", duration: 6 } }));
+      if (/^\/openai\/v1\/videos\/req-\d+\/content$/.test(path)) return new Response(mp4);
+      return serve(url, init);
+    };
+    const approvals = [];
+    let answer = "allowed-once";
+    let policy = "ask";
+    const saved = [];
+    const root = { id: "s-root", options: { provider: "cli-proxy", model: "claude-opus-5-5" }, session: { id: "s-root", requestHeader: () => undefined } };
+    const child = { id: "s-child", options: { provider: "cli-proxy", model: "claude-opus-5-5" }, session: { id: "s-child", requestHeader: () => undefined } };
+    const m = mountPlugin({
+      state: { version: 2, accounts: [{ id: "default", baseURL: "http://m.test", selectedModels: [] }] },
+      fetchImpl,
+      extraServices: {
+        workingDirectory: { ensure: async () => workDir },
+        attachments: {
+          saveImage: async ({ data, mediaType, name }) => (saved.push(name), { attachmentId: `sha256:${saved.length}`, mediaType, bytes: data.byteLength, width: 8, height: 8, name }),
+          readImage: async (ref) => ({ ref, data: png }),
+        },
+        approval: {
+          effectivePolicy: () => policy,
+          request: async (req) => (approvals.push(req), answer),
+        },
+        llm: { resolveModelInfo: async () => ({ inputModalities: ["text", "image"] }) },
+        agents: { list: () => [root, child], isOwnedBy: (id, owner) => id === "s-child" && owner === root },
+      },
+    });
+    let n = 0;
+    const call = (args, agent = root, signal = new AbortController().signal) => m.tools.find((t) => t.name === "generate_media").execute(args, { agent, callId: `toolu_${++n}`, signal });
+    const session = async (id = "s-root") => (await m.call("GET", `/api/dsh-cliproxyapi/media/session?sessionId=${id}`)).body.session;
+    try {
+      await m.call("POST", "/api/dsh-cliproxyapi/refresh", {});
+      assert.equal(m.tools.length, 0, "off by default");
+      await m.call("POST", "/api/dsh-cliproxyapi/media/save", { agentTool: true });
+      assert.deepEqual(m.tools.map((t) => t.name), ["generate_media"]);
+      const tool = m.tools[0];
+      const schema = JSON.stringify({ d: tool.description, p: tool.parameters });
+      assert.ok(!/grok-imagine-image|claude|default\//.test(schema), "the schema lists no models or accounts");
+      assert.ok(schema.length < 2600, `compact schema (${schema.length} chars)`);
+
+      // Image: no confirmation by default; the model gets previews when it can see images.
+      let out = await call({ kind: "image", prompt: "a lighthouse", count: 2, aspect: "16:9", images: ["ref.png"] });
+      assert.equal(out.status, "done");
+      assert.equal(out.files.length, 2);
+      assert.equal(out.previews.length, 2);
+      assert.equal(approvals.length, 0);
+      assert.equal(posts[0].path, "/v1/images/edits");
+      assert.equal(posts[0].body.prompt, "a lighthouse");
+      assert.equal(posts[0].body.n, 2);
+      const content = tool.output.render({}, out);
+      assert.equal(content.filter((b) => b.type === "image").length, 2);
+      let row = await m.call("GET", `/api/dsh-cliproxyapi/media/command?sessionId=s-root&commandId=${out.run}`);
+      assert.equal(row.body.run.status, "done", "the call has a chat-row record like a command");
+      assert.equal(out.run, "toolu_1");
+
+      // Words that look like options stay in the prompt (literal).
+      out = await call({ kind: "video", prompt: "10秒 竖屏 一只猫", seconds: 4, resolution: "480p" });
+      assert.equal(approvals.length, 1, "videos ask by default");
+      assert.match(approvals[0].displayReason.zh, /4 秒视频/);
+      assert.match(approvals[0].displayReason.en, /cannot be cancelled/);
+      assert.equal(approvals[0].toolName, "generate_media");
+      assert.equal(posts[1].body.prompt, "10秒 竖屏 一只猫");
+      assert.equal(posts[1].body.duration, 4);
+      assert.equal(out.status, "done");
+      assert.equal(out.files.length, 1);
+      assert.equal((await session()).agent.used, 4, "confirmed videos are counted too");
+
+      // Declined: nothing is sent or counted.
+      answer = "rejected";
+      const before = posts.length;
+      await assert.rejects(call({ kind: "video", prompt: "x", seconds: 4 }), /the user declined this video; do not retry/);
+      assert.equal(posts.length, before);
+      assert.equal((await session()).agent.used, 4);
+      answer = "allowed-once";
+      policy = "never";
+      await assert.rejects(call({ kind: "video", prompt: "x" }), /approval prompts are disabled in this session/);
+      policy = "ask";
+
+      // Auto for this session with a 10 s limit: switching to auto starts the count again.
+      let sent = await m.call("POST", "/api/dsh-cliproxyapi/media/session/save", { sessionId: "s-root", videoConfirm: "auto", videoBudget: { mode: "limited", seconds: 10 } });
+      assert.equal(sent.body.session.agent.used, 0);
+      assert.equal(sent.body.session.agent.sources.videoConfirm, "session");
+      const asked = approvals.length;
+      out = await call({ kind: "video", prompt: "a", seconds: 6 }, child);
+      assert.equal(approvals.length, asked, "auto does not ask");
+      assert.equal((await session()).agent.used, 6, "a sub-agent counts against its root session");
+      row = await m.call("GET", `/api/dsh-cliproxyapi/media/command?sessionId=s-child&commandId=${out.run}`);
+      assert.equal(row.body.run.status, "done", "the row lives in the sub-agent's own session");
+      const sentBefore = posts.length;
+      await assert.rejects(call({ kind: "video", prompt: "b", seconds: 6 }), /budget is 10 s and 6 s are used; this video needs 6 s/);
+      assert.equal(posts.length, sentBefore);
+
+      // CPA refuses at once: the seconds come back.
+      refuse = true;
+      await assert.rejects(call({ kind: "video", prompt: "c", seconds: 4 }), /CPA rejected the request/);
+      refuse = false;
+      assert.equal((await session()).agent.used, 6);
+
+      // Stop waiting: the job keeps running in the background.
+      pending = true;
+      const stop = new AbortController();
+      const waiting = call({ kind: "video", prompt: "d", seconds: 4 }, root, stop.signal);
+      for (let i = 0; i < 100 && posts.length === sentBefore + 1; i += 1) await new Promise((r) => setTimeout(r, 5));
+      stop.abort();
+      out = await waiting;
+      assert.equal(out.status, "running");
+      assert.match(out.note, /keeps running in the background/);
+      assert.equal((await session()).agent.used, 10);
+
+      // Argument checks reach the model as plain errors.
+      await assert.rejects(call({ kind: "image", prompt: "x", seconds: 4 }), /seconds is for videos only/);
+      await assert.rejects(call({ kind: "video", mode: "edit", prompt: "x", seconds: 4 }), /edit keeps the source's length/);
+
+      // Edit a local MP4 (no limit for this session now: a new limit starts the count again).
+      sent = await m.call("POST", "/api/dsh-cliproxyapi/media/session/save", { sessionId: "s-root", videoBudget: { mode: "unlimited" } });
+      assert.equal(sent.body.session.agent.used, 0);
+      pending = false;
+      writeFileSync(join(workDir, "clip.mp4"), mp4);
+      out = await call({ kind: "video", mode: "edit", prompt: "make it red", video: "clip.mp4" });
+      const edit = posts.at(-1);
+      assert.equal(edit.path, "/v1/videos/edits");
+      assert.equal(edit.body.prompt, "make it red");
+      assert.match(edit.body.video.url, /^data:video\/mp4;base64,/);
+      assert.equal(out.status, "done");
+      assert.equal(out.mode, "edit");
+
+      // Switching off removes the tool.
+      await m.call("POST", "/api/dsh-cliproxyapi/media/save", { agentTool: false });
+      assert.equal(m.tools.length, 0);
     } finally {
       m.dispose();
     }
