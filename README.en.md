@@ -218,7 +218,7 @@ Type in the composer:
 ```
 
 - **Options** (before the prompt): `-m <model>` picks a model for this run (same rules as `/cpa-image`); `-s <1-15>` sets the length in seconds; `-r <480p|720p>` the resolution; `--aspect <ratio>` is one of `1:1`, `16:9`, `9:16`, `4:3`, `3:4`, `3:2`, `2:3`; without it xAI decides (usually 16:9, or the first frame's ratio). These can also be written as separate words at the start or end of the prompt: `10s` / `10 seconds` / `10秒`, `480p` / `720p`, `16:9`, `portrait`, `landscape`, `square`, e.g. `/cpa-video 10s 480p this character dances`; a word counts only when a space, comma or the end follows it, so "3秒后爆炸" stays prompt text, and words in the middle of a sentence are never read as options. An explicit option such as `-s` wins. Without any, the Generation tab's video defaults apply. Everything after `--` is prompt text.
-- **How attached images are used** (images only; oversized ones are shrunk as described under Editing):
+- **How attached images are used** (images only; oversized ones are shrunk as described under Editing; CPA's video generation route was measured to read only about 1 MiB of request body, so all attached images share about 750 KB and are shrunk beyond that):
   - 1 image: the **first frame** by default (image to video); with `--ref` (or the word `reference`) a **reference**; with `--last` (or `last-frame`) the **last frame**, where the video ends.
   - 2 images: **references** by default; with `--first-last` (or `first-last`) the first is the first frame and the second the last frame, and the model fills in between.
   - 3 or more: **references**, up to 14 on `grok-imagine-video-1.5` and 7 on other video models. References bring in people, clothing or objects without locking the first frame; the prompt can name them in order as `<IMAGE_0>`, `<IMAGE_1>`, ….
@@ -235,11 +235,15 @@ Type in the composer:
 /cpa-video-edit make the dress red, keep everything else
 /cpa-video-extend 4s she turns and walks out of frame
 /cpa-video-extend --from cmd-xxxx-3 -s 6 the camera slowly pulls back
+/cpa-video-edit --video "D:\clips\street.mp4" make it a rainy night
+/cpa-video-extend --url https://example.com/clip.mp4 -s 4 the camera pulls back
 ```
 
-- When a video is done, **Edit video…** and **Extend video…** buttons appear below it; write one sentence and submit, and the result appears in a new row below. You can also type the command; without `--from` it uses the session's newest video that can still be used.
-- **How it works**: xAI's edit (`/v1/videos/edits`) and extension (`/v1/videos/extensions`) need the source video. The plugin does not upload local files (videos are several MB, far over the request size limit, and CPA has no route to xAI's file upload); it hands xAI the **short-lived link** that came with xAI's own result and xAI fetches it. That link is kept in memory only, never written to a file or log and never sent to the page, so **only videos generated since the plugin was last loaded, within about an hour, can be edited or extended**; after a reload or an hour the buttons disappear and the command asks you to generate again. Your own local videos cannot be edited.
+- When a video is done, **Edit video…** and **Extend video…** buttons appear below it; write one sentence and submit, and the result appears in a new row below. You can also type the command.
+- **Source video** (one of): **attach an MP4 file** in the composer; `--video <path>` (relative to the session's working directory; quote a path with spaces); `--url <public link>` (http/https, downloaded by xAI itself, no size limit); `--from <command id>` (a video the plugin made in this session); without any, the session's newest generated video. `-m <model>` picks whose video model account to use (default: the session's video model; for a video the plugin made, the account that made it).
+- **How it works**: xAI's edit (`/v1/videos/edits`) and extension (`/v1/videos/extensions`) take any MP4, as a public link or as base64 data. CPA has no route to xAI's file upload, so a local video travels base64-encoded inside the request (the edit route was measured to read a 20 MiB body, so local videos may be up to 14 MiB; compress or trim larger ones, or use `--url`). For about an hour, a video the plugin made goes by the short-lived link that came with xAI's own result (kept in memory only, never written to a file or log and never sent to the page); after that, or after a reload, the saved file is sent instead, so the buttons stay available while the file exists. Before sending, the plugin reads the length recorded in the MP4 and refuses a source outside the limits below without a request.
 - **Limits** (xAI's docs): both use `grok-imagine-video`; an edit needs a source of at most 8.7 s and keeps its length, ratio and resolution (720p at most); an extension needs a 2–15 s source, `-s` sets the added 2–10 s (default 6, or write `4s`), and returns the source plus the new part.
+- **When a server lacks a route**: some CPA servers' upstreams have no extension route (one answered HTTP 405 in testing). That run then reads "the upstream does not offer video extension (HTTP 405)", later extensions on the same account are refused without a request and the **Extend video…** button is hidden until the plugin reloads. After a 405, CPA pauses that credential for the model for about a minute.
 - Edits and extensions likewise cannot be cancelled once submitted and are billed as usual; background waiting, resuming after a reload and the row's buttons work as for `/cpa-video`.
 
 #### The generation-model button next to the composer
@@ -308,7 +312,7 @@ This plugin registers no agent tool, so it adds nothing to model context. Accoun
 - `/cpa-image [-m model] [--aspect ratio] [-n 1-4] prompt` — generate images; with attached images, edit them. See [Generating images](#generating-images-cpa-image).
 - `/cpa-video [-m model] [--aspect ratio] [-s 1-15] [-r 480p|720p] prompt` — generate a video; attach one image as the first frame. A submitted video cannot be cancelled. See [Generating videos](#generating-videos-cpa-video).
 - `/cpa-video-status` — list this session's video jobs.
-- `/cpa-video-edit [--from command-id] change` / `/cpa-video-extend [--from command-id] [-s 2-10] what happens next` — edit / extend a video the plugin generated. See [Editing and extending videos](#editing-and-extending-videos-cpa-video-edit-cpa-video-extend).
+- `/cpa-video-edit [--video path | --url link | --from command-id] [-m model] change` / `/cpa-video-extend [same] [-s 2-10] what happens next` — edit / extend any MP4 (an attached video file works too). See [Editing and extending videos](#editing-and-extending-videos-cpa-video-edit-cpa-video-extend).
 
 ### HTTP API
 

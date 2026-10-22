@@ -15,6 +15,10 @@ import {
   parseVideoEditCommand,
   submitVideoEdit,
   submitVideo,
+  isMp4,
+  mp4Duration,
+  videoImageBudget,
+  VIDEO_GENERATION_BODY_MAX_BYTES,
   retrieveVideo,
   downloadVideo,
   sniffVideoType,
@@ -459,6 +463,64 @@ describe("video generation", () => {
     assert.throws(() => parseVideoEditCommand("-s 11 x", "extend"), (e) => e.code === "invalid-extend-seconds");
     assert.throws(() => parseVideoEditCommand("--from bad! x", "edit"), (e) => e.code === "invalid-option");
     assert.throws(() => parseVideoEditCommand("--from cmd-a-1", "edit"), (e) => e.code === "missing-prompt");
+    assert.deepEqual(parseVideoEditCommand('--video "D:\\my clips\\a.mp4" -m grok 换成红色', "edit"), { video: "D:\\my clips\\a.mp4", model: "grok", prompt: "换成红色" });
+    assert.deepEqual(parseVideoEditCommand("--url=https://example.com/a.mp4 -s 3 继续", "extend"), { url: "https://example.com/a.mp4", seconds: 3, prompt: "继续" });
+    assert.throws(() => parseVideoEditCommand("--url https://u:p@example.com/a.mp4 x", "edit"), (e) => e.code === "invalid-video-url");
+    assert.throws(() => parseVideoEditCommand("--url file:///C:/a.mp4 x", "edit"), (e) => e.code === "invalid-video-url");
+    assert.throws(() => parseVideoEditCommand("--from cmd-a-1 --video a.mp4 x", "edit"), (e) => e.code === "one-video-source");
+  });
+
+  it("reads an MP4's length from moov/mvhd and budgets images for the 1 MiB generation body", () => {
+    const box = (type, payload) => {
+      const head = Buffer.alloc(8);
+      head.writeUInt32BE(8 + payload.length);
+      head.write(type, 4, "latin1");
+      return Buffer.concat([head, payload]);
+    };
+    const ftyp = box("ftyp", Buffer.from("isom\0\0\0\0isom"));
+    const v0 = Buffer.alloc(100);
+    v0.writeUInt32BE(600, 12);
+    v0.writeUInt32BE(5220, 16);
+    assert.equal(mp4Duration(Buffer.concat([ftyp, box("mdat", Buffer.alloc(40)), box("moov", box("trak", Buffer.alloc(8)), box("mvhd", v0))])), undefined, "mvhd must be inside moov at its level");
+    assert.equal(mp4Duration(Buffer.concat([ftyp, box("mdat", Buffer.alloc(40)), box("moov", Buffer.concat([box("trak", Buffer.alloc(8)), box("mvhd", v0)]))])), 8.7);
+    const v1 = Buffer.alloc(120);
+    v1[0] = 1;
+    v1.writeUInt32BE(1000, 20);
+    v1.writeBigUInt64BE(12345n, 24);
+    assert.equal(mp4Duration(new Uint8Array(Buffer.concat([ftyp, box("moov", box("mvhd", v1))]))), 12.35);
+    assert.equal(mp4Duration(Buffer.concat([ftyp, box("mdat", Buffer.alloc(4))])), undefined, "no moov");
+    assert.equal(mp4Duration(Buffer.from("not a video at all")), undefined);
+    assert.equal(isMp4(ftyp), true);
+    assert.equal(isMp4(Buffer.from("RIFF0000WEBP")), false);
+    const one = videoImageBudget("move", 1);
+    const body = JSON.stringify({
+      model: "grok-imagine-video-1.5", prompt: "move", duration: 15, aspect_ratio: "16:9", resolution: "720p",
+      image: { url: "data:image/jpeg;base64," + "A".repeat(Math.ceil(one / 3) * 4) },
+    });
+    assert.ok(one > 700_000 && body.length <= VIDEO_GENERATION_BODY_MAX_BYTES, `one image: ${one}, body ${body.length}`);
+    assert.ok(videoImageBudget("move", 14) * 14 < one, "shared between images");
+    assert.ok(videoImageBudget("长".repeat(4000), 1) < one, "a long prompt leaves less room");
+    assert.equal(videoImageBudget("x", 0), 0);
+  });
+
+  it("sends a local video inline, refuses an oversized body locally and names a missing upstream route", async () => {
+    const calls = [];
+    const fetchImpl = async (url, init) => (calls.push({ url, init }), new Response(JSON.stringify({ request_id: "req-9" })));
+    await submitVideoEdit({ fetch: fetchImpl, rootURL: "http://c", mode: "edit", sourceData: new Uint8Array([1, 2, 3]), prompt: "red" });
+    assert.deepEqual(JSON.parse(calls[0].init.body).video, { url: "data:video/mp4;base64,AQID" });
+    await assert.rejects(
+      submitVideo({ fetch: fetchImpl, rootURL: "http://c", model: "grok-imagine-video", prompt: "p", seconds: 4, image: { mediaType: "image/jpeg", data: new Uint8Array(800_000) } }),
+      (e) => e.code === "request-too-large"
+    );
+    assert.equal(calls.length, 1, "an oversized generation body never leaves the plugin");
+    await assert.rejects(
+      submitVideoEdit({ fetch: async () => new Response(JSON.stringify({ error: { message: "status 405" } }), { status: 405 }), rootURL: "http://c", mode: "extend", sourceUrl: "https://e.test/a.mp4", prompt: "p", seconds: 4 }),
+      (e) => e.code === "route-unsupported" && e.detail === "extensions"
+    );
+    await assert.rejects(
+      submitVideo({ fetch: async () => new Response('{"error":"Failed to read request body: length limit exceeded"}', { status: 400 }), rootURL: "http://c", model: "grok-imagine-video", prompt: "p", seconds: 4 }),
+      (e) => e.code === "request-too-large"
+    );
   });
 
   it("submits through the native route with the alias resolved and only the given options", async () => {

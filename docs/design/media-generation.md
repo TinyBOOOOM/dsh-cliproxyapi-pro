@@ -346,6 +346,7 @@ submit ──► queued/processing ──► done ──► download ──► s
 3. **P3 生视频**（✅ 已实现，待真实生成测试）：视频提交与轮询、任务持久化、`/cpa-video`、`/cpa-video-status`、视频预览。
    - 对照 CPA `dev@9e79552` 的 `openai_videos_handlers.go` 核对：原生 `POST /v1/videos/generations` 原样转给 xAI（字段 `model` / `prompt` / `duration` / `aspect_ratio` / `resolution` / `image.url`，只接受 Grok 视频 id，所以 `sora-2*` 由插件改写为 `grok-imagine-video`），返回 `request_id`；`GET /v1/videos/{id}` 返回 xAI 原样结果（`status`、`video.url` / `duration`、`error`）；原生提交也会登记凭据绑定，所以 `GET /openai/v1/videos/{id}/content` 可以下载（CPA 用凭据的代理去取 `video.url`）。不写比例时交给 xAI（默认 16:9 / 首帧比例），这也是选原生接口而不是 OpenAI 格式接口（那里默认尺寸固定为竖屏 720x1280）的原因。
    - 后续补充（2026-10-22）：按 xAI 文档实现参考图（`reference_images`，1.5 最多 14 张）、首尾帧（`image` + `last_frame`）、尾帧，以及编辑 / 延长（`/v1/videos/edits`、`/extensions`，模型 `grok-imagine-video`）。原视频不上传：请求体上限约 2 MiB、CPA 没有 `/v1/files`，所以用 xAI 结果自带的短期链接（只放内存、约 1 小时、重载即失效）。这改写了 D9（v1 不做编辑 / 延长）。
+    - 再次补充（2026-10-22）：用不会生成内容的请求（空提示词 / 非法时长）实测 BCPA 的请求体上限：`/v1/videos/generations` 读得下 1 MiB、1.2 MiB 起返回「length limit exceeded」；`/v1/videos/edits` 读得下 20 MiB；`/v1/videos/extensions` 返回 405（该服务器上游没有延长接口，CPA 随后让凭据冷却约 1 分钟）。据此 `/cpa-video-edit` / `-extend` 改为接受任意 MP4：附带文件、`--video` 路径、`--url` 公开链接、`--from`，本地视频以 base64 内联（≤ 14 MiB），插件生成的视频在链接过期后发送已保存的文件；视频的附带图片按 1 MiB 请求体分配。
    - 视频预览没有用 `documentPreviews`：对话里的命令行直接用 `<video>` 播放，`media/file` 支持 `Range`。§15 第 5 项（完成提示）由命令行本身承担：后台完成后该行自动显示视频；第 6 项因此不再需要。
 4. **P4 agent 工具**：`generate_media`、开关、确认、上限，以及 AGENTS.md / README / CHANGELOG 的修改。
 
