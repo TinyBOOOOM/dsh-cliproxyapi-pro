@@ -4,7 +4,7 @@
 
 本插件的所有重要变更。版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
-## Unreleased
+## 1.8.0 — 2026-10-22
 
 ### 新增
 - **识别生图 / 生视频模型。** 按模型目录的 `type`（`openai-image`）、输出模态，以及 CPA 自己分流到图片 / 视频接口的模型族（`grok-imagine-image*`、`gpt-image-*`、`grok-imagine-video*`、`sora-2*`）识别生成模型；只出现在 `/v1/models` 普通列表里的生成模型也会收录。生成模型不再写入对话路由，也不参与首次推荐勾选；已保存的勾选保持不变。

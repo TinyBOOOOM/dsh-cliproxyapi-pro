@@ -4,7 +4,7 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 1.8.0 — 2026-10-22
 
 ### Added
 - **Image and video models are recognized** from the catalog's `type` (`openai-image`), output modalities, and the model families CPA itself routes to its image / video handlers (`grok-imagine-image*`, `gpt-image-*`, `grok-imagine-video*`, `sora-2*`); a media model only the plain `/v1/models` listing carries is included too. Media models are no longer written to chat routes and take no part in the first-run recommendation; saved selections are kept unchanged.
