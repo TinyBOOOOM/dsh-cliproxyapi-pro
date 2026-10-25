@@ -4,6 +4,11 @@
 
 本插件的所有重要变更。版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## Unreleased
+
+### 文档
+- 更新插件简介（npm 的 `description` 与 DSH 插件列表里显示的 `locale/*.json` `meta.description`），补上按原生协议同步、各凭证额度和可选的生图 / 生视频。
+
 ## 1.9.0 — 2026-10-25
 
 ### 新增

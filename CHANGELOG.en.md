@@ -4,6 +4,11 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Documentation
+- Updated the plugin summary (npm `description` and the `locale/*.json` `meta.description` shown in the DSH plugin list) to cover model sync over native protocols, per-credential quota and the optional image / video generation.
+
 ## 1.9.0 — 2026-10-25
 
 ### Added
