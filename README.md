@@ -49,7 +49,7 @@
    dsh-cliproxyapi-pro
    ```
 
-   需要固定版本时可以写成 `dsh-cliproxyapi-pro@1.8.0`。
+   需要固定版本时可以写成 `dsh-cliproxyapi-pro@1.9.0`。
 4. 点击 **安装**，完成后点击 **立即启用**。
 
 > 在中国大陆下载慢，可以点输入框旁的 **安装源**，切换到 **中国大陆镜像源**。
@@ -78,7 +78,7 @@ dsh plugin --profile <profile 名称> add dsh-cliproxyapi-pro
 
 | 来源 | 填写内容 |
 |---|---|
-| 某个发布版本 | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v1.8.0` |
+| 某个发布版本 | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v1.9.0` |
 | 最新开发版 | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#main` |
 | 离线安装包 | 下载 [`dsh-cliproxyapi-pro.tgz`](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/releases/latest/download/dsh-cliproxyapi-pro.tgz)（始终是最新版），填写它的本地绝对路径 |
 | 本地源码（开发用） | 克隆后的仓库目录绝对路径；以链接方式安装，改代码后重载插件即生效 |
@@ -96,29 +96,37 @@ CPA 就在本机默认端口 `8317` 且没有设置密钥时，什么都不用�
 
 ## 截图
 
-图 1–5 是离线组件渲染：用本插件的真实界面代码加示例数据（`example.com` 地址、虚构账号）在浏览器中渲染，配色按 DSH 深色主题近似，实际颜色跟随你的 DSH 主题。图 6 是 1.6.0 在 DSH 桌面版中的实际截图。
+图 1–7 是离线组件渲染：用本插件的真实界面代码加示例数据（`example.com` 地址、虚构账号）在浏览器中渲染，配色按 DSH 深色主题近似，实际颜色跟随你的 DSH 主题。图 8 是 1.6.0 在 DSH 桌面版中的实际截图。
 
-**1. 账号与连接。** 设置左侧导航的 **CLIProxyAPI** 页：顶部账号栏三个标签共用；账号标题下是连接状态、地址和模型数，右侧「启用」开关立即生效，「⋯」菜单里是「立即探测刷新」和「删除此账号」。「连接」标签里每项一行，地址旁可「测试连接」（用正在编辑的值，不保存），次要说明在 ⓘ 里。
+**1. 账号与连接。** 设置左侧导航的 **CLIProxyAPI** 页：顶部账号栏四个标签（连接 / 模型 / 生成 / 额度）共用；账号标题下是连接状态、地址和模型数，右侧「启用」开关立即生效，「⋯」菜单里是「立即探测刷新」和「删除此账号」。「连接」标签里每项一行，地址旁可「测试连接」（用正在编辑的值，不保存），次要说明在 ⓘ 里。
 
 ![账号栏、账号标题与连接标签（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/connection.png)
 
-**2. 模型与统一保存。** 「模型」标签列出该 CPA 上的全部模型：全部 / 已勾选 / 未勾选、家族筛选、搜索、批量操作与「恢复推荐精选」；勾选的模型显示将使用的协议，可「编辑参数」。连接和模型的改动统一记录，底部出现「有未保存的更改 · 放弃更改 / 保存并应用」。
+**2. 模型与统一保存。** 「模型」标签列出该 CPA 上的全部对话模型：全部 / 已勾选 / 未勾选、家族筛选、搜索、批量操作与「恢复推荐精选」；勾选的模型显示将使用的协议，可「编辑参数」。连接和模型的改动统一记录，底部出现「有未保存的更改 · 放弃更改 / 保存并应用」。
 
 ![模型标签与底部保存栏（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/model-filter.png)
 
-**3. 额度。** 「额度」标签：管理密钥、额度数据与刷新、凭证分布条，按渠道分组的凭证（套餐、前缀、状态、5 小时 / 每日 / 每周等额度条与重置时间；Devin 显示每日 / 每周额度，所有 Devin 模型共用；没有额度接口的渠道只显示状态与近期请求），以及可展开的「模型 → 渠道」表。标签上显示该账号可用凭证中最低的剩余额度。
+**3. 生图 / 生视频。** 「生成」标签顶部是总开关「启用图片和视频生成」（对所有账号生效，新安装默认关闭；关闭时这一页只剩这个开关，输入框旁的生成按钮和生成命令都不出现）。打开后分组列出生图 / 生视频模型，每个模型可单独开关、改类型；下面是标记漏识别的模型、保存位置、视频默认值和 agent 生成设置。
+
+![生成标签：总开关、生图 / 生视频模型与生成设置（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/generation.png)
+
+**4. 额度。** 「额度」标签：管理密钥、额度数据与刷新、凭证分布条，按渠道分组的凭证（套餐、前缀、状态、5 小时 / 每日 / 每周等额度条与重置时间；Devin 显示每日 / 每周额度，所有 Devin 模型共用；没有额度接口的渠道只显示状态与近期请求），以及可展开的「模型 → 渠道」表。标签上显示该账号可用凭证中最低的剩余额度。
 
 ![额度标签：分布条与按渠道分组的凭证额度（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/quota.png)
 
-**4. 对话框里的额度。** 模型选择器左侧的徽标显示当前模型可用凭证中最充足的剩余额度；点击后列出服务该模型的每个凭证及其额度窗口。只对本插件同步、且所属账号已填写管理密钥的模型显示。
+**5. 管理密钥被拒绝。** 密钥连续 3 次被 CPA 拒绝（401/403）后停止自动查询，以免 CPA 封禁本机地址；页面说明原因，保留上次成功读取的数据。保存新的管理密钥后恢复，手动「刷新额度」只再试一次。
+
+![额度标签：管理密钥连续 3 次被拒绝后停止自动查询（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/quota-key-stopped.png)
+
+**6. 对话框里的额度。** 模型选择器左侧的徽标显示当前模型可用凭证中最充足的剩余额度；点击后列出服务该模型的每个凭证及其额度窗口。只对本插件同步、且所属账号已填写管理密钥的模型显示。
 
 ![模型选择器旁的额度徽标与弹出列表（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/quota-badge.png)
 
-**5. 添加账号。** 填名称、地址和 API Key 后点「连接」：先测试，成功才创建并启用账号；失败时显示原因，可选「仍然添加（不启用）」。
+**7. 添加账号。** 填名称、地址和 API Key 后点「连接」：先测试，成功才创建并启用账号；失败时显示原因，可选「仍然添加（不启用）」。
 
 ![添加账号表单（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/add-account.png)
 
-**6. 内置插件里的插件更新页**（1.6.0 实际截图）。**设置** → **内置插件** → **CLIProxyAPI** 标签页只有插件更新：检查更新与离线下载、检测到 DSH 插件市场后的「立即更新」、更新通道、下载区域，以及自动检查 / 自动下载 / 自动安装开关。图中已是稳定通道最新版本，所以「立即更新」不可用。
+**8. 内置插件里的插件更新页**（1.6.0 实际截图）。**设置** → **内置插件** → **CLIProxyAPI** 标签页只有插件更新：检查更新与离线下载、检测到 DSH 插件市场后的「立即更新」、更新通道、下载区域，以及自动检查 / 自动下载 / 自动安装开关。图中已是稳定通道最新版本，所以「立即更新」不可用。
 
 ![内置插件中的 CLIProxyAPI 更新页：版本状态、插件市场更新、通道、区域与自动开关](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/updates.png)
 
@@ -180,12 +188,13 @@ CPA 对每个模型同时提供 OpenAI Chat、OpenAI Responses、Anthropic Messa
 - **对话框徽标**：模型选择器左侧的小徽标（信号格 + 百分比）显示当前所选模型可用凭证中最充足的剩余额度，点击可查看每个凭证的额度。只对本插件同步、且所属账号已填写管理密钥的模型显示；没有管理密钥时不显示徽标。在新建对话页（输入栏尚未接管会话时），徽标显示在输入框上方工作区一行的右侧。
 - **精确匹配**：只在所选模型所属的账号（按路由 `cli-proxy*`、`cli-proxy-2*`…）里找凭证；带前缀的模型（如 `devin/claude-opus-5-5`）只匹配该前缀的凭证；不带前缀的同名模型（如 `claude-opus-5-5`）优先匹配不带前缀的凭证，Claude 渠道与 Devin 渠道不会混用。Antigravity 等按模型分组的额度窗口只取与当前模型相符的那一组。
 - **排查**：`/cpa-status` 会附带额度摘要：每个账号的管理密钥状态、额度状态、凭证数，以及模型选择器中每个模型匹配到的凭证和剩余额度（不输出密钥）。
-- **刷新**：结果在宿主端缓存 5 分钟；有页面在看时才在后台刷新过期账号，也可手动「刷新额度」。管理密钥被拒（401/403）后暂停该账号的自动刷新，直到更新密钥或手动刷新，避免触发 CPA 的错误密钥封禁。
+- **刷新**：结果在宿主端缓存 5 分钟；有页面在看时才在后台刷新过期账号，也可手动「刷新额度」。管理密钥被拒（401/403）时，后台按 5 分钟周期继续尝试，连续 3 次被拒绝后停止该账号的自动查询，避免触发 CPA 的错误密钥封禁（同一地址累计 5 次错误会被封 30 分钟）。失败次数保存在 `.dsh-cliproxyapi/quota-state.json`（不含密钥），重启 DSH 后继续计数；保存新的管理密钥（包括在 DSH 凭证页修改）、清除密钥或一次成功的查询会清零。停止后手动刷新只再试一次，再被拒绝立即停止。额度页和徽标会显示已被拒绝的次数或已停止的说明。
 
 ### 生图 / 生视频模型（「生成」标签页）
 
 CPA 通过 `/v1/images/*` 和 `/v1/videos/*` 提供生图、生视频模型（如 Grok Imagine）。这些模型不能用于对话，所以插件会把它们识别出来，不放进对话模型选择器。
 
+- **总开关**：「生成」标签顶部的「启用图片和视频生成」对所有账号生效。关闭时输入框旁不显示生成按钮，`/cpa-image`、`/cpa-video`、`/cpa-video-edit`、`/cpa-video-extend`、`/cpa-video-status` 不注册，agent 生成工具也不注册，「生成」标签只显示这个开关；已提交的视频照常完成，聊天记录里已生成的结果仍可查看（不提供编辑 / 延长按钮）。新安装默认关闭；已有 `media-settings.json` 或用过生成的配置升级后保持开启。不论开关如何，生成模型都不会进入对话模型选择器。下面介绍的功能都需要先打开它。
 - **识别规则**（按顺序）：你在「生成」标签里手动指定的类型；模型目录里的 `type`（`openai-image` 为生图）或输出模态（只输出图片为生图，输出视频为生视频）；CPA 分流到图片 / 视频接口的模型族，按前缀匹配：以 `grok-imagine-image` 或 `gpt-image-` 开头为生图，以 `grok-imagine-video` 开头或 `sora-2*` 为生视频。其余都是对话模型（如 `gemini-3.1-flash-image`：CPA 只通过对话接口提供它，DSH 也不能显示对话中返回的图片）。只出现在 `/v1/models` 普通列表里的生成模型也会被收录。模型目录可能列出 CPA 生成接口暂不接受的变体（例如 `grok-imagine-video-1.5-lite`），它们同样不能对话，因此归为生成模型；用它们生成时会显示 CPA 返回的错误。
 - **不进入模型选择器**：生成模型不会写入任何对话路由，也不参与首次推荐勾选；即使旧的勾选里含有它们，也不会被同步（勾选本身保持不变）。「模型」标签只列对话模型。
 - **「生成」标签**（与 连接 / 模型 / 额度 并列）：分「生图模型」「生视频模型」两组列出，修改立即保存。每个模型可以用开关决定是否提供给生成功能（新出现的模型默认开启），用类型下拉框改为生图 / 生视频 / 对话模型；手动指定的类型可以恢复为自动识别。识别漏掉的模型可以在「把其他模型标记为生成模型」里手动标记。改动类型会立即重新同步该账号的路由。`sora-2*` 标注为「→ grok-imagine-video」：CPA 会把它改写为 Grok 视频模型调用。
@@ -259,7 +268,7 @@ CPA 通过 `/v1/images/*` 和 `/v1/videos/*` 提供生图、生视频模型（�
 
 #### 让 agent 生成（`generate_media` 工具，默认关闭）
 
-在「生成」标签打开 **允许 agent 生成图片 / 视频** 后，对话里的 agent 可以调用 `generate_media` 工具生图、生视频、编辑或延长视频。关闭时（默认）不注册这个工具，不占用模型上下文；打开后，且至少有一个启用的生成模型时才注册，工具说明保持精简，不列模型清单。
+在「生成」标签打开 **允许 agent 生成图片 / 视频** 后，对话里的 agent 可以调用 `generate_media` 工具生图、生视频、编辑或延长视频。关闭时（默认）不注册这个工具，不占用模型上下文；打开后，且总开关「启用图片和视频生成」打开、至少有一个启用的生成模型时才注册，工具说明保持精简，不列模型清单。
 
 - **能做什么**：参数为 `kind`（image / video）、`prompt`，可选 `mode`（generate / edit / extend）、`model`、`images`（本地图片路径：生图时改图 / 合成，生视频时 1 张为首帧、2 张以上为参考图）、`frames`（首帧 / 参考图 / 首尾帧 / 尾帧）、`video`（编辑 / 延长的原视频：本地 MP4 路径或公开链接，不写时用本会话最新生成的视频）、`aspect`、`seconds`、`resolution`、`count`。可选字段可以省略或填 `null`（兼容 Responses 严格参数模式）；视频的 `count` 应填 `null`，一次只生成一个视频。没写 `model` 或填 `null` / 空字符串时，用输入框旁按钮里本会话选中的模型（子 agent 用其所属会话的选择）。处理方式与对应的斜杠命令相同，但提示词**原样发送**：不识别提示词里的「10秒」「竖屏」等词，也不请对话模型解读参数。工具说明同时要求 agent 使用用户自己的措辞和细节，不要扩写成更长的场景描写，也不要添加用户没有要求的镜头、光线、风格、人物或环境细节。
 - **结果**：文件保存到保存位置，工具返回文件路径、模型和实际参数。生图时，如果当前对话模型能看图，还会把生成的图片（DSH 自动缩小）一起交给它。对话根据工具调用的原始记录显示一条**独立的生成行**，放在思考过程之外，和斜杠命令一样显示一问一答（进度、图片 / 可播放的视频、打开 / 显示文件夹 / 复制，视频下方同样有「编辑视频…」「延长视频…」）；不需要展开思考过程，不再额外伪造用户命令，也不会重复显示已有对应生成行的工具卡片或旧版镜像命令卡片。
@@ -336,6 +345,8 @@ CPA 通过 `/v1/images/*` 和 `/v1/videos/*` 提供生图、生视频模型（�
 - `/cpa-video-status`：列出本会话的视频任务。
 - `/cpa-video-edit [--video 路径 | --url 链接 | --from 命令id] [-m 模型] 修改说明`、`/cpa-video-extend [同上] [-s 2-10] 接下来的内容`：编辑 / 延长任意 MP4（可附带视频文件）。见 [编辑 / 延长视频](#编辑--延长视频cpa-video-editcpa-video-extend)。
 
+`/cpa-image` 和 `/cpa-video*` 只在「生成」标签的「启用图片和视频生成」打开时存在。
+
 ### HTTP 接口
 
 供设置面板使用，需要 DSH Web 会话的认证；POST 只接受来自本机或受信任主机的同源请求。
@@ -356,7 +367,7 @@ CPA 通过 `/v1/images/*` 和 `/v1/videos/*` 提供生图、生视频模型（�
 | POST | `/api/dsh-cliproxyapi/quota/refresh` | `{ accountId? }` | 开始刷新一个或全部账号的额度并立即返回（快照中 `refreshing` 为真） |
 | POST | `/api/dsh-cliproxyapi/quota/save` | `{ accountId, managementKey?, clear? }` | 保存或清除该账号的管理密钥，并开始刷新额度；响应不含密钥 |
 | GET | `/api/dsh-cliproxyapi/media/status` | — | `{ ok, media }`：生成设置与每个账号识别出的生图 / 生视频模型；不联网 |
-| POST | `/api/dsh-cliproxyapi/media/save` | `{ account: { accountId, disabledModels?, kindOverrides? } }` | 保存某账号关闭的生成模型（整表替换）或类型覆盖（按模型合并，`null` 表示恢复自动识别）；类型变化时重新同步该账号并在响应中附带 `status`。无效值返回 400 和错误码，如 `invalid-account`、`invalid-kind` |
+| POST | `/api/dsh-cliproxyapi/media/save` | `{ enabled? }`、全局字段（如 `agentTool`、`outputDir`），或 `{ account: { accountId, disabledModels?, kindOverrides? } }` | `enabled` 打开 / 关闭生成总开关（随即注册或移除生成命令和 agent 工具）；保存某账号关闭的生成模型（整表替换）或类型覆盖（按模型合并，`null` 表示恢复自动识别）；类型变化时重新同步该账号并在响应中附带 `status`。无效值返回 400 和错误码，如 `invalid-enabled`、`invalid-account`、`invalid-kind` |
 | POST | `/api/dsh-cliproxyapi/media/diagnose` | `{ accountId }` | 只读诊断（见上文），返回 `{ ok, diagnostic }`，不含 Key |
 | GET | `/api/dsh-cliproxyapi/media/session?sessionId=` | — | `{ ok, session }`：可选的生图 / 生视频模型、当前选择及其来源（`session` / `last` / `only`）、本会话最近生成的文件（只有文件名和 id，不含路径）；`pendingConfirmations` 仅列出缺少原生提问服务时、属于这个确切会话的待确认项 `{ commandId, kind, en, zh, expiresAt }`，原生提问不在其中；不联网 |
 | POST | `/api/dsh-cliproxyapi/media/session/save` | `{ sessionId?, kind: "image" \| "video", ref }` | 为会话选择模型（`ref` 为 `账号id/模型id`，`null` 清除本会话的选择），并记为上一次选择；不在可选列表里的模型返回 400 `invalid-model`。也可以只传 `{ sessionId, videoConfirm?, imageConfirm?, videoBudget? }`（`ask` / `auto` / `inherit`，上限为 `{ mode: "limited", seconds }` / `{ mode: "unlimited" }` / `inherit`）修改本会话的 agent 生成设置 |
@@ -404,11 +415,12 @@ CPA 通过 `/v1/images/*` 和 `/v1/videos/*` 提供生图、生视频模型（�
   ```
 
   设置通过面板保存后立即应用。手动编辑此文件后需重载插件或重启 DSH 才会重新读取；文件损坏、结构 / 字段无效或无法读取时采用关闭自动联网检查的安全默认值。版本检查结果、候选版本、下载完成提示与命令只在内存中，插件重载后重新检查；下载包仍位于独立的 `updates` 子目录，由用户按需清理。
-- **生成设置**：独立保存在 `<Profile 目录>/.dsh-cliproxyapi/media-settings.json`，不改动 `state.json`。没有此文件时使用默认值；文件损坏时也使用默认值并在日志中提示，下次保存前会把损坏的文件另存为 `media-settings.corrupt-<时间>.json`。目前生效的是 `outputDir`（保存位置）、`lastSelection`（上一次选择的模型）以及每个账号的 `disabledModels`（关闭的生成模型）和 `kindOverrides`（手动指定的类型）；其余字段为后续生成功能预留，现在没有效果：
+- **生成设置**：独立保存在 `<Profile 目录>/.dsh-cliproxyapi/media-settings.json`，不改动 `state.json`。没有此文件时使用默认值（`enabled: false`，生成关闭；但已存在 `media-sessions.json` 或 `media-jobs.json` 时视为开启）；文件里没有 `enabled` 字段（总开关出现之前写入的文件）时视为开启。文件损坏时也使用默认值并在日志中提示，下次保存前会把损坏的文件另存为 `media-settings.corrupt-<时间>.json`。各字段：`enabled`（总开关）、`agentTool`（agent 生成工具）、`outputDir`（保存位置）、`defaultVideoSeconds` / `defaultVideoResolution`（视频默认值）、`imageConfirm` / `videoConfirm` / `videoBudget`（agent 生成的确认方式和秒数上限）、`lastSelection`（上一次选择的模型），以及每个账号的 `disabledModels`（关闭的生成模型）和 `kindOverrides`（手动指定的类型）：
 
   ```json
   {
     "version": 1,
+    "enabled": true,
     "agentTool": false,
     "outputDir": "generated",
     "defaultVideoSeconds": 6,
@@ -425,6 +437,7 @@ CPA 通过 `/v1/images/*` 和 `/v1/videos/*` 提供生图、生视频模型（�
 
 - **会话生成记录**：`<Profile 目录>/.dsh-cliproxyapi/media-sessions.json` 保存每个会话选择的生成模型、最近 48 次生成的记录（状态、模型、提示词、选项、起止时间、保存目录显示名、错误摘要），以及最近生成的最多 48 个文件路径和生成它们的命令 id（供对话里的命令行显示图片），只保留最近更新的 500 个会话。删除它只会清空这些选择和记录，不会删除已生成的文件。文件损坏时按空记录处理，下次写入前另存为 `media-sessions.corrupt-<时间>.json`。
 - **视频任务**：`<Profile 目录>/.dsh-cliproxyapi/media-jobs.json` 保存已提交的视频任务（CPA 请求 id、账号、模型、会话和命令 id、工作目录与保存位置、提示词、时长、提交时间、状态），用于重载或重启后继续等待；最多 200 个，已结束的保留 7 天。不含 Key 和视频地址。文件损坏时按空处理，下次写入前另存为 `media-jobs.corrupt-<时间>.json`。
+- **管理密钥失败次数**：`<Profile 目录>/.dsh-cliproxyapi/quota-state.json` 记录每个账号连续被 CPA 管理接口拒绝（401/403）的次数、最后的错误码和时间，用来在 3 次后停止自动查询；不含密钥。删除它只会清零计数。
 - **密钥**：通过 DSH 的 `credentials` 服务按引用名存取；凭证服务里没有时，回退读取同名环境变量。
 - **环境变量**：`CLIPROXYAPI_BASE_URL` 只用于服务地址留空的账号的自动发现。
 - **插件行配置**：`cordis.patch.yml` 中本插件行的 `config` 会在启动时叠加到状态文件上：包含 `accounts` 时替换账号列表，否则其中的字段作用于第一个账号。一般保持 `{}`，用设置面板配置即可。

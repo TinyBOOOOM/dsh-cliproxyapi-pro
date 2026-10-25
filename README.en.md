@@ -49,7 +49,7 @@ The plugin is published on npm as [`dsh-cliproxyapi-pro`](https://www.npmjs.com/
    dsh-cliproxyapi-pro
    ```
 
-   To pin a version, write `dsh-cliproxyapi-pro@1.8.0`.
+   To pin a version, write `dsh-cliproxyapi-pro@1.9.0`.
 4. Click **Install**. When it finishes, the dialog offers to enable the plugin right away — accept it.
 
 > If downloads are slow in mainland China, open **Registry** next to the input and choose **the mainland China mirror**.
@@ -78,7 +78,7 @@ In **Add plugin**, or as the `plugin_manager` `target`, you can also enter:
 
 | Source | What to enter |
 |---|---|
-| A released version | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v1.8.0` |
+| A released version | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v1.9.0` |
 | Latest development version | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#main` |
 | Offline package | Download [`dsh-cliproxyapi-pro.tgz`](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/releases/latest/download/dsh-cliproxyapi-pro.tgz) (always the latest release) and enter its absolute local path |
 | Local source (development) | Absolute path of a cloned repository; installed as a link, so code changes go live when the plugin reloads |
@@ -96,29 +96,37 @@ If CPA runs on this machine on the default port `8317` without a key, there is n
 
 ## Screenshots
 
-The panel follows the DSH display language; the screenshots show the Chinese UI. Images 1–5 are offline component renders: this plugin's real UI code with sample data (`example.com` addresses, fictional accounts) rendered in a browser, with colors approximating the DSH dark theme; the real colors follow your DSH theme. Image 6 is an actual capture of 1.6.0 in the DSH desktop app.
+The panel follows the DSH display language; the screenshots show the Chinese UI. Images 1–7 are offline component renders: this plugin's real UI code with sample data (`example.com` addresses, fictional accounts) rendered in a browser, with colors approximating the DSH dark theme; the real colors follow your DSH theme. Image 8 is an actual capture of 1.6.0 in the DSH desktop app.
 
-**1. Accounts and connection.** The **CLIProxyAPI** page in the Settings dialog's left navigation: one account bar for all tabs; under the account title are the connection state, address and model count, with the **Enabled** switch (applies at once) and the **⋯** menu (**Probe & Refresh**, **Delete Account**) on the right. The **Connection** tab has one row per setting, **Test Connection** next to the address (uses the values being edited, saves nothing), and secondary explanations in ⓘ tips.
+**1. Accounts and connection.** The **CLIProxyAPI** page in the Settings dialog's left navigation: one account bar for all four tabs (Connection / Models / Generation / Quota); under the account title are the connection state, address and model count, with the **Enabled** switch (applies at once) and the **⋯** menu (**Probe & Refresh**, **Delete Account**) on the right. The **Connection** tab has one row per setting, **Test Connection** next to the address (uses the values being edited, saves nothing), and secondary explanations in ⓘ tips.
 
 ![Account bar, account header and Connection tab (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/connection.png)
 
-**2. Models and one save bar.** The **Models** tab lists every model on that CPA: All / Checked / Unchecked, family filter, search, bulk actions and **Reset to Recommended**; checked models show the protocol they will use and can be edited with **Edit Parameters**. Connection and model edits are tracked together, and a bar at the bottom shows **Unsaved changes · Discard / Save & Apply**.
+**2. Models and one save bar.** The **Models** tab lists every chat model on that CPA: All / Checked / Unchecked, family filter, search, bulk actions and **Reset to Recommended**; checked models show the protocol they will use and can be edited with **Edit Parameters**. Connection and model edits are tracked together, and a bar at the bottom shows **Unsaved changes · Discard / Save & Apply**.
 
 ![Models tab with the save bar (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/model-filter.png)
 
-**3. Quota.** The **Quota** tab: management key, quota data and refresh, a distribution bar, credentials grouped by channel (plan, prefix, status, 5-hour / daily / weekly meters with reset times; Devin shows its daily / weekly quota, shared by every Devin model; channels without a quota endpoint show status and recent requests only), and an expandable "Model → Channel" table. The tab label shows the lowest remaining quota among the account's usable credentials.
+**3. Image and video generation.** The top of the **Generation** tab holds the master switch **Enable image and video generation** (for every account, off on a new installation; while off this page shows only the switch, and neither the composer's generation buttons nor the generation commands exist). Once on, it lists image and video models in groups, each with its own switch and kind; below are marking missed models, the save location, video defaults and the agent generation settings.
+
+![Generation tab: master switch, image / video models and generation settings (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/generation.png)
+
+**4. Quota.** The **Quota** tab: management key, quota data and refresh, a distribution bar, credentials grouped by channel (plan, prefix, status, 5-hour / daily / weekly meters with reset times; Devin shows its daily / weekly quota, shared by every Devin model; channels without a quota endpoint show status and recent requests only), and an expandable "Model → Channel" table. The tab label shows the lowest remaining quota among the account's usable credentials.
 
 ![Quota tab: distribution bar and per-channel credential quota (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/quota.png)
 
-**4. Quota in the composer.** The badge left of the model selector shows the best remaining quota among the usable credentials serving the current model; clicking it lists every such credential with its quota windows. It appears only for models this plugin synchronizes whose account has a management key.
+**5. A rejected management key.** After CPA rejects the key 3 times in a row (401/403), automatic checks stop so CPA does not ban this address; the page explains why and keeps the last data it read. Saving a new management key resumes them; a manual **Refresh Quota** tries only once.
+
+![Quota tab: automatic checks stopped after the management key was rejected 3 times in a row (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/quota-key-stopped.png)
+
+**6. Quota in the composer.** The badge left of the model selector shows the best remaining quota among the usable credentials serving the current model; clicking it lists every such credential with its quota windows. It appears only for models this plugin synchronizes whose account has a management key.
 
 ![Quota badge next to the model selector with its peek (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/quota-badge.png)
 
-**5. Adding an account.** Enter a name, address and API key and click **Connect**: it tests first and creates an enabled account only when that works; on failure the reason is shown and **Add Anyway (Disabled)** is offered.
+**7. Adding an account.** Enter a name, address and API key and click **Connect**: it tests first and creates an enabled account only when that works; on failure the reason is shown and **Add Anyway (Disabled)** is offered.
 
 ![Add account form (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/add-account.png)
 
-**6. The plugin update page under Built-in plugins** (actual 1.6.0 capture). **Settings** → **Built-in plugins** → the **CLIProxyAPI** tab holds only plugin updates: checking and offline download, **Update Now** once the DSH plugin market is detected, the update channel, the download region, and the automatic check / download / install switches. Here the plugin is already the latest Stable version, so **Update Now** is disabled.
+**8. The plugin update page under Built-in plugins** (actual 1.6.0 capture). **Settings** → **Built-in plugins** → the **CLIProxyAPI** tab holds only plugin updates: checking and offline download, **Update Now** once the DSH plugin market is detected, the update channel, the download region, and the automatic check / download / install switches. Here the plugin is already the latest Stable version, so **Update Now** is disabled.
 
 ![The CLIProxyAPI update page under Built-in plugins: version status, plugin-market update, channel, region and automatic switches](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/updates.png)
 
@@ -180,12 +188,13 @@ Each account's **Quota** tab (next to **Connection**, **Models** and **Generatio
 - **Composer badge**: a small badge left of the model selector (signal bars + percentage) shows the best remaining quota among the usable credentials serving the selected model; click it for every credential's windows. It appears only for models this plugin synchronizes whose account has a management key; without a key there is no badge. On the New Session page (before the composer takes over the session) the badge sits at the right end of the workspace row above the input box.
 - **Exact matching**: credentials are looked up only in the account the selected route belongs to (`cli-proxy*`, `cli-proxy-2*`, …); a prefixed model (such as `devin/claude-opus-5-5`) matches only credentials with that prefix; a bare id (such as `claude-opus-5-5`) prefers un-prefixed credentials, so the Claude and Devin channels never mix. Per-model-group windows (for example Antigravity) count only the group that fits the current model.
 - **Troubleshooting**: `/cpa-status` includes a quota summary: each account's key state, quota state, credential count, and which credentials each picker model maps to with its remaining quota (never the key).
-- **Refreshing**: results are cached on the Host for 5 minutes; stale accounts refresh in the background only while a page is asking, or on **Refresh Quota**. A rejected management key (401/403) pauses that account's automatic refresh until the key changes or you refresh manually, so CPA's bad-key protection is not triggered.
+- **Refreshing**: results are cached on the Host for 5 minutes; stale accounts refresh in the background only while a page is asking, or on **Refresh Quota**. When the management key is rejected (401/403), background checks continue at the 5-minute interval and stop for that account after 3 rejections in a row, so CPA's bad-key protection (a 30-minute ban after 5 bad keys from one address) is not triggered. The count is stored in `.dsh-cliproxyapi/quota-state.json` (never the key) and continues after a DSH restart; saving a new management key (also on the DSH credentials page), clearing the key or a successful check resets it. Once stopped, a manual refresh tries only once and stops again on another rejection. The Quota tab and the badge show how many times the key was rejected, or that checks have stopped.
 
 ### Image and video models (the "Generation" tab)
 
 CPA serves image and video generators (such as Grok Imagine) through `/v1/images/*` and `/v1/videos/*`. They cannot chat, so the plugin recognizes them and keeps them out of the chat model picker.
 
+- **Master switch**: **Enable image and video generation** at the top of the Generation tab applies to every account. While off, the composer shows no generation buttons, `/cpa-image`, `/cpa-video`, `/cpa-video-edit`, `/cpa-video-extend` and `/cpa-video-status` are not registered, the agent generation tool is not registered either, and the Generation tab shows only this switch; videos already submitted still finish, and past results in the chat stay viewable (without the edit / extend buttons). New installations start with it off; a profile that already has `media-settings.json` or has used generation keeps it on after the upgrade. Either way, media models never enter the chat model picker. Everything below needs it switched on.
 - **Recognition**, in order: a kind you set on the Generation tab; the catalog's `type` (`openai-image` is an image model) or output modalities (image-only output is an image model, video output a video model); the model families CPA routes to its image / video handlers, matched by prefix: ids starting with `grok-imagine-image` or `gpt-image-` are image models, ids starting with `grok-imagine-video` and `sora-2*` are video models. Everything else is a chat model (for example `gemini-3.1-flash-image`: CPA serves it only through chat, and DSH cannot show images returned in a chat reply). A media model that only the plain `/v1/models` listing carries is included too. A catalog may list variants CPA's generation endpoints do not accept yet (for example `grok-imagine-video-1.5-lite`); they cannot chat either, so they count as media models, and generating with one shows CPA's error.
 - **Not in the model picker**: media models are written to no chat route and take no part in the first-run recommendation; an older selection that names them does not synchronize them (the selection itself is kept). The Models tab lists chat models only.
 - **The Generation tab** (next to Connection / Models / Quota) lists "Image models" and "Video models"; changes are saved at once. A switch decides whether each model is offered for generation (models that appear later start switched on), and a kind menu changes it to image / video / chat; a kind you set can be reset to the detected one. A model detection missed can be marked under "Mark another model as a media model". Changing a kind re-synchronizes that account's routes immediately. `sora-2*` is labelled "→ grok-imagine-video": CPA rewrites it to the Grok video model.
@@ -259,7 +268,7 @@ Each time `/cpa-image`, `/cpa-video`, `/cpa-video-edit` or `/cpa-video-extend` r
 
 #### Letting the agent generate (`generate_media` tool, off by default)
 
-With **Let the agent generate images / videos** switched on in the Generation tab, the chat agent can call the `generate_media` tool to generate images and videos, or to edit and extend videos. While off (the default) the tool is not registered and takes no model context; when on, it is registered only while at least one generation model is enabled. Its definition is compact and lists no models.
+With **Let the agent generate images / videos** switched on in the Generation tab, the chat agent can call the `generate_media` tool to generate images and videos, or to edit and extend videos. While off (the default) the tool is not registered and takes no model context; when on, it is registered only while the **Enable image and video generation** master switch is on and at least one generation model is enabled. Its definition is compact and lists no models.
 
 - **What it does**: parameters `kind` (image / video) and `prompt`, optionally `mode` (generate / edit / extend), `model`, `images` (local image paths: for images, to edit or combine; for videos, 1 is the first frame and 2 or more are references), `frames` (first frame / references / first & last frame / last frame), `video` (the source of an edit / extension: a local MP4 path or a public link; without it, this session's newest generated video), `aspect`, `seconds`, `resolution`, `count`. Optional fields may be omitted or set to `null` (including on Responses strict-schema routes); video `count` should be `null`, as each call generates one video. An omitted, `null` or empty `model` uses this session's pick in the composer button (a sub-agent uses the pick of the session it belongs to). It works like the matching slash command, except that the prompt is **sent as written**: words like "10s" or "portrait" in it are not read as options and the chat model is not asked to interpret parameters. The tool description also tells the agent to use the user's own wording and level of detail, never expanding it into a longer scene description or adding camera, lighting, style, character or environment details the user did not ask for.
 - **Result**: files go to the save location; the tool returns their paths, the model and the actual parameters. For images, when the current chat model can see images, the generated images (downscaled by DSH) are handed to it as well. The chat renders one **independent generation row** from the recorded tool lifecycle, outside the thinking process, using the slash command's exchange layout (progress, images / a playable video, open / show in folder / copy, and **Edit video… / Extend video…** under a video). There is no need to expand thinking, no extra user command is fabricated, and tool cards or legacy mirrored command cards with a matching generation row do not repeat the result.
@@ -336,6 +345,8 @@ Apart from the generation tool `generate_media` (off by default, see above), thi
 - `/cpa-video-status` — list this session's video jobs.
 - `/cpa-video-edit [--video path | --url link | --from command-id] [-m model] change` / `/cpa-video-extend [same] [-s 2-10] what happens next` — edit / extend any MP4 (an attached video file works too). See [Editing and extending videos](#editing-and-extending-videos-cpa-video-edit-cpa-video-extend).
 
+`/cpa-image` and `/cpa-video*` exist only while **Enable image and video generation** is on in the Generation tab.
+
 ### HTTP API
 
 Used by the settings panel. Requires the DSH Web session's authentication; POST accepts only same-origin requests from loopback or trusted hosts.
@@ -356,7 +367,7 @@ Used by the settings panel. Requires the DSH Web session's authentication; POST 
 | POST | `/api/dsh-cliproxyapi/quota/refresh` | `{ accountId? }` | Start refreshing the quota of one or every account and return at once (`refreshing` is set in the snapshot) |
 | POST | `/api/dsh-cliproxyapi/quota/save` | `{ accountId, managementKey?, clear? }` | Store or clear the account's management key and start refreshing its quota; the response never contains the key |
 | GET | `/api/dsh-cliproxyapi/media/status` | — | `{ ok, media }`: generation settings and each account's recognized image / video models; no network access |
-| POST | `/api/dsh-cliproxyapi/media/save` | `{ account: { accountId, disabledModels?, kindOverrides? } }` | Save an account's switched-off media models (replaces the list) or kind overrides (merged per model; `null` restores detection); a kind change re-synchronizes that account and adds `status` to the response. Invalid values return 400 with a code such as `invalid-account` or `invalid-kind` |
+| POST | `/api/dsh-cliproxyapi/media/save` | `{ enabled? }`, global fields (such as `agentTool`, `outputDir`), or `{ account: { accountId, disabledModels?, kindOverrides? } }` | `enabled` switches generation on / off (registering or removing the generation commands and the agent tool at once); save an account's switched-off media models (replaces the list) or kind overrides (merged per model; `null` restores detection); a kind change re-synchronizes that account and adds `status` to the response. Invalid values return 400 with a code such as `invalid-enabled`, `invalid-account` or `invalid-kind` |
 | POST | `/api/dsh-cliproxyapi/media/diagnose` | `{ accountId }` | Read-only diagnostic (see above); returns `{ ok, diagnostic }` without the key |
 | GET | `/api/dsh-cliproxyapi/media/session?sessionId=` | — | `{ ok, session }`: the image / video models to choose from, the current pick and where it comes from (`session` / `last` / `only`), and this session's recent files (names and ids only, no paths); `pendingConfirmations` lists only compatibility requests owned by this exact session when the native question service is absent, as `{ commandId, kind, en, zh, expiresAt }`; native questions never appear in that list; no network access |
 | POST | `/api/dsh-cliproxyapi/media/session/save` | `{ sessionId?, kind: "image" \| "video", ref }` | Pick a session's model (`ref` is `accountId/modelId`; `null` clears the session's pick) and remember it as the last pick; a model that is not offered returns 400 `invalid-model`. Alternatively `{ sessionId, videoConfirm?, imageConfirm?, videoBudget? }` (`ask` / `auto` / `inherit`; the limit is `{ mode: "limited", seconds }` / `{ mode: "unlimited" }` / `inherit`) sets this session's agent-generation rules |
@@ -404,11 +415,12 @@ Failures use a top-level `errorCode` or `update.errorCode`; HTTP status or `ok` 
   ```
 
   Panel saves take effect immediately. After editing this file manually, reload the plugin or restart DSH to re-read it. Corrupt, structurally invalid, invalid-field or unreadable files use safe defaults with automatic network checks disabled. Check results, the candidate version, download notices and commands are in-memory only and reset on plugin reload; downloaded packages remain in the separate `updates` subdirectory for you to clean up when needed.
-- **Generation settings**: stored separately at `<profile dir>/.dsh-cliproxyapi/media-settings.json`; `state.json` is not changed. Without this file the defaults apply; a damaged file also falls back to the defaults with a log warning, and the next save first keeps the damaged file as `media-settings.corrupt-<time>.json`. Currently `outputDir` (save location), `lastSelection` (the last picked models) and each account's `disabledModels` (switched-off media models) and `kindOverrides` (kinds you set) take effect; the other fields are reserved for the generation features still to come and have no effect yet:
+- **Generation settings**: stored separately at `<profile dir>/.dsh-cliproxyapi/media-settings.json`; `state.json` is not changed. Without this file the defaults apply (`enabled: false`, generation off; but on when `media-sessions.json` or `media-jobs.json` exists); a file without the `enabled` field (written before the master switch existed) reads as on. A damaged file also falls back to the defaults with a log warning, and the next save first keeps the damaged file as `media-settings.corrupt-<time>.json`. The fields: `enabled` (master switch), `agentTool` (agent generation tool), `outputDir` (save location), `defaultVideoSeconds` / `defaultVideoResolution` (video defaults), `imageConfirm` / `videoConfirm` / `videoBudget` (agent confirmation and seconds limit), `lastSelection` (the last picked models), and each account's `disabledModels` (switched-off media models) and `kindOverrides` (kinds you set):
 
   ```json
   {
     "version": 1,
+    "enabled": true,
     "agentTool": false,
     "outputDir": "generated",
     "defaultVideoSeconds": 6,
@@ -425,6 +437,7 @@ Failures use a top-level `errorCode` or `update.errorCode`; HTTP status or `ok` 
 
 - **Per-session generation records**: `<profile dir>/.dsh-cliproxyapi/media-sessions.json` keeps each session's picked generation models, records of its last 48 runs (status, model, prompt, options, start and end times, a display name for the save folder, error summary), and the paths of its last 48 generated files with the command id that produced them (for the command rows in the conversation), for the 500 most recently updated sessions. Deleting it only clears those picks and records, never generated files. A damaged file is treated as empty and kept as `media-sessions.corrupt-<time>.json` before the next write.
 - **Video jobs**: `<profile dir>/.dsh-cliproxyapi/media-jobs.json` keeps submitted video jobs (CPA request id, account, model, session and command id, working directory and save location, prompt, length, submission time, state) so a reload or restart can keep waiting; at most 200, finished ones kept 7 days. No keys and no video URLs. A damaged file is treated as empty and kept as `media-jobs.corrupt-<time>.json` before the next write.
+- **Management key failures**: `<profile dir>/.dsh-cliproxyapi/quota-state.json` records, per account, how many times in a row the CPA management API rejected the key (401/403), the last error code and time, so automatic checks stop after 3; it never holds the key. Deleting it only resets the counts.
 - **Keys**: stored and resolved by ref through the DSH `credentials` service, falling back to an environment variable of the same name.
 - **Environment**: `CLIPROXYAPI_BASE_URL` is used only for auto-discovery of accounts without a base URL.
 - **Plugin row config**: the plugin row's `config` in `cordis.patch.yml` is overlaid on the state file at startup: `accounts` replaces the account list, other fields apply to the first account. Normally keep it `{}` and configure through the Settings panel.

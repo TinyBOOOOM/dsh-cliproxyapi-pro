@@ -4,6 +4,14 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.9.0 — 2026-10-25
+
+### Added
+- **A master switch for image and video generation.** The top of the Generation tab has **Enable image and video generation**, for every account. While off, the composer shows no generation buttons, `/cpa-image`, `/cpa-video`, `/cpa-video-edit`, `/cpa-video-extend` and `/cpa-video-status` are not registered, the agent tool `generate_media` is not registered either, and the Generation tab shows only this switch; videos already submitted still finish, and past results in the chat stay viewable (without the edit / extend buttons). New installations start with it off; a profile that already has `media-settings.json` (a missing field reads as on) or has used generation (`media-sessions.json` / `media-jobs.json` exist) keeps it on. It is stored as the new `enabled` field of `media-settings.json`.
+
+### Changed
+- **A rejected management key is retried automatically at most 3 times.** When the CPA management API answers a quota check with 401/403, background checks continue at the 5-minute cache interval and stop after 3 rejections in a row (CPA bans an address for 30 minutes after 5 bad keys). The count is stored in `.dsh-cliproxyapi/quota-state.json` (never the key) and continues across DSH restarts and plugin reloads. Saving a new management key (also on the DSH credentials page), clearing the key or a successful check resets it; once stopped, a manual refresh tries only once and stops again on another rejection. The Quota tab and the composer badge show "rejected n/3 times in a row" or that checks have stopped, and `/cpa-status` says so too. Earlier versions paused after the first rejection, for the current run only.
+
 ## 1.8.0 — 2026-10-22
 
 ### Added

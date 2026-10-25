@@ -41,7 +41,7 @@ export function clientHarness({ update = null, loading = true, withMarket = fals
     setTimeout(fn, ms) { const id = ++nextTimer; timers.set(id, { fn, ms }); return id; },
     clearTimeout(id) { timers.delete(id); },
   };
-  const source = readFileSync(new URL("../lib/client.js", import.meta.url), "utf8").replace("return module.exports;", "exports.__test = {API, PluginUpdatePanel, PluginUpdatePage, CpaSettingsPanel, CpaSectionPage, QuotaPanel, QuotaBadge, MediaPanel, MediaChip, ImageCommandCard, MediaToolRow, MediaCommandRow, MediaConfirmationDock, mediaConversationDefinition, MEDIA_NODE_KIND, hasMediaNode, toolRunId, apply, CSS, zh, en, createMarketUpdater, startAutoInstall, compareVersions, createQuotaStore, summarizeModelQuota, windowAppliesTo, credentialHeadroom, quotaLevel, quotaStats}; return module.exports;");
+  const source = readFileSync(new URL("../lib/client.js", import.meta.url), "utf8").replace("return module.exports;", "exports.__test = {API, PluginUpdatePanel, PluginUpdatePage, CpaSettingsPanel, CpaSectionPage, QuotaPanel, QuotaBadge, MediaPanel, MediaChip, ImageCommandCard, MediaToolRow, MediaCommandRow, MediaConfirmationDock, mediaConversationDefinition, MEDIA_NODE_KIND, hasMediaNode, toolRunId, apply, CSS, zh, en, createMarketUpdater, startAutoInstall, compareVersions, createQuotaStore, summarizeModelQuota, windowAppliesTo, credentialHeadroom, quotaLevel, quotaStats, quotaErrorText}; return module.exports;");
   vm.runInNewContext(source, context, { filename: "client.js" });
   // One shared market client per harness, using the fake fetch and timers.
   const market = withMarket ? exports.__test.createMarketUpdater() : null;
