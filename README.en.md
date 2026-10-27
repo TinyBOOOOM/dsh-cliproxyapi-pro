@@ -14,13 +14,13 @@ Enter a server URL and an API key, and the plugin reads the CPA model catalog an
 - **Works out of the box**: on the first connection, the newest model of each family in that server's own catalog is checked (at most 12), so the picker isn't flooded with hundreds of models. [Details](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/en/accounts-and-models.md)
 - **Native protocols**: Claude over Anthropic Messages, GPT / Codex / Grok over OpenAI Responses, everything else over OpenAI Chat — fewer protocol translations inside CPA. [Details](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/en/accounts-and-models.md)
 - **Visual management**: check models and edit per-model parameters in the settings panel. By default the plugin registers no agent tool, so it takes no model context (the optional generation tool `generate_media` is switched on in the Generation tab). [Details](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/en/accounts-and-models.md)
+- **Channel quota**: see each channel's remaining quota per credential, with a badge for the current model in the composer; failed queries pause automatic refresh. [Details](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/en/quota.md)
+- **Images and videos**: generate and edit images, and generate, edit and extend videos through CPA; the optional agent generation tool is off by default. [Details](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/en/media.md)
 - **Plugin updates**: automatically check Stable / Beta / Dev channels and choose global / Mainland China sources. With the [DSH plugin market (dshmarket)](https://github.com/dsh-market/dsh-market) installed, new versions install in one click or automatically; otherwise download a verified offline package and upgrade with DSH closed. [Details](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/en/updates.md)
 - **Secure**: API keys live only in the DSH credentials service, never in configuration files. [Details](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/en/storage-and-config.md)
 - **Zero dependencies**: no npm dependencies and nothing built at install time; installs in seconds. [Details](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/en/development.md)
 
 Works with DSH `0.2.0-rc.1` and later (desktop and web).
-- **Channel quota**: [Quota tab, composer badge and failure protection](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/en/quota.md).
-- **Images / videos**: [Generation, image editing, video edit / extend and optional agent tool](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/en/media.md).
 
 ## Installation
 
@@ -109,7 +109,7 @@ The panel follows the DSH display language; the screenshots show the Chinese UI.
 
 ![The CLIProxyAPI update page under Built-in plugins: version status, plugin-market update, channel, region and automatic switches](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/updates.png)
 
-## Contents
+## Documentation
 
 - [Accounts and models](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/en/accounts-and-models.md)
 - [Channel quota](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/en/quota.md)

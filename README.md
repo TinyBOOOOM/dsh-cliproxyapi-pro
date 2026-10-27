@@ -14,13 +14,13 @@
 - **开箱即用**：首次连接时按该服务自己的模型目录，为每个模型家族勾选最新的一个（最多 12 个），模型选择器不会被上百个模型淹没。 [详解](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/zh/accounts-and-models.md)
 - **原生协议**：Claude 走 Anthropic Messages，GPT / Codex / Grok 走 OpenAI Responses，其余走 OpenAI Chat，减少 CPA 的协议转换。 [详解](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/zh/accounts-and-models.md)
 - **可视化管理**：设置面板里勾选模型、编辑单个模型的参数。默认不注册 Agent 工具，不占用模型上下文（可选的生成工具 `generate_media` 需在「生成」标签手动打开）。 [详解](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/zh/accounts-and-models.md)
+- **渠道额度**：按凭证查看各渠道的剩余额度，对话框里的徽标显示当前模型的额度；查询失败会暂停自动刷新。 [详解](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/zh/quota.md)
+- **生图 / 生视频**：通过 CPA 生成和编辑图片，生成、编辑和延长视频；可选的 agent 生成工具默认关闭。 [详解](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/zh/media.md)
 - **插件更新**：自动检查稳定 / Beta / 开发通道，可选择全球 / 中国大陆下载源；装有 [DSH 插件市场（dshmarket）](https://github.com/dsh-market/dsh-market) 时可一键或自动安装新版本，否则下载校验离线包，在关闭 DSH 后手动升级。 [详解](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/zh/updates.md)
 - **安全**：API Key 只保存在 DSH 凭证服务里，不写入任何配置文件。 [详解](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/zh/storage-and-config.md)
 - **零依赖**：不依赖任何 npm 包，安装时无需构建，安装几秒完成。 [详解](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/zh/development.md)
 
 适用于 DSH `0.2.0-rc.1` 及以上版本（含桌面版与 Web 版）。
-- **渠道额度**：[额度页、对话框徽标与失败保护](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/zh/quota.md)。
-- **生图 / 生视频**：[生成、改图、视频编辑 / 延长与可选 agent 工具](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/zh/media.md)。
 
 ## 安装
 
@@ -109,7 +109,7 @@ CPA 就在本机默认端口 `8317` 且没有设置密钥时，什么都不用�
 
 ![内置插件中的 CLIProxyAPI 更新页：版本状态、插件市场更新、通道、区域与自动开关](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/updates.png)
 
-## 目录
+## 文档
 
 - [账号与模型](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/zh/accounts-and-models.md)
 - [渠道额度](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/zh/quota.md)
