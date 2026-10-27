@@ -180,7 +180,8 @@ CPA 对每个模型同时提供 OpenAI Chat、OpenAI Responses、Anthropic Messa
 - **对话框徽标**：模型选择器左侧的小徽标（信号格 + 百分比）显示当前所选模型可用凭证中最充足的剩余额度，点击可查看每个凭证的额度。只对本插件同步、且所属账号已填写管理密钥的模型显示；没有管理密钥时不显示徽标。在新建对话页（输入栏尚未接管会话时），徽标显示在输入框上方工作区一行的右侧。
 - **精确匹配**：只在所选模型所属的账号（按路由 `cli-proxy*`、`cli-proxy-2*`…）里找凭证；带前缀的模型（如 `devin/claude-opus-5-5`）只匹配该前缀的凭证；不带前缀的同名模型（如 `claude-opus-5-5`）优先匹配不带前缀的凭证，Claude 渠道与 Devin 渠道不会混用。Antigravity 等按模型分组的额度窗口只取与当前模型相符的那一组。
 - **排查**：`/cpa-status` 会附带额度摘要：每个账号的管理密钥状态、额度状态、凭证数，以及模型选择器中每个模型匹配到的凭证和剩余额度（不输出密钥）。
-- **刷新**：结果在宿主端缓存 5 分钟；有页面在看时才在后台刷新过期账号，也可手动「刷新额度」。管理密钥被拒（401/403）后暂停该账号的自动刷新，直到更新密钥或手动刷新，避免触发 CPA 的错误密钥封禁。
+- **刷新与失败保护**：结果在宿主端缓存 30 分钟；有页面查询状态时才在后台刷新过期账号，也可手动「刷新额度」。账号级查询失败（包括网络错误、超时、HTTP 错误和无效响应）即暂停该账号的自动查询；单个凭证的额度探测失败则暂停该凭证，其他正常凭证仍按间隔更新。暂停后不再定时重试；在该账号点「刷新额度」或保存管理密钥可重试，仍失败会再次暂停。「刷新全部」不会恢复已暂停的账号或凭证。暂停状态保存在宿主内存中，刷新网页、切换模型不会清除，重载插件或重启宿主会重置。手动刷新不受 30 分钟缓存限制，但同一账号正在执行的请求会合并，避免并发重复查询；不要反复手动刷新。
+- **页面轮询**：页面平时每 60 秒读取宿主状态，后台查询进行中每 4 秒读取；状态接口失败后改为 60 / 120 / 240 / 300 秒退避（最多 5 分钟），成功后恢复。读取状态不等于每次都查询上游，失败凭证仍保持暂停。
 
 ### 生图 / 生视频模型（「生成」标签页）
 
@@ -352,8 +353,8 @@ CPA 通过 `/v1/images/*` 和 `/v1/videos/*` 提供生图、生视频模型（�
 | POST | `/api/dsh-cliproxyapi/updates/check` | `{}` | 主动检查所选通道与区域；手动检查不触发自动下载 |
 | POST | `/api/dsh-cliproxyapi/updates/save` | `{ autoCheck?, autoDownload?, autoInstall?, channel?, region? }` | 只保存这五项更新设置，与账号配置独立 |
 | POST | `/api/dsh-cliproxyapi/updates/download` | `{ version }` | 下载最近一次检查确认的新版本，完成校验后保存离线包；不安装 |
-| GET | `/api/dsh-cliproxyapi/quota/status` | — | `{ ok, quota }`：缓存的额度快照；过期账号在后台刷新 |
-| POST | `/api/dsh-cliproxyapi/quota/refresh` | `{ accountId? }` | 开始刷新一个或全部账号的额度并立即返回（快照中 `refreshing` 为真） |
+| GET | `/api/dsh-cliproxyapi/quota/status` | — | `{ ok, quota }`：缓存的额度快照；仅未暂停的过期账号 / 凭证在后台刷新；账号与凭证的 `autoRefreshPaused` 表示失败暂停 |
+| POST | `/api/dsh-cliproxyapi/quota/refresh` | `{ accountId? }` | 开始刷新并立即返回；指定账号会重试其暂停查询，未指定时跳过暂停项；正在刷新时 `refreshing` 为真 |
 | POST | `/api/dsh-cliproxyapi/quota/save` | `{ accountId, managementKey?, clear? }` | 保存或清除该账号的管理密钥，并开始刷新额度；响应不含密钥 |
 | GET | `/api/dsh-cliproxyapi/media/status` | — | `{ ok, media }`：生成设置与每个账号识别出的生图 / 生视频模型；不联网 |
 | POST | `/api/dsh-cliproxyapi/media/save` | `{ account: { accountId, disabledModels?, kindOverrides? } }` | 保存某账号关闭的生成模型（整表替换）或类型覆盖（按模型合并，`null` 表示恢复自动识别）；类型变化时重新同步该账号并在响应中附带 `status`。无效值返回 400 和错误码，如 `invalid-account`、`invalid-kind` |

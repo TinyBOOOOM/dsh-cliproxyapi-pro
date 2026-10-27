@@ -591,6 +591,179 @@ describe("quota client", () => {
     assert.ok(content(h.QuotaBadge({ t, directory, store, sessionId: "s2", placement: "hero", presence })).includes("90%"), "other sessions unaffected");
   });
 
+  it("explains the 30-minute policy and account/credential pauses in both languages", () => {
+    for (const language of ["zh", "en"]) {
+      const h = clientHarness();
+      const t = (key) => h[language][key] ?? key;
+      const data = structuredClone(quotaData);
+      const account = data.accounts[0];
+      account.state = "error";
+      account.errorCode = "network";
+      account.error = "PRIVATE UPSTREAM ERROR";
+      account.autoRefreshPaused = true;
+      const cred = account.credentials[0];
+      cred.quotaState = "error";
+      cred.autoRefreshPaused = true;
+      cred.error = "PRIVATE CREDENTIAL ERROR";
+      const store = { getSnapshot: () => ({ data, loading: false, error: null, busy: null }) };
+      const tree = h.QuotaPanel({ t, store, accountId: "default" });
+      const status = nodes(tree, (n) => n.props.className === "dcpa-q-sub");
+      assert.ok(status.some((n) => content(n).includes(t("qAccountPaused"))));
+      assert.ok(content(tree).includes(t("qErrNetwork")), "account error stays localized");
+      assert.ok(!content(tree).includes(account.error));
+      assert.equal(button(tree, t("qRefresh")).props.disabled, false, "manual retry remains available");
+      assert.ok(nodes(tree, (n) => n.props.text === t("qRefreshPolicy")).length > 0);
+      assert.match(t("qRefreshPolicy"), /30/);
+      assert.match(t("qRefreshPolicy"), language === "zh" ? /插件内存.*插件重启.*刷新页面不会清除/ : /plugin memory.*plugin restart.*reloading the page does not clear/);
+      const row = nodes(tree, (n) => n.props.cred?.id === cred.id)[0];
+      const renderedRow = row.type(row.props);
+      const meters = nodes(renderedRow, (n) => n.props.cred?.id === cred.id)[0];
+      for (const windows of [cred.windows, []]) {
+        const rendered = meters.type({ ...meters.props, windows });
+        assert.ok(content(rendered).includes(t("qQuotaError")));
+        assert.ok(content(rendered).includes(t("qCredentialPaused")), "pause remains visible even with cached windows");
+        assert.ok(!content(rendered).includes(cred.error));
+      }
+      const healthy = meters.type({ ...meters.props, cred: account.credentials[1], windows: account.credentials[1].windows });
+      assert.ok(!content(healthy).includes(t("qCredentialPaused")), "healthy sibling is not labeled paused");
+      account.autoRefreshPaused = false;
+      assert.ok(!content(h.QuotaPanel({ t, store, accountId: "default" })).includes(t("qAccountPaused")), "credential failure does not label whole account paused");
+    }
+  });
+
+  function pollingStore(fetch) {
+    const timers = new Map();
+    let id = 0;
+    const store = clientHarness().createQuotaStore({
+      fetch,
+      setTimeout: (fn, ms) => { timers.set(++id, { fn, ms }); return id; },
+      clearTimeout: (key) => timers.delete(key),
+    });
+    return {
+      store, timers,
+      delay() { assert.equal(timers.size, 1); return [...timers.values()][0].ms; },
+      async poll() {
+        assert.equal(timers.size, 1);
+        const [key, timer] = [...timers][0];
+        timers.delete(key);
+        timer.fn();
+        await flushClient();
+      },
+    };
+  }
+
+  it("backs off repeated failed status reads despite stale refreshing and resets after recovery", async () => {
+    let mode = "busy";
+    const busyData = { ...quotaData, refreshing: true };
+    const p = pollingStore(async () => {
+      if (mode === "error") throw new Error("offline");
+      return new Response(JSON.stringify({ ok: true, quota: mode === "busy" ? busyData : quotaData }));
+    });
+    const off = p.store.subscribe(() => {});
+    await flushClient();
+    assert.equal(p.delay(), 4000);
+    mode = "error";
+    for (const expected of [60000, 120000, 240000, 300000, 300000]) {
+      await p.poll();
+      assert.equal(p.delay(), expected);
+      assert.equal(p.store.getSnapshot().data.refreshing, true, "cached busy data is retained");
+      assert.equal(p.store.getSnapshot().loading, false);
+      assert.match(p.store.getSnapshot().error, /offline/);
+    }
+    mode = "busy";
+    await p.poll();
+    assert.equal(p.delay(), 4000, "successful GET restores busy polling");
+    assert.equal(p.store.getSnapshot().error, null);
+    mode = "error";
+    await p.poll();
+    assert.equal(p.delay(), 60000, "new failure sequence starts at 60 seconds");
+    mode = "idle";
+    await p.poll();
+    assert.equal(p.delay(), 60000, "successful idle snapshot restores normal polling");
+    mode = "error";
+    await p.poll();
+    assert.equal(p.delay(), 60000);
+    await p.poll();
+    assert.equal(p.delay(), 120000);
+    off();
+    assert.equal(p.timers.size, 0, "unsubscribe clears backoff timer");
+    p.store.dispose();
+  });
+
+  it("resets backoff on successful quota mutations but not failed mutations", async () => {
+    for (const action of ["refresh", "saveKey", "clearKey"]) {
+      let failMutation = true;
+      const p = pollingStore(async (_url, init) => {
+        if (init.method !== "POST" || failMutation) throw new Error("offline");
+        return new Response(JSON.stringify({ ok: true, quota: { ...quotaData, refreshing: true } }));
+      });
+      p.store.subscribe(() => {});
+      await flushClient();
+      assert.equal(p.delay(), 60000, "initial GET failure starts backoff without cached data");
+      await p.poll();
+      assert.equal(p.delay(), 120000);
+      assert.equal((await p.store[action]("default", "test-key")).ok, false);
+      assert.equal(p.delay(), 120000, "failed mutation does not reset status retry delay");
+      await p.poll();
+      assert.equal(p.delay(), 240000);
+      failMutation = false;
+      assert.equal((await p.store[action]("default", "test-key")).ok, true);
+      assert.equal(p.delay(), 4000, `${action} success restores busy polling`);
+      assert.equal(p.store.getSnapshot().error, null);
+      await p.poll();
+      assert.equal(p.delay(), 60000, "first GET failure after mutation restarts backoff");
+      p.store.dispose();
+      assert.equal(p.timers.size, 0);
+    }
+  });
+
+  it("ignores an older failed GET after a successful mutation", async () => {
+    let rejectGet;
+    const p = pollingStore(async (_url, init) => {
+      if (init.method !== "POST") return new Promise((_resolve, reject) => { rejectGet = reject; });
+      return new Response(JSON.stringify({ ok: true, quota: { ...quotaData, refreshing: true } }));
+    });
+    p.store.subscribe(() => {});
+    await p.store.refresh("default");
+    assert.equal(p.delay(), 4000);
+    rejectGet(new Error("outdated failure"));
+    await flushClient();
+    assert.equal(p.delay(), 4000);
+    assert.equal(p.store.getSnapshot().error, null);
+    assert.equal(p.store.getSnapshot().loading, false);
+    p.store.dispose();
+  });
+
+  it("aborts an in-flight retry on disposal without rearming timers or notifying subscribers", async () => {
+    let pending = false, finish, signal, requests = 0, notifications = 0;
+    const p = pollingStore(async (_url, init) => {
+      requests++;
+      if (!pending) throw new Error("offline");
+      signal = init.signal;
+      return new Promise((resolve) => { finish = resolve; });
+    });
+    p.store.subscribe(() => { notifications++; });
+    await flushClient();
+    await p.poll();
+    assert.equal(p.delay(), 120000);
+    pending = true;
+    await p.poll();
+    assert.equal(p.timers.size, 0, "request is pending");
+    const snapshot = p.store.getSnapshot(), before = notifications;
+    p.store.dispose();
+    assert.equal(signal.aborted, true);
+    finish(new Response(JSON.stringify({ ok: true, quota: { ...quotaData, refreshing: true } })));
+    await flushClient();
+    assert.equal(notifications, before);
+    assert.equal(p.store.getSnapshot(), snapshot, "late response does not publish after disposal");
+    assert.equal(p.timers.size, 0);
+    p.store.subscribe(() => { notifications++; });
+    await p.store.load();
+    await p.store.refresh("default");
+    assert.equal(requests, 3, "disposed store cannot start new requests");
+    assert.equal(notifications, before);
+  });
+
   it("polls only while subscribed and disposes cleanly", async () => {
     const timers = new Map(); let id = 0; const calls = [];
     const h = clientHarness();

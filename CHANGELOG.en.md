@@ -4,6 +4,12 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixed
+- **Failed quota queries no longer retry automatically forever.** Automatic refresh caching increases from 5 to 30 minutes. An account-level failure pauses that account; a failed credential quota probe pauses only that credential while healthy credentials keep updating. Only an account-specific manual refresh or saving its management key retries paused queries; another failure pauses them again, and refresh-all does not recover them. The UI explains the pause and recovery steps. Pauses live in Host memory, survive a page reload, and reset on plugin reload or Host restart.
+- **Failed quota status requests slow down page polling.** Even when the last snapshot still says “refreshing”, failures back off to 60 / 120 / 240 / 300 seconds instead of polling every 4 seconds indefinitely. A successful status read or mutation restores normal polling.
+
 ## 1.8.0 — 2026-10-22
 
 ### Added
