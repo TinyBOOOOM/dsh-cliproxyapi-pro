@@ -11,7 +11,7 @@ import {
   UpdateError, compareUpdateVersions, createPluginUpdater, loadUpdateSettings,
   normalizeUpdateSettings, packageFilePatterns, parseUpdateVersion, saveUpdateSettings, storeUpdatePackage,
   validateUpdateMetadata, verifyUpdatePackage,
-} from "../lib/updater.js";
+} from "../lib/updater/index.js";
 
 // Any accidental fallback is a fake too: this suite never contacts the network.
 let originalFetch;
