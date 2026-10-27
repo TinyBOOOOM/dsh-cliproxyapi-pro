@@ -2,27 +2,9 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  normalizeCpaRoot,
-  discoveryCandidates,
-  parseCatalog,
-  filterModels,
-  sortModelsNewestFirst,
-  buildPiAiRoutes,
-  resolveConfig,
-  applyModelOverride,
-  nativeProtocol,
-  CpaRuntime,
-  normalizeState,
-  mergeHostConfig,
-  newAccountDefaults,
-  accountConflicts,
-  createCpaController,
-  recommendModels,
-  apply,
-} from "../../lib/index.js";
-import { videoImageBudget } from "../../lib/media.js";
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { apply } from "../../lib/index.js";
+
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { json, fakeServers, MEDIA_SERVERS } from "../helpers/host-catalog.mjs";
