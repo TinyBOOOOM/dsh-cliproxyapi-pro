@@ -1,9 +1,9 @@
-// Registers provider protocol, concurrency, and response-bound cases in the controller suite.
+// Quota controller provider protocol, concurrency and response-bound cases.
 import assert from "node:assert/strict";
-import { it } from "node:test";
-import { json, apiOk, harness, scenarioHandler, credentialById } from "./quota-harness.mjs";
+import { describe, it } from "node:test";
+import { json, apiOk, harness, scenarioHandler, credentialById } from "../helpers/quota-harness.mjs";
 
-export function registerProviderCases() {
+describe("quota controller", () => {
   it("bounds concurrent credential work", async () => {
     let active = 0;
     let peak = 0;
@@ -150,4 +150,4 @@ export function registerProviderCases() {
     const snap = await h.controller.refresh("default");
     assert.equal(snap.accounts[0].errorCode, "invalid-response");
   });
-}
+});

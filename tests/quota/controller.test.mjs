@@ -3,8 +3,6 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { QUOTA_TTL_MS, matchCredentials } from "../../lib/quota/index.js";
 import { FAKE_KEY, UPSTREAM_TOKEN, START, json, apiOk, harness, scenarioHandler, credentialById } from "../helpers/quota-harness.mjs";
-import { registerPolicyCases } from "../helpers/quota-policy-cases.mjs";
-import { registerProviderCases } from "../helpers/quota-provider-cases.mjs";
 
 describe("quota controller", () => {
   it("reports nokey without any fetch", async () => {
@@ -247,8 +245,6 @@ describe("quota controller", () => {
     assert.equal(QUOTA_TTL_MS, 30 * 60 * 1000);
   });
 
-  registerPolicyCases();
-
   it("refreshes in the background from snapshot only when stale", async () => {
     const h = harness({ handler: scenarioHandler() });
     let snap = await h.controller.snapshot();
@@ -332,6 +328,4 @@ describe("quota controller", () => {
     await new Promise((r) => setImmediate(r));
     assert.equal(h.calls.length, count);
   });
-
-  registerProviderCases();
 });

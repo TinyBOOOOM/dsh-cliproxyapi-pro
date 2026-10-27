@@ -1,10 +1,10 @@
-// Registers quota pause, recovery, and refresh scheduling cases in the controller suite.
+// Quota controller pause, recovery and refresh scheduling cases.
 import assert from "node:assert/strict";
-import { it } from "node:test";
+import { describe, it } from "node:test";
 import { QUOTA_TTL_MS } from "../../lib/quota/index.js";
-import { FAKE_KEY, json, harness, AUTH_FILES, scenarioHandler, credentialById } from "./quota-harness.mjs";
+import { FAKE_KEY, json, harness, AUTH_FILES, scenarioHandler, credentialById } from "../helpers/quota-harness.mjs";
 
-export function registerPolicyCases() {
+describe("quota controller", () => {
   for (const [label, handler, code] of [
     ["network", () => { throw new TypeError("offline"); }, "network"],
     ["server", () => json(503, {}), "http"],
@@ -176,4 +176,4 @@ export function registerPolicyCases() {
     assert.equal(h.calls.length, 1);
     h.controller.dispose();
   });
-}
+});
