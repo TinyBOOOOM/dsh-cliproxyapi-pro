@@ -36,7 +36,7 @@
   ```
 
   设置通过面板保存后立即应用。手动编辑此文件后需重载插件或重启 DSH 才会重新读取；文件损坏、结构 / 字段无效或无法读取时采用关闭自动联网检查的安全默认值。版本检查结果、候选版本、下载完成提示与命令只在内存中，插件重载后重新检查；下载包仍位于独立的 `updates` 子目录，由用户按需清理。
-- **生成设置**：独立保存在 `<Profile 目录>/.dsh-cliproxyapi/media-settings.json`，不改动 `state.json`。没有此文件时使用默认值；文件损坏时也使用默认值并在日志中提示，下次保存前会把损坏的文件另存为 `media-settings.corrupt-<时间>.json`。目前生效的是 `outputDir`（保存位置）、`lastSelection`（上一次选择的模型）以及每个账号的 `disabledModels`（关闭的生成模型）和 `kindOverrides`（手动指定的类型）；其余字段为后续生成功能预留，现在没有效果：
+- **生成设置**：独立保存在 `<Profile 目录>/.dsh-cliproxyapi/media-settings.json`，不改动 `state.json`。没有此文件时使用默认值；文件损坏时也使用默认值并在日志中提示，下次保存前会把损坏的文件另存为 `media-settings.corrupt-<时间>.json`。各字段都有作用：`outputDir`（保存位置）、`lastSelection`（上一次选择的模型）、`defaultVideoSeconds` / `defaultVideoResolution`（`/cpa-video` 未指定 `-s` / `-r` 时的默认值）、`agentTool`、`imageConfirm`、`videoConfirm`、`videoBudget`（agent 生成工具的开关、确认方式与秒数上限），以及每个账号的 `disabledModels`（关闭的生成模型）和 `kindOverrides`（手动指定的类型）：
 
   ```json
   {
