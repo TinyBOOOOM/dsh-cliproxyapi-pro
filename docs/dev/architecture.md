@@ -15,7 +15,7 @@
 | Bundle patch | `cordis.patch.yml` — inserts row `dsh-cliproxyapi-pro` |
 | Display metadata | `locale/en.json`, `locale/zh.json` (`meta.title`, `meta.description`), `icon.svg` |
 | Agent tool | `generate_media` only, **off by default** (Generation tab switch); registered only while switched on and a generation model is offered (see the invariant below) |
-| Slash commands | `/cpa-status`, `/cpa-refresh`, `/cpa-image` (image generation; accepts image attachments), `/cpa-video` (video generation; images = first frame / references / pinned first-last frames), `/cpa-video-edit`, `/cpa-video-extend`, `/cpa-video-status` |
+| Slash commands | `/cpa-status`, `/cpa-refresh`; only while the Generation master switch is on: `/cpa-image` (image generation; accepts image attachments), `/cpa-video` (video generation; images = first frame / references / pinned first-last frames), `/cpa-video-edit`, `/cpa-video-extend`, `/cpa-video-status` |
 | Account HTTP routes | `/api/dsh-cliproxyapi/{status,refresh,save,accounts/add,accounts/remove,accounts/test}` |
 | Update HTTP routes | `/api/dsh-cliproxyapi/updates/{status,check,save,download}` |
 | Tests (`node:test`) | `tests/<area>/*.test.mjs` (host, media, quota, updater, client); shared fixtures in `tests/helpers/` |

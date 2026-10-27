@@ -290,6 +290,21 @@ describe("quota client", () => {
     assert.equal(notifications, before);
   });
 
+  it("explains rejected management keys with the count and when checks stopped", () => {
+    const h = clientHarness();
+    for (const language of ["zh", "en"]) {
+      const t = (key) => h[language][key] ?? key;
+      const plain = h.quotaErrorText(t, { errorCode: "unauthorized", errorStatus: 401 });
+      assert.equal(plain, h[language].qErrUnauthorized);
+      const retrying = h.quotaErrorText(t, { errorCode: "unauthorized", errorStatus: 401, authFailures: 2, authFailureLimit: 3, authPaused: false });
+      assert.ok(retrying.includes(h[language].qAuthRetrying.replaceAll("{n}", "2").replaceAll("{max}", "3")));
+      const paused = h.quotaErrorText(t, { errorCode: "forbidden", errorStatus: 403, authFailures: 3, authFailureLimit: 3, authPaused: true });
+      assert.ok(paused.startsWith(h[language].qErrForbidden));
+      assert.ok(paused.includes(h[language].qAuthPaused.replaceAll("{n}", "3")));
+      assert.equal(h.quotaErrorText(t, { errorCode: "network", authFailures: 2 }), h[language].qErrNetwork, "only key rejections carry the count");
+    }
+  });
+
   it("polls only while subscribed and disposes cleanly", async () => {
     const timers = new Map(); let id = 0; const calls = [];
     const h = clientHarness();

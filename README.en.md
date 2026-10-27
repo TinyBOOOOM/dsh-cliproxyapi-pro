@@ -36,7 +36,7 @@ The plugin is published on npm as [`dsh-cliproxyapi-pro`](https://www.npmjs.com/
    dsh-cliproxyapi-pro
    ```
 
-   To pin a version, write `dsh-cliproxyapi-pro@1.8.0`.
+   To pin a version, write `dsh-cliproxyapi-pro@1.9.0`.
 4. Click **Install**. When it finishes, the dialog offers to enable the plugin right away — accept it.
 
 > If downloads are slow in mainland China, open **Registry** next to the input and choose **the mainland China mirror**.
@@ -65,7 +65,7 @@ In **Add plugin**, or as the `plugin_manager` `target`, you can also enter:
 
 | Source | What to enter |
 |---|---|
-| A released version | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v1.8.0` |
+| A released version | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v1.9.0` |
 | Latest development version | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#main` |
 | Offline package | Download [`dsh-cliproxyapi-pro.tgz`](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/releases/latest/download/dsh-cliproxyapi-pro.tgz) (always the latest release) and enter its absolute local path |
 | Local source (development) | Absolute path of a cloned repository; installed as a link, so code changes go live when the plugin reloads |
@@ -83,29 +83,37 @@ If CPA runs on this machine on the default port `8317` without a key, there is n
 
 ## Screenshots
 
-The panel follows the DSH display language; the screenshots show the Chinese UI. Images 1–5 are offline component renders: this plugin's real UI code with sample data (`example.com` addresses, fictional accounts) rendered in a browser, with colors approximating the DSH dark theme; the real colors follow your DSH theme. Image 6 is an actual capture of 1.6.0 in the DSH desktop app.
+The panel follows the DSH display language; the screenshots show the Chinese UI. Images 1–7 are offline component renders: this plugin's real UI code with sample data (`example.com` addresses, fictional accounts) rendered in a browser, with colors approximating the DSH dark theme; the real colors follow your DSH theme. Image 8 is an actual capture of 1.6.0 in the DSH desktop app.
 
-**1. Accounts and connection.** The **CLIProxyAPI** page in the Settings dialog's left navigation: one account bar for all tabs; under the account title are the connection state, address and model count, with the **Enabled** switch (applies at once) and the **⋯** menu (**Probe & Refresh**, **Delete Account**) on the right. The **Connection** tab has one row per setting, **Test Connection** next to the address (uses the values being edited, saves nothing), and secondary explanations in ⓘ tips.
+**1. Accounts and connection.** The **CLIProxyAPI** page in the Settings dialog's left navigation: one account bar for all four tabs (Connection / Models / Generation / Quota); under the account title are the connection state, address and model count, with the **Enabled** switch (applies at once) and the **⋯** menu (**Probe & Refresh**, **Delete Account**) on the right. The **Connection** tab has one row per setting, **Test Connection** next to the address (uses the values being edited, saves nothing), and secondary explanations in ⓘ tips.
 
 ![Account bar, account header and Connection tab (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/connection.png)
 
-**2. Models and one save bar.** The **Models** tab lists every model on that CPA: All / Checked / Unchecked, family filter, search, bulk actions and **Reset to Recommended**; checked models show the protocol they will use and can be edited with **Edit Parameters**. Connection and model edits are tracked together, and a bar at the bottom shows **Unsaved changes · Discard / Save & Apply**.
+**2. Models and one save bar.** The **Models** tab lists every chat model on that CPA: All / Checked / Unchecked, family filter, search, bulk actions and **Reset to Recommended**; checked models show the protocol they will use and can be edited with **Edit Parameters**. Connection and model edits are tracked together, and a bar at the bottom shows **Unsaved changes · Discard / Save & Apply**.
 
 ![Models tab with the save bar (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/model-filter.png)
 
-**3. Quota.** The **Quota** tab: management key, quota data and refresh, a distribution bar, credentials grouped by channel (plan, prefix, status, 5-hour / daily / weekly meters with reset times; Devin shows its daily / weekly quota, shared by every Devin model; channels without a quota endpoint show status and recent requests only), and an expandable "Model → Channel" table. The tab label shows the lowest remaining quota among the account's usable credentials.
+**3. Image and video generation.** The top of the **Generation** tab holds the master switch **Enable image and video generation** (for every account, off on a new installation; while off this page shows only the switch, and neither the composer's generation buttons nor the generation commands exist). Once on, it lists image and video models in groups, each with its own switch and kind; below are marking missed models, the save location, video defaults and the agent generation settings.
+
+![Generation tab: master switch, image / video models and generation settings (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/generation.png)
+
+**4. Quota.** The **Quota** tab: management key, quota data and refresh, a distribution bar, credentials grouped by channel (plan, prefix, status, 5-hour / daily / weekly meters with reset times; Devin shows its daily / weekly quota, shared by every Devin model; channels without a quota endpoint show status and recent requests only), and an expandable "Model → Channel" table. The tab label shows the lowest remaining quota among the account's usable credentials.
 
 ![Quota tab: distribution bar and per-channel credential quota (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/quota.png)
 
-**4. Quota in the composer.** The badge left of the model selector shows the best remaining quota among the usable credentials serving the current model; clicking it lists every such credential with its quota windows. It appears only for models this plugin synchronizes whose account has a management key.
+**5. A rejected management key.** After CPA rejects the key 3 times in a row (401/403), automatic checks stop so CPA does not ban this address; the page explains why and keeps the last data it read. Saving a new management key resumes them; a manual **Refresh Quota** tries only once.
+
+![Quota tab: automatic checks stopped after the management key was rejected 3 times in a row (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/quota-key-stopped.png)
+
+**6. Quota in the composer.** The badge left of the model selector shows the best remaining quota among the usable credentials serving the current model; clicking it lists every such credential with its quota windows. It appears only for models this plugin synchronizes whose account has a management key.
 
 ![Quota badge next to the model selector with its peek (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/quota-badge.png)
 
-**5. Adding an account.** Enter a name, address and API key and click **Connect**: it tests first and creates an enabled account only when that works; on failure the reason is shown and **Add Anyway (Disabled)** is offered.
+**7. Adding an account.** Enter a name, address and API key and click **Connect**: it tests first and creates an enabled account only when that works; on failure the reason is shown and **Add Anyway (Disabled)** is offered.
 
 ![Add account form (offline render)](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/add-account.png)
 
-**6. The plugin update page under Built-in plugins** (actual 1.6.0 capture). **Settings** → **Built-in plugins** → the **CLIProxyAPI** tab holds only plugin updates: checking and offline download, **Update Now** once the DSH plugin market is detected, the update channel, the download region, and the automatic check / download / install switches. Here the plugin is already the latest Stable version, so **Update Now** is disabled.
+**8. The plugin update page under Built-in plugins** (actual 1.6.0 capture). **Settings** → **Built-in plugins** → the **CLIProxyAPI** tab holds only plugin updates: checking and offline download, **Update Now** once the DSH plugin market is detected, the update channel, the download region, and the automatic check / download / install switches. Here the plugin is already the latest Stable version, so **Update Now** is disabled.
 
 ![The CLIProxyAPI update page under Built-in plugins: version status, plugin-market update, channel, region and automatic switches](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/updates.png)
 

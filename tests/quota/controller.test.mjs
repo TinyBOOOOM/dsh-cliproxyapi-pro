@@ -165,29 +165,6 @@ describe("quota controller", () => {
     assert.deepEqual(matchCredentials(account, "claude-opus-5-5"), { credentialIds: ["claude.json"], matchedBy: "model-list" });
   });
 
-  it("locks an account out after 401 until an explicit refresh", async () => {
-    const h = harness({ handler: () => json(401, { error: "invalid management key" }) });
-    let snap = await h.controller.refresh("default");
-    assert.equal(snap.accounts[0].state, "error");
-    assert.equal(snap.accounts[0].errorCode, "unauthorized");
-    assert.equal(snap.accounts[0].errorStatus, 401);
-    assert.equal(h.calls.length, 1);
-
-    h.clock.now += QUOTA_TTL_MS * 3;
-    snap = await h.controller.snapshot();
-    assert.equal(snap.accounts[0].refreshing, false);
-    await new Promise((r) => setImmediate(r));
-    assert.equal(h.calls.length, 1);
-    await h.controller.refresh();
-    assert.equal(h.calls.length, 1, "refresh-all skips locked-out accounts");
-
-    h.setHandler(scenarioHandler());
-    snap = await h.controller.refresh("default");
-    assert.equal(snap.accounts[0].state, "ok");
-    assert.ok(h.calls.length > 1);
-    assert.equal(JSON.stringify(h.logs).includes(FAKE_KEY), false);
-  });
-
   it("maps 403 to forbidden", async () => {
     const h = harness({ handler: () => json(403, {}) });
     const snap = await h.controller.refresh("default");
@@ -296,15 +273,6 @@ describe("quota controller", () => {
     assert.equal(h.keys.has("CLI_PROXY_MANAGEMENT_KEY"), false);
     assert.equal(snap.accounts[0].state, "nokey");
     assert.deepEqual(snap.accounts[0].credentials, []);
-  });
-
-  it("clears a lockout when a new key is saved", async () => {
-    const h = harness({ handler: () => json(401, {}) });
-    await h.controller.refresh("default");
-    h.setHandler(scenarioHandler());
-    const snap = await h.controller.saveKey("default", { managementKey: "new-key-456" });
-    assert.equal(snap.accounts[0].state, "ok");
-    assert.equal(h.calls.at(-1).headers.Authorization, "Bearer new-key-456");
   });
 
   it("aborts in-flight work on dispose", async () => {

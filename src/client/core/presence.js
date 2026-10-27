@@ -37,6 +37,16 @@
     const composerBadges = createBadgePresence();
     // The generation-model button has its own composer/hero presence.
     const mediaChips = createBadgePresence();
+    // The Generation tab tells the composer buttons when the master switch
+    // changed, so they appear / disappear without waiting for a retry.
+    const mediaGenerationListeners = new Set();
+    const announceMediaGeneration = () => {
+      for (const fn of [...mediaGenerationListeners]) {
+        try {
+          fn();
+        } catch {}
+      }
+    };
 
     /**
      * Composer placement announces itself for its session; hero placement

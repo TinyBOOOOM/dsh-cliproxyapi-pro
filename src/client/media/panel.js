@@ -94,6 +94,7 @@
           if (!mounted.current) return;
           setData(body.media ?? null);
           after?.();
+          if ("enabled" in patch) announceMediaGeneration();
           setNotice({ tone: "ok", text: t("mediaSaved") });
         } catch (err) {
           if (mounted.current) setNotice({ tone: "error", text: mediaErrorText(t, err) });
@@ -354,13 +355,47 @@
         return h("div", { className: "dcpa-tabbody dcpa-models dcpa-media" }, h("p", { className: "dcpa-q-sub" }, t("mediaLoading")));
       }
 
+      // The master switch (all accounts): off hides every generation feature.
+      const generationOn = data?.settings?.enabled === true;
+      const masterCard = h(
+        "div",
+        { className: "dcpa-media-card", "data-generation": generationOn ? "on" : "off" },
+        h(
+          "div",
+          { className: "dcpa-media-agent-head" },
+          h("span", { className: "dcpa-frow-label" }, t("mediaMasterTitle"), h(InfoTip, { t, text: t("mediaMasterHint") })),
+          h(
+            "button",
+            {
+              type: "button",
+              role: "switch",
+              className: "dcpa-switch",
+              "aria-checked": generationOn,
+              "aria-label": t("mediaMasterTitle"),
+              disabled: busy !== null || data === null,
+              onClick: () => void saveGlobal({ enabled: !generationOn }),
+            },
+            h("span", { className: "dcpa-switch-thumb" })
+          )
+        ),
+        h("p", { className: "dcpa-q-sub" }, t(generationOn ? "mediaMasterOnNote" : "mediaMasterOffNote"))
+      );
+      const messages = [
+        error ? h("p", { key: "err", className: "dcpa-q-msg", "data-tone": "error", role: "alert" }, fmt(t, "mediaLoadError", { error })) : null,
+        data?.settingsError ? h("p", { key: "invalid", className: "dcpa-q-msg", "data-tone": "error", role: "alert" }, t("mediaSettingsInvalid")) : null,
+        notice ? h("p", { key: "notice", className: "dcpa-q-msg", "data-tone": notice.tone, role: notice.tone === "error" ? "alert" : "status" }, notice.text) : null,
+      ];
+
+      if (!generationOn) {
+        return h("div", { className: "dcpa-tabbody dcpa-models dcpa-media" }, masterCard, ...messages);
+      }
+
       return h(
         "div",
         { className: "dcpa-tabbody dcpa-models dcpa-media" },
+        masterCard,
         h("p", { className: "dcpa-q-sub" }, t("mediaIntro")),
-        error ? h("p", { className: "dcpa-q-msg", "data-tone": "error", role: "alert" }, fmt(t, "mediaLoadError", { error })) : null,
-        data?.settingsError ? h("p", { className: "dcpa-q-msg", "data-tone": "error", role: "alert" }, t("mediaSettingsInvalid")) : null,
-        notice ? h("p", { className: "dcpa-q-msg", "data-tone": notice.tone, role: notice.tone === "error" ? "alert" : "status" }, notice.text) : null,
+        ...messages,
         mine && models.length === 0
           ? h("p", { className: "dcpa-hint" }, t(catalogRead ? "mediaNone" : "mediaNoCatalog"))
           : null,

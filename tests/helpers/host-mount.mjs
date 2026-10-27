@@ -20,11 +20,16 @@ export async function settledRun(m, sessionId, commandId) {
   throw new Error("the run did not settle");
 }
 
-export function mountPlugin({ state, fetchImpl, extraServices = {}, files = {}, dir: reuseDir }) {
+export function mountPlugin({ state, fetchImpl, extraServices = {}, files = {}, dir: reuseDir, generation = true }) {
   const dir = reuseDir ?? mkdtempSync(join(tmpdir(), "cpa-mount-"));
   const stateDir = join(dir, ".dsh-cliproxyapi");
   mkdirSync(stateDir, { recursive: true });
   writeFileSync(join(stateDir, "state.json"), JSON.stringify(state));
+  // Generation is off on a fresh profile; most tests use it, so switch it on
+  // unless the test brings its own settings file or asks for a fresh profile.
+  if (generation && reuseDir === undefined && files["media-settings.json"] === undefined) {
+    writeFileSync(join(stateDir, "media-settings.json"), JSON.stringify({ version: 1, enabled: true }));
+  }
   for (const [name, content] of Object.entries(files)) writeFileSync(join(stateDir, name), typeof content === "string" ? content : JSON.stringify(content));
   const providers = {};
   const creds = { CLI_PROXY_API_KEY: "key-a" };
@@ -82,7 +87,15 @@ export function mountPlugin({ state, fetchImpl, extraServices = {}, files = {}, 
   };
   const sub = {
     ...ctx,
-    commands: { register: (c) => (commands.push(c), () => {}) },
+    commands: {
+      register: (c) => {
+        commands.push(c);
+        return () => {
+          const at = commands.indexOf(c);
+          if (at >= 0) commands.splice(at, 1);
+        };
+      },
+    },
     tools: {
       register: (t) => {
         tools.push(t);

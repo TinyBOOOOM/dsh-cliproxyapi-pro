@@ -13,6 +13,8 @@
 - `/cpa-video-status`：列出本会话的视频任务。
 - `/cpa-video-edit [--video 路径 | --url 链接 | --from 命令id] [-m 模型] 修改说明`、`/cpa-video-extend [同上] [-s 2-10] 接下来的内容`：编辑 / 延长任意 MP4（可附带视频文件）。见 [编辑 / 延长视频](media.md#编辑--延长视频cpa-video-editcpa-video-extend)。
 
+`/cpa-image` 和 `/cpa-video*` 只在「生成」标签的「启用图片和视频生成」打开时存在。
+
 ### HTTP 接口
 
 供设置面板使用，需要 DSH Web 会话的认证；POST 只接受来自本机或受信任主机的同源请求。
@@ -33,7 +35,7 @@
 | POST | `/api/dsh-cliproxyapi/quota/refresh` | `{ accountId? }` | 开始刷新并立即返回；指定账号会重试其暂停查询，未指定时跳过暂停项；正在刷新时 `refreshing` 为真 |
 | POST | `/api/dsh-cliproxyapi/quota/save` | `{ accountId, managementKey?, clear? }` | 保存或清除该账号的管理密钥，并开始刷新额度；响应不含密钥 |
 | GET | `/api/dsh-cliproxyapi/media/status` | — | `{ ok, media }`：生成设置与每个账号识别出的生图 / 生视频模型；不联网 |
-| POST | `/api/dsh-cliproxyapi/media/save` | `{ account: { accountId, disabledModels?, kindOverrides? } }` | 保存某账号关闭的生成模型（整表替换）或类型覆盖（按模型合并，`null` 表示恢复自动识别）；类型变化时重新同步该账号并在响应中附带 `status`。无效值返回 400 和错误码，如 `invalid-account`、`invalid-kind` |
+| POST | `/api/dsh-cliproxyapi/media/save` | `{ enabled? }`、全局字段（如 `agentTool`、`outputDir`），或 `{ account: { accountId, disabledModels?, kindOverrides? } }` | `enabled` 打开 / 关闭生成总开关（随即注册或移除生成命令和 agent 工具）；保存某账号关闭的生成模型（整表替换）或类型覆盖（按模型合并，`null` 表示恢复自动识别）；类型变化时重新同步该账号并在响应中附带 `status`。无效值返回 400 和错误码，如 `invalid-enabled`、`invalid-account`、`invalid-kind` |
 | POST | `/api/dsh-cliproxyapi/media/diagnose` | `{ accountId }` | 只读诊断（见 [生图与生视频](media.md)），返回 `{ ok, diagnostic }`，不含 Key |
 | GET | `/api/dsh-cliproxyapi/media/session?sessionId=` | — | `{ ok, session }`：可选的生图 / 生视频模型、当前选择及其来源（`session` / `last` / `only`）、本会话最近生成的文件（只有文件名和 id，不含路径）；`pendingConfirmations` 仅列出缺少原生提问服务时、属于这个确切会话的待确认项 `{ commandId, kind, en, zh, expiresAt }`，原生提问不在其中；不联网 |
 | POST | `/api/dsh-cliproxyapi/media/session/save` | `{ sessionId?, kind: "image" \| "video", ref }` | 为会话选择模型（`ref` 为 `账号id/模型id`，`null` 清除本会话的选择），并记为上一次选择；不在可选列表里的模型返回 400 `invalid-model`。也可以只传 `{ sessionId, videoConfirm?, imageConfirm?, videoBudget? }`（`ask` / `auto` / `inherit`，上限为 `{ mode: "limited", seconds }` / `{ mode: "unlimited" }` / `inherit`）修改本会话的 agent 生成设置 |

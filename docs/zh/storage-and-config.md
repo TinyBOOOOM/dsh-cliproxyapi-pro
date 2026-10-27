@@ -36,11 +36,12 @@
   ```
 
   设置通过面板保存后立即应用。手动编辑此文件后需重载插件或重启 DSH 才会重新读取；文件损坏、结构 / 字段无效或无法读取时采用关闭自动联网检查的安全默认值。版本检查结果、候选版本、下载完成提示与命令只在内存中，插件重载后重新检查；下载包仍位于独立的 `updates` 子目录，由用户按需清理。
-- **生成设置**：独立保存在 `<Profile 目录>/.dsh-cliproxyapi/media-settings.json`，不改动 `state.json`。没有此文件时使用默认值；文件损坏时也使用默认值并在日志中提示，下次保存前会把损坏的文件另存为 `media-settings.corrupt-<时间>.json`。各字段都有作用：`outputDir`（保存位置）、`lastSelection`（上一次选择的模型）、`defaultVideoSeconds` / `defaultVideoResolution`（`/cpa-video` 未指定 `-s` / `-r` 时的默认值）、`agentTool`、`imageConfirm`、`videoConfirm`、`videoBudget`（agent 生成工具的开关、确认方式与秒数上限），以及每个账号的 `disabledModels`（关闭的生成模型）和 `kindOverrides`（手动指定的类型）：
+- **生成设置**：独立保存在 `<Profile 目录>/.dsh-cliproxyapi/media-settings.json`，不改动 `state.json`。没有此文件时使用默认值（`enabled: false`，生成关闭；但已存在 `media-sessions.json` 或 `media-jobs.json` 时视为开启）；文件里没有 `enabled` 字段（总开关出现之前写入的文件）时视为开启。文件损坏时也使用默认值并在日志中提示，下次保存前会把损坏的文件另存为 `media-settings.corrupt-<时间>.json`。各字段都有作用：`enabled`（总开关）、`agentTool`（agent 生成工具）、`outputDir`（保存位置）、`defaultVideoSeconds` / `defaultVideoResolution`（`/cpa-video` 未指定 `-s` / `-r` 时的默认值）、`imageConfirm` / `videoConfirm` / `videoBudget`（agent 生成的确认方式和秒数上限）、`lastSelection`（上一次选择的模型），以及每个账号的 `disabledModels`（关闭的生成模型）和 `kindOverrides`（手动指定的类型）：
 
   ```json
   {
     "version": 1,
+    "enabled": true,
     "agentTool": false,
     "outputDir": "generated",
     "defaultVideoSeconds": 6,
@@ -57,6 +58,7 @@
 
 - **会话生成记录**：`<Profile 目录>/.dsh-cliproxyapi/media-sessions.json` 保存每个会话选择的生成模型、最近 48 次生成的记录（状态、模型、提示词、选项、起止时间、保存目录显示名、错误摘要），以及最近生成的最多 48 个文件路径和生成它们的命令 id（供对话里的命令行显示图片），只保留最近更新的 500 个会话。删除它只会清空这些选择和记录，不会删除已生成的文件。文件损坏时按空记录处理，下次写入前另存为 `media-sessions.corrupt-<时间>.json`。
 - **视频任务**：`<Profile 目录>/.dsh-cliproxyapi/media-jobs.json` 保存已提交的视频任务（CPA 请求 id、账号、模型、会话和命令 id、工作目录与保存位置、提示词、时长、提交时间、状态），用于重载或重启后继续等待；最多 200 个，已结束的保留 7 天。不含 Key 和视频地址。文件损坏时按空处理，下次写入前另存为 `media-jobs.corrupt-<时间>.json`。
+- **管理密钥失败次数**：`<Profile 目录>/.dsh-cliproxyapi/quota-state.json` 记录每个账号连续被 CPA 管理接口拒绝（401/403）的次数、最后的错误码和时间，用来在 3 次后停止自动查询；不含密钥。删除它只会清零计数。
 - **密钥**：通过 DSH 的 `credentials` 服务按引用名存取；凭证服务里没有时，回退读取同名环境变量。
 - **环境变量**：`CLIPROXYAPI_BASE_URL` 只用于服务地址留空的账号的自动发现。
 - **插件行配置**：`cordis.patch.yml` 中本插件行的 `config` 会在启动时叠加到状态文件上：包含 `accounts` 时替换账号列表，否则其中的字段作用于第一个账号。一般保持 `{}`，用设置面板配置即可。

@@ -286,7 +286,7 @@ describe("multi-account", () => {
     };
     const sub = {
       ...ctx,
-      commands: { register: (c) => (commands.push(c), () => {}) },
+      commands: { register: (c) => (commands.push(c), () => commands.splice(commands.indexOf(c), 1)) },
       tools: { register: (t) => (tools.push(t), () => {}) },
       webServer: { register: (r) => (routes.set(r.path, r.handler), () => {}) },
     };
@@ -315,11 +315,24 @@ describe("multi-account", () => {
       // No agent tool: nothing is added to model context.
       // The optional agent tool waits for the tools service but registers nothing while switched off.
       assert.equal(tools.length, 0);
+      // Generation is off on a profile that never used it: only the account commands exist.
+      assert.deepEqual(commands.map((c) => c.name).sort(), ["cpa-refresh", "cpa-status"]);
+
+      // The master switch registers the generation commands, and removes them again.
+      let sent = await post("/api/dsh-cliproxyapi/media/save", { enabled: true });
+      assert.equal(sent.code, 200, JSON.stringify(sent.body));
+      assert.equal(sent.body.media.settings.enabled, true);
       assert.deepEqual(commands.map((c) => c.name).sort(), ["cpa-image", "cpa-refresh", "cpa-status", "cpa-video", "cpa-video-edit", "cpa-video-extend", "cpa-video-status"]);
       assert.equal(commands.find((c) => c.name === "cpa-video").input.attachments, true);
       assert.equal(commands.find((c) => c.name === "cpa-image").input.attachments, true);
+      sent = await post("/api/dsh-cliproxyapi/media/save", { enabled: false });
+      assert.equal(sent.code, 200, JSON.stringify(sent.body));
+      assert.equal(JSON.parse(readFileSync(join(stateDir, "media-settings.json"), "utf8")).enabled, false);
+      assert.deepEqual(commands.map((c) => c.name).sort(), ["cpa-refresh", "cpa-status"]);
+      sent = await post("/api/dsh-cliproxyapi/media/save", { enabled: "yes" });
+      assert.equal(sent.code, 400);
 
-      let sent = await post("/api/dsh-cliproxyapi/refresh", {});
+      sent = await post("/api/dsh-cliproxyapi/refresh", {});
       assert.equal(sent.code, 200, JSON.stringify(sent.body));
       assert.equal(sent.body.accounts[0].status.state, "connected");
       assert.deepEqual(providers["cli-proxy-messages"].models.map((m) => m.id), ["claude-opus-5-5"]);

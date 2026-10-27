@@ -1,7 +1,7 @@
 {
   "name": "dsh-cliproxyapi-pro",
-  "version": "1.8.0",
-  "description": "Auto-discovery CLIProxyAPI (CPA) provider and management UI for DeepSeek Harness — multiple accounts, dynamic model sync, capability detection, and visual settings.",
+  "version": "1.9.0",
+  "description": "CLIProxyAPI (CPA) provider for DeepSeek Harness — multiple accounts, model sync over native protocols, per-credential quota, and optional image / video generation.",
   "keywords": [
     "dsh",
     "deepseek-harness",

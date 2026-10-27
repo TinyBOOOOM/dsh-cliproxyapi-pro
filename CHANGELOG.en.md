@@ -7,7 +7,7 @@ All notable changes to this plugin. Versions follow [Semantic Versioning](https:
 ## Unreleased
 
 ### Fixed
-- **Failed quota queries no longer retry automatically forever.** Automatic refresh caching increases from 5 to 30 minutes. An account-level failure pauses that account; a failed credential quota probe pauses only that credential while healthy credentials keep updating. Only an account-specific manual refresh or saving its management key retries paused queries; another failure pauses them again, and refresh-all does not recover them. The UI explains the pause and recovery steps. Pauses live in Host memory, survive a page reload, and reset on plugin reload or Host restart.
+- **Failed quota queries no longer retry automatically forever.** Automatic refresh caching increases from 5 to 30 minutes (1.9.0's at most 3 background retries of a rejected management key now run at that 30-minute interval; the counting is unchanged). Any other account-level failure (network errors, timeouts, HTTP errors, invalid responses) pauses that account; a failed credential quota probe pauses only that credential while healthy credentials keep updating. Only an account-specific manual refresh or saving its management key retries paused queries; another failure pauses them again, and refresh-all does not recover them. The UI explains the pause and recovery steps. Pauses live in Host memory, survive a page reload, and reset on plugin reload or Host restart.
 - **Failed quota status requests slow down page polling.** Even when the last snapshot still says “refreshing”, failures back off to 60 / 120 / 240 / 300 seconds instead of polling every 4 seconds indefinitely. A successful status read or mutation restores normal polling.
 
 ### Changed
@@ -17,6 +17,15 @@ All notable changes to this plugin. Versions follow [Semantic Versioning](https:
 ### Documentation
 - The READMEs are trimmed to an overview, installation and getting started; the detailed guides move to `docs/zh/` and `docs/en/`. `AGENTS.md` becomes a short entry point with the developer detail in `docs/dev/`.
 - Corrected the storage guide: every `media-settings.json` field has an effect (it said some were reserved).
+- Updated the plugin summary (npm `description` and the `locale/*.json` `meta.description` shown in the DSH plugin list) to cover model sync over native protocols, per-credential quota and the optional image / video generation.
+
+## 1.9.0 — 2026-10-25
+
+### Added
+- **A master switch for image and video generation.** The top of the Generation tab has **Enable image and video generation**, for every account. While off, the composer shows no generation buttons, `/cpa-image`, `/cpa-video`, `/cpa-video-edit`, `/cpa-video-extend` and `/cpa-video-status` are not registered, the agent tool `generate_media` is not registered either, and the Generation tab shows only this switch; videos already submitted still finish, and past results in the chat stay viewable (without the edit / extend buttons). New installations start with it off; a profile that already has `media-settings.json` (a missing field reads as on) or has used generation (`media-sessions.json` / `media-jobs.json` exist) keeps it on. It is stored as the new `enabled` field of `media-settings.json`.
+
+### Changed
+- **A rejected management key is retried automatically at most 3 times.** When the CPA management API answers a quota check with 401/403, background checks continue at the 5-minute cache interval and stop after 3 rejections in a row (CPA bans an address for 30 minutes after 5 bad keys). The count is stored in `.dsh-cliproxyapi/quota-state.json` (never the key) and continues across DSH restarts and plugin reloads. Saving a new management key (also on the DSH credentials page), clearing the key or a successful check resets it; once stopped, a manual refresh tries only once and stops again on another rejection. The Quota tab and the composer badge show "rejected n/3 times in a row" or that checks have stopped, and `/cpa-status` says so too. Earlier versions paused after the first rejection, for the current run only.
 
 ## 1.8.0 — 2026-10-22
 

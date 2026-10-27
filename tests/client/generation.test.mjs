@@ -7,7 +7,7 @@ import { update, reply, button, SCHEMA, capabilities, operation, json, runTimers
 
 describe("generation tab", () => {
   const media = (overrides = {}) => ({
-    settings: { agentTool: false, videoConfirm: "ask" },
+    settings: { enabled: true, agentTool: false, videoConfirm: "ask" },
     accounts: [
       {
         id: "default",
@@ -36,14 +36,36 @@ describe("generation tab", () => {
       assert.ok(text.includes(h[language].mediaVideoGroup));
       assert.ok(text.includes("→ grok-imagine-video"), "the Sora alias is labelled");
       const switches = nodes(tree, (n) => n.props.role === "switch");
-      assert.equal(switches.length, 3, "two models and the agent switch");
-      assert.equal(switches[2].props["aria-label"], h[language].mediaAgentTitle);
-      assert.equal(switches[2].props["aria-checked"], false, "the agent tool is off by default");
+      assert.equal(switches.length, 4, "the master switch, two models and the agent switch");
+      assert.equal(switches[0].props["aria-label"], h[language].mediaMasterTitle);
       assert.equal(switches[0].props["aria-checked"], true);
-      assert.equal(switches[0].props["aria-label"], h[language].mediaEnabledLabel.replace("{model}", "grok-imagine-image"));
+      assert.equal(switches[3].props["aria-label"], h[language].mediaAgentTitle);
+      assert.equal(switches[3].props["aria-checked"], false, "the agent tool is off by default");
+      assert.equal(switches[1].props["aria-checked"], true);
+      assert.equal(switches[1].props["aria-label"], h[language].mediaEnabledLabel.replace("{model}", "grok-imagine-image"));
       assert.ok(button(tree, h[language].diagRun), "the diagnostic is offered");
       assert.equal(nodes(tree, (n) => n.props.title !== undefined).length, 0, "help text uses InfoTip, not title attributes");
     }
+  });
+
+  it("shows only the master switch while generation is off, and turns it on", async () => {
+    const posts = [];
+    const off = { ...media(), settings: { ...media().settings, enabled: false } };
+    const h = clientHarness({ update: off, loading: false, fetch: async (url, options = {}) => (options.method === "POST" && posts.push(JSON.parse(options.body)), okJson({ media: media() })) });
+    for (const language of ["zh", "en"]) {
+      const tree = h.renderMedia({ account }, language, false);
+      const switches = nodes(tree, (n) => n.props.role === "switch");
+      assert.equal(switches.length, 1, "no model or agent switches while off");
+      assert.equal(switches[0].props["aria-label"], h[language].mediaMasterTitle);
+      assert.equal(switches[0].props["aria-checked"], false);
+      const text = content(tree);
+      assert.ok(text.includes(h[language].mediaMasterOffNote));
+      assert.equal(text.includes(h[language].mediaImageGroup), false);
+      assert.equal(button(tree, h[language].diagRun), undefined, "no diagnostic while off");
+    }
+    nodes(h.renderMedia({ account }, "zh", false), (n) => n.props.role === "switch")[0].props.onClick();
+    await flushClient();
+    assert.deepEqual(posts, [{ enabled: true }]);
   });
 
   it("switches the agent tool and saves its confirmation and seconds limit", async () => {
@@ -108,7 +130,7 @@ describe("generation tab", () => {
     let tree = h.renderMedia({ account, onStatus: (s) => adopted.push(s) });
     await flushClient();
     tree = h.renderMedia({ account, onStatus: (s) => adopted.push(s) });
-    nodes(tree, (n) => n.props.role === "switch")[1].props.onClick();
+    nodes(tree, (n) => n.props.role === "switch")[2].props.onClick();
     await flushClient();
     assert.deepEqual(requests[0].body, { account: { accountId: "default", disabledModels: ["sora-2"] } });
     assert.equal(adopted.length, 0, "a switch does not re-sync routes");

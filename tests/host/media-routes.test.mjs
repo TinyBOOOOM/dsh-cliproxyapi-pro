@@ -163,6 +163,69 @@ describe("media models", () => {
     }
   });
 
+  it("the generation master switch hides commands, the agent tool and the composer choices", async () => {
+    const state = { version: 2, accounts: [{ id: "default", baseURL: "http://m.test", selectedModels: [] }] };
+    const generationCommands = ["cpa-image", "cpa-video", "cpa-video-edit", "cpa-video-extend", "cpa-video-status"];
+    const off = mountPlugin({
+      state,
+      fetchImpl: fakeServers(MEDIA_SERVERS),
+      files: { "media-settings.json": { version: 1, enabled: false, agentTool: true } },
+    });
+    try {
+      await off.call("POST", "/api/dsh-cliproxyapi/refresh", {});
+      assert.deepEqual(off.commands.map((c) => c.name).sort(), ["cpa-refresh", "cpa-status"]);
+      assert.equal(off.tools.length, 0, "no agent tool while generation is off, even with its own switch on");
+      let view = await off.call("GET", "/api/dsh-cliproxyapi/media/session?sessionId=s-1");
+      assert.equal(view.code, 200, JSON.stringify(view.body));
+      assert.equal(view.body.session.generation, false);
+      assert.deepEqual(view.body.session.options, { image: [], video: [] });
+      assert.equal(view.body.session.catalogIncomplete, false);
+      // The Generation tab still lists the account's media models for when it is switched on.
+      const status = await off.call("GET", "/api/dsh-cliproxyapi/media/status");
+      assert.equal(status.body.media.settings.enabled, false);
+      assert.ok(status.body.media.accounts[0].models.some((m) => m.kind === "image"));
+      // Chat routes never carry the media models either way.
+      assert.ok(Object.values(off.providers).every((r) => r.models.every((m) => !m.id.startsWith("grok-imagine"))));
+
+      const on = await off.call("POST", "/api/dsh-cliproxyapi/media/save", { enabled: true });
+      assert.equal(on.code, 200, JSON.stringify(on.body));
+      assert.deepEqual(off.commands.map((c) => c.name).filter((n) => generationCommands.includes(n)).sort(), generationCommands);
+      assert.equal(off.tools.length, 1, "the agent tool follows its own switch again");
+      view = await off.call("GET", "/api/dsh-cliproxyapi/media/session?sessionId=s-1");
+      assert.equal(view.body.session.generation, true);
+      assert.ok(view.body.session.options.image.length > 0);
+
+      await off.call("POST", "/api/dsh-cliproxyapi/media/save", { enabled: false });
+      assert.deepEqual(off.commands.map((c) => c.name).sort(), ["cpa-refresh", "cpa-status"]);
+      assert.equal(off.tools.length, 0);
+    } finally {
+      off.dispose();
+    }
+
+    // A fresh profile starts off; one that already used generation keeps it on.
+    const fresh = mountPlugin({ state, fetchImpl: fakeServers(MEDIA_SERVERS), generation: false });
+    try {
+      assert.deepEqual(fresh.commands.map((c) => c.name).sort(), ["cpa-refresh", "cpa-status"]);
+      const status = await fresh.call("GET", "/api/dsh-cliproxyapi/media/status");
+      assert.equal(status.body.media.settings.enabled, false);
+    } finally {
+      fresh.dispose();
+    }
+    const used = mountPlugin({ state, fetchImpl: fakeServers(MEDIA_SERVERS), generation: false, files: { "media-sessions.json": { version: 1, sessions: {} } } });
+    try {
+      assert.deepEqual(used.commands.map((c) => c.name).filter((n) => generationCommands.includes(n)).sort(), generationCommands);
+    } finally {
+      used.dispose();
+    }
+    const legacy = mountPlugin({ state, fetchImpl: fakeServers(MEDIA_SERVERS), files: { "media-settings.json": { version: 1, outputDir: "out" } } });
+    try {
+      const status = await legacy.call("GET", "/api/dsh-cliproxyapi/media/status");
+      assert.equal(status.body.media.settings.enabled, true, "a settings file from before the switch reads as on");
+    } finally {
+      legacy.dispose();
+    }
+  });
+
   it("media/session re-reads a catalog whose plain listing failed and returns the image models", async () => {
     let listingCalls = 0;
     const fetchImpl = async (url) => {

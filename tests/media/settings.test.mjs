@@ -36,6 +36,16 @@ describe("media settings", () => {
     assert.deepEqual(normalizeMediaSettings(odd), odd);
   });
 
+  it("starts with generation off, reads a file from before the switch as on, and patches it strictly", () => {
+    assert.equal(defaultMediaSettings().enabled, false, "a new profile starts off");
+    assert.equal(normalizeMediaSettings({ outputDir: "out" }).enabled, true, "an older file without the field stays on");
+    assert.equal(normalizeMediaSettings({ enabled: false }).enabled, false);
+    assert.equal(normalizeMediaSettings({ enabled: "no" }).enabled, true);
+    assert.equal(applyMediaPatch(defaultMediaSettings(), { enabled: true }).settings.enabled, true);
+    assert.equal(applyMediaPatch(normalizeMediaSettings({}), { enabled: false }).settings.enabled, false);
+    assert.throws(() => applyMediaPatch(defaultMediaSettings(), { enabled: 1 }), (error) => error.code === "invalid-enabled");
+  });
+
   it("rejects invalid patch values with stable codes and reports kind changes", () => {
     const base = defaultMediaSettings();
     const code = (patch) => {

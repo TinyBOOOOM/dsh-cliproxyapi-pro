@@ -44,6 +44,7 @@ function harness(options = {}) {
     logger: { warn: (m) => logs.push(m), info: (m) => logs.push(m), debug: (m) => logs.push(m) },
     timeoutMs: options.timeoutMs ?? 2000,
     concurrency: options.concurrency,
+    ...(options.authStore === undefined ? {} : { authStore: options.authStore }),
   });
   return {
     controller,

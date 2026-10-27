@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "CLIProxyAPI (CPA) 接入与同步",
-    "description": "接入一个或多个 CLIProxyAPI（CPA）账号（可分别启用或停用），实时同步模型与推理能力，并提供可视化配置与模型过滤面板。"
+    "description": "接入一个或多个 CLIProxyAPI（CPA）账号，按原生协议把模型同步到 DSH，查看各凭证额度，并可选用 CPA 的生图、生视频模型生成图片和视频。"
   }
 }

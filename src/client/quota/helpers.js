@@ -56,7 +56,12 @@
     function quotaErrorText(t, account) {
       const key = QUOTA_ERROR_KEYS[account?.errorCode];
       if (key === undefined) return null;
-      return fmt(t, key, { status: account.errorStatus ?? "?" });
+      const text = fmt(t, key, { status: account.errorStatus ?? "?" });
+      // Consecutive management-key rejections: the count, or that background checks stopped.
+      const n = account.authFailures;
+      if ((account.errorCode !== "unauthorized" && account.errorCode !== "forbidden") || !Number.isInteger(n) || n <= 0) return text;
+      const max = account.authFailureLimit ?? 3;
+      return `${text} ${fmt(t, account.authPaused ? "qAuthPaused" : "qAuthRetrying", { n, max })}`;
     }
 
     function windowLabel(t, w) {

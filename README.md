@@ -36,7 +36,7 @@
    dsh-cliproxyapi-pro
    ```
 
-   需要固定版本时可以写成 `dsh-cliproxyapi-pro@1.8.0`。
+   需要固定版本时可以写成 `dsh-cliproxyapi-pro@1.9.0`。
 4. 点击 **安装**，完成后点击 **立即启用**。
 
 > 在中国大陆下载慢，可以点输入框旁的 **安装源**，切换到 **中国大陆镜像源**。
@@ -65,7 +65,7 @@ dsh plugin --profile <profile 名称> add dsh-cliproxyapi-pro
 
 | 来源 | 填写内容 |
 |---|---|
-| 某个发布版本 | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v1.8.0` |
+| 某个发布版本 | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v1.9.0` |
 | 最新开发版 | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#main` |
 | 离线安装包 | 下载 [`dsh-cliproxyapi-pro.tgz`](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/releases/latest/download/dsh-cliproxyapi-pro.tgz)（始终是最新版），填写它的本地绝对路径 |
 | 本地源码（开发用） | 克隆后的仓库目录绝对路径；以链接方式安装，改代码后重载插件即生效 |
@@ -83,29 +83,37 @@ CPA 就在本机默认端口 `8317` 且没有设置密钥时，什么都不用�
 
 ## 截图
 
-图 1–5 是离线组件渲染：用本插件的真实界面代码加示例数据（`example.com` 地址、虚构账号）在浏览器中渲染，配色按 DSH 深色主题近似，实际颜色跟随你的 DSH 主题。图 6 是 1.6.0 在 DSH 桌面版中的实际截图。
+图 1–7 是离线组件渲染：用本插件的真实界面代码加示例数据（`example.com` 地址、虚构账号）在浏览器中渲染，配色按 DSH 深色主题近似，实际颜色跟随你的 DSH 主题。图 8 是 1.6.0 在 DSH 桌面版中的实际截图。
 
-**1. 账号与连接。** 设置左侧导航的 **CLIProxyAPI** 页：顶部账号栏三个标签共用；账号标题下是连接状态、地址和模型数，右侧「启用」开关立即生效，「⋯」菜单里是「立即探测刷新」和「删除此账号」。「连接」标签里每项一行，地址旁可「测试连接」（用正在编辑的值，不保存），次要说明在 ⓘ 里。
+**1. 账号与连接。** 设置左侧导航的 **CLIProxyAPI** 页：顶部账号栏四个标签（连接 / 模型 / 生成 / 额度）共用；账号标题下是连接状态、地址和模型数，右侧「启用」开关立即生效，「⋯」菜单里是「立即探测刷新」和「删除此账号」。「连接」标签里每项一行，地址旁可「测试连接」（用正在编辑的值，不保存），次要说明在 ⓘ 里。
 
 ![账号栏、账号标题与连接标签（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/connection.png)
 
-**2. 模型与统一保存。** 「模型」标签列出该 CPA 上的全部模型：全部 / 已勾选 / 未勾选、家族筛选、搜索、批量操作与「恢复推荐精选」；勾选的模型显示将使用的协议，可「编辑参数」。连接和模型的改动统一记录，底部出现「有未保存的更改 · 放弃更改 / 保存并应用」。
+**2. 模型与统一保存。** 「模型」标签列出该 CPA 上的全部对话模型：全部 / 已勾选 / 未勾选、家族筛选、搜索、批量操作与「恢复推荐精选」；勾选的模型显示将使用的协议，可「编辑参数」。连接和模型的改动统一记录，底部出现「有未保存的更改 · 放弃更改 / 保存并应用」。
 
 ![模型标签与底部保存栏（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/model-filter.png)
 
-**3. 额度。** 「额度」标签：管理密钥、额度数据与刷新、凭证分布条，按渠道分组的凭证（套餐、前缀、状态、5 小时 / 每日 / 每周等额度条与重置时间；Devin 显示每日 / 每周额度，所有 Devin 模型共用；没有额度接口的渠道只显示状态与近期请求），以及可展开的「模型 → 渠道」表。标签上显示该账号可用凭证中最低的剩余额度。
+**3. 生图 / 生视频。** 「生成」标签顶部是总开关「启用图片和视频生成」（对所有账号生效，新安装默认关闭；关闭时这一页只剩这个开关，输入框旁的生成按钮和生成命令都不出现）。打开后分组列出生图 / 生视频模型，每个模型可单独开关、改类型；下面是标记漏识别的模型、保存位置、视频默认值和 agent 生成设置。
+
+![生成标签：总开关、生图 / 生视频模型与生成设置（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/generation.png)
+
+**4. 额度。** 「额度」标签：管理密钥、额度数据与刷新、凭证分布条，按渠道分组的凭证（套餐、前缀、状态、5 小时 / 每日 / 每周等额度条与重置时间；Devin 显示每日 / 每周额度，所有 Devin 模型共用；没有额度接口的渠道只显示状态与近期请求），以及可展开的「模型 → 渠道」表。标签上显示该账号可用凭证中最低的剩余额度。
 
 ![额度标签：分布条与按渠道分组的凭证额度（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/quota.png)
 
-**4. 对话框里的额度。** 模型选择器左侧的徽标显示当前模型可用凭证中最充足的剩余额度；点击后列出服务该模型的每个凭证及其额度窗口。只对本插件同步、且所属账号已填写管理密钥的模型显示。
+**5. 管理密钥被拒绝。** 密钥连续 3 次被 CPA 拒绝（401/403）后停止自动查询，以免 CPA 封禁本机地址；页面说明原因，保留上次成功读取的数据。保存新的管理密钥后恢复，手动「刷新额度」只再试一次。
+
+![额度标签：管理密钥连续 3 次被拒绝后停止自动查询（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/quota-key-stopped.png)
+
+**6. 对话框里的额度。** 模型选择器左侧的徽标显示当前模型可用凭证中最充足的剩余额度；点击后列出服务该模型的每个凭证及其额度窗口。只对本插件同步、且所属账号已填写管理密钥的模型显示。
 
 ![模型选择器旁的额度徽标与弹出列表（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/quota-badge.png)
 
-**5. 添加账号。** 填名称、地址和 API Key 后点「连接」：先测试，成功才创建并启用账号；失败时显示原因，可选「仍然添加（不启用）」。
+**7. 添加账号。** 填名称、地址和 API Key 后点「连接」：先测试，成功才创建并启用账号；失败时显示原因，可选「仍然添加（不启用）」。
 
 ![添加账号表单（离线渲染）](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/add-account.png)
 
-**6. 内置插件里的插件更新页**（1.6.0 实际截图）。**设置** → **内置插件** → **CLIProxyAPI** 标签页只有插件更新：检查更新与离线下载、检测到 DSH 插件市场后的「立即更新」、更新通道、下载区域，以及自动检查 / 自动下载 / 自动安装开关。图中已是稳定通道最新版本，所以「立即更新」不可用。
+**8. 内置插件里的插件更新页**（1.6.0 实际截图）。**设置** → **内置插件** → **CLIProxyAPI** 标签页只有插件更新：检查更新与离线下载、检测到 DSH 插件市场后的「立即更新」、更新通道、下载区域，以及自动检查 / 自动下载 / 自动安装开关。图中已是稳定通道最新版本，所以「立即更新」不可用。
 
 ![内置插件中的 CLIProxyAPI 更新页：版本状态、插件市场更新、通道、区域与自动开关](https://raw.githubusercontent.com/TinyBOOOOM/dsh-cliproxyapi-pro/main/assets/screenshots/updates.png)
 

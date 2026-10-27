@@ -21,7 +21,7 @@
 - Screenshots live in `assets/screenshots/` and are referenced by both READMEs and by `screenshots.json` (1–8 relative paths, read by plugin storefronts such as dsh-market).
   They are not shipped in the npm package.
   When the panel changes visibly, retake them, keep them free of real keys, server URLs and private data, and keep the captions in both READMEs accurate.
-  Currently `connection.png`, `model-filter.png`, `quota.png`, `quota-badge.png` and `add-account.png` are labelled offline component renders (the real `lib/client.js` bundled with React and rendered in headless Edge with `example.com` sample data and approximate dark-theme tokens); `updates.png` (the Built-in plugins update tab) is a live 1.6.0 capture supplied by the maintainer.
+  Currently `connection.png`, `model-filter.png`, `generation.png`, `quota.png`, `quota-key-stopped.png`, `quota-badge.png` and `add-account.png` are labelled offline component renders (the first five re-rendered for the generation master switch and the key-failure limit with React 19 production builds and headless Edge; `quota-badge.png` and `add-account.png` are older renders of unchanged surfaces) (the real `lib/client.js` bundled with React and rendered in headless Edge with `example.com` sample data and approximate dark-theme tokens); `updates.png` (the Built-in plugins update tab) is a live 1.6.0 capture supplied by the maintainer.
   Prefer live captures when the maintainer supplies them.
   If a screenshot is ever replaced by an offline component render, label it as such in both READMEs.
 

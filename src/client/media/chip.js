@@ -111,8 +111,10 @@
             if (controller.signal.aborted) return;
             if (!res.ok || body.ok === false) throw new Error(body.error || `HTTP ${res.status}`);
             setData(body.session ?? null);
-            needsRetry = body.session?.catalogIncomplete === true ||
-              !["image", "video"].some((kind) => Array.isArray(body.session?.options?.[kind]) && body.session.options[kind].length > 0);
+            // Generation switched off: nothing to show and nothing to wait for
+            // (the Generation tab announces when it is switched on again).
+            needsRetry = body.session?.generation !== false && (body.session?.catalogIncomplete === true ||
+              !["image", "video"].some((kind) => Array.isArray(body.session?.options?.[kind]) && body.session.options[kind].length > 0));
           } catch (err) {
             if (!controller.signal.aborted) setError(err instanceof Error ? err.message : String(err));
           } finally {
@@ -126,6 +128,19 @@
           if (again !== null) clearTimeout(again);
         };
       }, [sessionId, shadowed, openKind, retry]);
+
+      // The master switch changed on the Generation tab: load again now.
+      useEffect(() => {
+        const reload = () => {
+          if (!mounted.current) return;
+          closeMenu();
+          setRetry((n) => n + 1);
+        };
+        mediaGenerationListeners.add(reload);
+        return () => {
+          mediaGenerationListeners.delete(reload);
+        };
+      }, []);
 
       useEffect(() => {
         if (openKind === null) return undefined;

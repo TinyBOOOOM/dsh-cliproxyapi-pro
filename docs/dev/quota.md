@@ -2,10 +2,12 @@
 
 # Quota engine
 
-- `lib/quota/`: `createQuotaController()` (fed by `controller.quotaAccounts()`: id, endpoint, owned `routes`, `pickerModels`) returns cached snapshots, refreshes stale accounts in the background, locks an account out of background refresh after any cycle failure until `saveKey`/account-specific manual refresh, and never touches the management API without a key.
+- `lib/quota/`: `createQuotaController()` (fed by `controller.quotaAccounts()`: id, endpoint, owned `routes`, `pickerModels`) returns cached snapshots, refreshes stale accounts in the background, and never touches the management API without a key.
+- Management 401/403 answers count per account (`authFailures`, persisted through `deps.authStore` in `<profileDir>/.dsh-cliproxyapi/quota-state.json` via `normalizeQuotaAuthState()` in `lib/quota/auth-state.js`, never a key); they do not lock the account out, and background / refresh-all attempts continue at the TTL until `AUTH_FAILURE_LIMIT` (3; CPA bans an address for 30 minutes after 5 bad keys), then stop. Only a success, a new or cleared key (`saveKey`) or `keyChanged(ref)` (`lib/host/apply/lifecycle.js` forwards `credentials/reference-updated`) resets the count; a manual `refresh(id)` tries once without resetting it, so another rejection stops again. Network errors neither count nor reset. Snapshots report `authFailures` / `authFailureLimit` / `authPaused`.
+- Every other cycle failure (network, timeout, HTTP, invalid response) locks the account out of background refresh and refresh-all (`lockedOut`, in memory) until `saveKey`, `keyChanged(ref)` or an account-specific manual refresh.
 - Failed credential quota probes are independently quarantined (`pausedCredentials`, safe model/error metadata only); background cycles and refresh-all skip their model reads, token downloads and upstream probes while healthy credentials continue.
 - Account-specific refresh and `saveKey` retry paused credentials; a failure pauses them again.
-- Snapshots expose `autoRefreshPaused` on accounts and credentials.
+- Snapshots expose `autoRefreshPaused` on accounts (the `lockedOut` state) and credentials; the key-rejection pause is reported separately as `authPaused`.
 - Pauses live in the Host controller (survive page reloads, reset on plugin reload/Host restart); cycle-local maps and generation fencing prevent cancelled work from changing quarantine state. `matchCredentials()` is the single source of model → credential mapping (`modelIndex`/`modelMatch` in each snapshot account): prefixed ids only to that prefix, bare ids prefer un-prefixed credentials, family heuristics only when model lists are missing.
 - Snapshots never contain keys, tokens or raw upstream bodies.
 
