@@ -1,0 +1,63 @@
+[
+  "core/api.js",
+  {
+    "dictionary": "zh",
+    "parts": [
+      "i18n/zh/settings.js",
+      "i18n/zh/updates.js",
+      "i18n/zh/quota.js",
+      "i18n/zh/accounts.js",
+      "i18n/zh/media.js"
+    ]
+  },
+  {
+    "dictionary": "en",
+    "parts": [
+      "i18n/en/settings.js",
+      "i18n/en/updates.js",
+      "i18n/en/quota.js",
+      "i18n/en/accounts.js",
+      "i18n/en/media.js"
+    ]
+  },
+  {
+    "css": [
+      "styles/base.css",
+      "styles/updates.css",
+      "styles/tabs.css",
+      "styles/quota.css",
+      "styles/accounts.css",
+      "styles/media.css",
+      "styles/chat.css",
+      "styles/badge.css"
+    ]
+  },
+  "core/helpers.js",
+  "updates/api.js",
+  "market.js",
+  "update-panel.js",
+  "settings/fields.js",
+  "settings/section.js",
+  "settings/add-account.js",
+  {
+    "contiguous": [
+      "settings/account-panel.part.js",
+      "settings/account-panel-models.part.js"
+    ]
+  },
+  "media/helpers.js",
+  "media/panel.js",
+  "quota/helpers.js",
+  "quota/store.js",
+  "core/presence.js",
+  "quota/panel.js",
+  "settings/page.js",
+  "quota/badge.js",
+  "media/chip.js",
+  "chat/tool-id.js",
+  "media/confirmation-dock.js",
+  "chat/tool-row.js",
+  "chat/command-helpers.js",
+  "chat/command-card.js",
+  "apply.js"
+]

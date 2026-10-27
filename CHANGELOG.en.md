@@ -10,6 +10,14 @@ All notable changes to this plugin. Versions follow [Semantic Versioning](https:
 - **Failed quota queries no longer retry automatically forever.** Automatic refresh caching increases from 5 to 30 minutes. An account-level failure pauses that account; a failed credential quota probe pauses only that credential while healthy credentials keep updating. Only an account-specific manual refresh or saving its management key retries paused queries; another failure pauses them again, and refresh-all does not recover them. The UI explains the pause and recovery steps. Pauses live in Host memory, survive a page reload, and reset on plugin reload or Host restart.
 - **Failed quota status requests slow down page polling.** Even when the last snapshot still says “refreshing”, failures back off to 60 / 120 / 240 / 300 seconds instead of polling every 4 seconds indefinitely. A successful status read or mutation restores normal polling.
 
+### Changed
+- **The code is split by responsibility; behavior is unchanged.** The Host entry `lib/index.js` now only re-exports; the implementation lives in `lib/host/` (including `lib/host/apply/`), and the generation, quota and update engines move to `lib/media/`, `lib/quota/` and `lib/updater/`. The Web UI is still the single file `lib/client.js`, now generated from the sources in `src/client/` by the zero-dependency `scripts/build-client.mjs` and committed; nothing is built at install time and no dependencies are added. Tests are grouped per module under `tests/<module>/`.
+- The packed files are now `lib/**/*.js`, so the package contains the new module files. The built-in offline update of 1.5.0–1.6.0 still uses the old fixed file list and rejects this version's offline package; users of those versions should update once through the plugin market or npm (the Plugins page and `dsh plugin add` are unaffected). 1.7.0 and later verify against the package's own `files` and are unaffected.
+
+### Documentation
+- The READMEs are trimmed to an overview, installation and getting started; the detailed guides move to `docs/zh/` and `docs/en/`. `AGENTS.md` becomes a short entry point with the developer detail in `docs/dev/`.
+- Corrected the storage guide: every `media-settings.json` field has an effect (it said some were reserved).
+
 ## 1.8.0 — 2026-10-22
 
 ### Added
