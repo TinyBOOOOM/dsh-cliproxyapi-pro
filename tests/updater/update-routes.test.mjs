@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { apply, normalizeState, ROUTES } from "../lib/index.js";
+import { apply, normalizeState, ROUTES } from "../../lib/index.js";
 
 function fixture(options = {}) {
   const dir = mkdtempSync(join(tmpdir(), "cpa-updates-http-"));
