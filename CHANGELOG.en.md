@@ -4,7 +4,7 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 1.9.1 — 2026-10-27
 
 ### Fixed
 - **Failed quota queries no longer retry automatically forever.** Automatic refresh caching increases from 5 to 30 minutes (1.9.0's at most 3 background retries of a rejected management key now run at that 30-minute interval; the counting is unchanged). Any other account-level failure (network errors, timeouts, HTTP errors, invalid responses) pauses that account; a failed credential quota probe pauses only that credential while healthy credentials keep updating. Only an account-specific manual refresh or saving its management key retries paused queries; another failure pauses them again, and refresh-all does not recover them. The UI explains the pause and recovery steps. Pauses live in Host memory, survive a page reload, and reset on plugin reload or Host restart.

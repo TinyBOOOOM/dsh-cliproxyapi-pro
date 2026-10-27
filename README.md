@@ -36,7 +36,7 @@
    dsh-cliproxyapi-pro
    ```
 
-   需要固定版本时可以写成 `dsh-cliproxyapi-pro@1.9.0`。
+   需要固定版本时可以写成 `dsh-cliproxyapi-pro@1.9.1`。
 4. 点击 **安装**，完成后点击 **立即启用**。
 
 > 在中国大陆下载慢，可以点输入框旁的 **安装源**，切换到 **中国大陆镜像源**。
@@ -65,7 +65,7 @@ dsh plugin --profile <profile 名称> add dsh-cliproxyapi-pro
 
 | 来源 | 填写内容 |
 |---|---|
-| 某个发布版本 | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v1.9.0` |
+| 某个发布版本 | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v1.9.1` |
 | 最新开发版 | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#main` |
 | 离线安装包 | 下载 [`dsh-cliproxyapi-pro.tgz`](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/releases/latest/download/dsh-cliproxyapi-pro.tgz)（始终是最新版），填写它的本地绝对路径 |
 | 本地源码（开发用） | 克隆后的仓库目录绝对路径；以链接方式安装，改代码后重载插件即生效 |
