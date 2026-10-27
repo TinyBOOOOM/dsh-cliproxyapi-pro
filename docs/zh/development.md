@@ -22,7 +22,7 @@ docs/zh/, docs/en/  中英文用户文档
 docs/dev/           开发详解；AGENTS.md 为编码 Agent 的入口
 ```
 
-<!-- MODULE-MAP: filled in by the coordinator -->
+各目录下的逐文件说明见开发文档（英文）：[Host](../dev/architecture.md#module-map)、[生成](../dev/media.md#module-map)、[额度](../dev/quota.md#module-map)、[更新](../dev/updater.md#module-map)、[客户端](../dev/client.md#module-map)、[测试](../dev/testing.md#test-layout)。修改客户端时编辑 `src/client/`，再运行 `npm run build:client` 重新生成 `lib/client.js`，两者一起提交。
 
 ```bash
 git clone https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git

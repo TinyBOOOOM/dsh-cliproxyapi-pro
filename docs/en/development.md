@@ -22,7 +22,7 @@ docs/zh/, docs/en/  Bilingual user guides
 docs/dev/           Developer detail; AGENTS.md is the coding-agent entry
 ```
 
-<!-- MODULE-MAP: filled in by the coordinator -->
+Per-file maps are in the developer guides: [host](../dev/architecture.md#module-map), [media](../dev/media.md#module-map), [quota](../dev/quota.md#module-map), [updater](../dev/updater.md#module-map), [client](../dev/client.md#module-map), [tests](../dev/testing.md#test-layout). To change the client, edit `src/client/`, run `npm run build:client` to regenerate `lib/client.js`, and commit both.
 
 ```bash
 git clone https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git

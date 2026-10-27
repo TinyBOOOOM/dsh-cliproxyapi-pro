@@ -7,9 +7,22 @@ Guide for coding agents (and humans). Read this entry point before editing; load
 A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) bundle connecting one or more [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) (CPA) servers. It discovers their catalogs and synchronizes selected chat models into `llm-pi-ai` provider routes for the DSH model picker; quota, generation and plugin updates are separate services.
 Repository: <https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro>, default branch `main`.
 
-<!-- MODULE-MAP: filled in by the coordinator -->
+## Module map
 
-Host entry: `lib/index.js`; core: `lib/host/`; apply wiring: `lib/host/apply/`. Media, quota and updater internals live in `lib/media/`, `lib/quota/` and `lib/updater/`. Client source is `src/client/`; `lib/client.js` is generated. Tests use `tests/<area>/` plus `tests/helpers/`. User docs are `README.md` / `README.en.md` and `docs/zh/` / `docs/en/`; developer detail is `docs/dev/`. See the [surface inventory](docs/dev/architecture.md).
+| Path | Owns |
+|---|---|
+| `lib/index.js` | Cordis entry (`name`, `inject`, `apply`) and the public re-export barrel; keep every existing export |
+| `lib/host/` | Account config, state, discovery, model/route building, `CpaRuntime`, `createCpaController`, HTTP gate, mount guard |
+| `lib/host/apply/` | `applyImpl` as factories over one explicit activation context: state, updates, quota, media service, image/video jobs, agent tool, commands, HTTP routes, lifecycle |
+| `lib/media/` | Media engine (barrel `index.js`): classification, preferences, stores, parsers, image/video requests, interpretation, codecs, tool schema |
+| `lib/quota/` | Quota engine (barrel `index.js`): management API, parsers, matching, `probes/`, controller |
+| `lib/updater/` | Offline updater (barrel `index.js`): preferences, SemVer, registry metadata, package verification, storage |
+| `src/client/` | Web client sources, assembled in `src/client/manifest.json` order into the generated `lib/client.js` |
+| `tests/<area>/`, `tests/helpers/` | `node:test` suites per area (`host`, `media`, `quota`, `updater`, `client`) and shared fakes |
+
+Per-file maps live in the topic guides: [host](docs/dev/architecture.md#module-map), [media](docs/dev/media.md#module-map), [quota](docs/dev/quota.md#module-map), [updater](docs/dev/updater.md#module-map), [client](docs/dev/client.md#module-map), [tests](docs/dev/testing.md#test-layout). Keep them current when you add, rename or split a module; keep hand-written files at about 600 lines or fewer (800 at most).
+
+User docs are `README.md` / `README.en.md` and `docs/zh/` / `docs/en/`; developer detail is `docs/dev/`, starting with the [surface inventory](docs/dev/architecture.md).
 
 ## Hard constraints
 
@@ -71,7 +84,7 @@ A checkout may be live-linked, including the models serving this agent. Work in 
 | Adding an account/global/update setting | [Adding settings](docs/dev/adding-settings.md), bilingual [HTTP reference](docs/en/reference.md) |
 | Tests, generated-client checks, validation commands | [Testing](docs/dev/testing.md) |
 | Live profiles, reloads, linked installations | [Live Harness](docs/dev/live-harness.md) |
-| READMEs, user guides, screenshots, shipped files | [Documentation rules](docs/dev/documentation.md), [coverage record](docs/dev/documentation-coverage.md) |
+| READMEs, user guides, screenshots, shipped files | [Documentation rules](docs/dev/documentation.md) |
 | CI, tags, npm trusted publishing, release checklist | [CI and release](docs/dev/release.md) |
 
 Keep account UI in the Settings `cliproxyapi` section and update-only UI in plugin config/tab slots. Preserve session-bound media picks and exact account-scoped quota matching. Never use navigation DOM patches, private market APIs or synthetic command events to reproduce native surfaces; the detailed client guide records the slot ids, durable tool lifecycle and compatibility behavior.

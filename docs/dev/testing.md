@@ -18,4 +18,14 @@ Do not install React just for validation.
 
 Tests live under `tests/<area>/*.test.mjs`: `host`, `media`, `quota`, `updater`, `client`; shared fixtures belong in `tests/helpers/` and must not end in `.test.mjs`. `npm run check` syntax-checks every `lib/**/*.js` and `scripts/**` file and runs `node scripts/build-client.mjs --check` before tests.
 
-<!-- MODULE-MAP: filled in by the coordinator -->
+## Test layout
+
+| Directory | Covers |
+|---|---|
+| `tests/host/` | Config/state units, multi-account controller (`harness()` in `tests/helpers/host-harness.mjs`), connection tests, media catalog/routes, image/video jobs, video edit, agent tool and consent, interpretation (activation fakes in `tests/helpers/host-mount.mjs`, `host-catalog.mjs`, `host-consent.mjs`) |
+| `tests/media/` | Media engine units (`tests/helpers/media-images.mjs`) |
+| `tests/quota/` | Quota helpers and controller (`tests/helpers/quota-harness.mjs`) |
+| `tests/updater/` | Updater preferences, SemVer, registries, package verification, downloads, update HTTP routes (`tests/helpers/updater-*.mjs`) |
+| `tests/client/` | Client rendering through the VM/Hook harness `tests/helpers/client-harness.mjs` (fixtures in `client-fixtures.mjs`), always against the generated `lib/client.js` |
+
+Keep test files at about 600 lines or fewer; when a suite grows, add another file with the same `describe` title rather than growing one file.

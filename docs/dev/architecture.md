@@ -24,7 +24,42 @@
 
 Repository: <https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro> (default branch `main`).
 
-<!-- MODULE-MAP: filled in by the coordinator -->
+## Module map
+
+The Host entry `lib/index.js` only re-exports; behavior lives in these modules (no import cycles; engines are imported only through their barrels `lib/media/index.js`, `lib/quota/index.js`, `lib/updater/index.js`).
+
+| Module | Owns |
+|---|---|
+| `lib/host/config.js` | Constants, `ACCOUNT_FIELDS` / `GLOBAL_FIELDS`, credential refs, `resolveConfig()`, `normalizeModelOverrides()` |
+| `lib/host/accounts.js` | `normalizeState()` migration, `mergeHostConfig()`, conflicts, `newAccountDefaults()`, `patchAccount()` |
+| `lib/host/state-store.js` | State path resolution and atomic `state.json` writes |
+| `lib/host/discovery.js` | `discoveryCandidates()`, `discoverCpa()`, `parseCatalog()`, plain-listing merge |
+| `lib/host/models.js` | Filtering, families, version ordering, `recommendModels()` |
+| `lib/host/routes.js` | `nativeProtocol()`, overrides, `buildPiAiRoutes()`, `managedRouteKeys()` |
+| `lib/host/runtime.js` | `CpaRuntime`: discover → build → diff-write → follow default model |
+| `lib/host/controller.js` | `createCpaController()`, `serializeSettings()` |
+| `lib/host/http-gate.js` | `ROUTES`, `admitRequest()` / `admitUpdateRequest()`, bounded JSON bodies |
+| `lib/host/mount-guard.js` | Mount-once guard across HMR generations |
+| `lib/host/status-text.js` | `/cpa-status` account and quota text |
+| `lib/host/apply-utils.js` | `outsideHmrTransaction()`, `accountPatchFromInput()` |
+| `lib/host/apply/index.js` | `applyImpl`: builds the activation context and wires the factories below in the original order |
+| `lib/host/apply/state.js` | State migration on activation, route seeding, fresh reads |
+| `lib/host/apply/controller.js` | Credentials, media preferences, account controller, refresh scheduling |
+| `lib/host/apply/updates.js` | Update preferences, `createPluginUpdater()` wiring, startup / 6-hour schedule |
+| `lib/host/apply/quota-service.js` | `createQuotaController()` wiring |
+| `lib/host/apply/media-service.js` | Media status/save, generation choices, `sessionView()`, session picks, `byteRange()` |
+| `lib/host/apply/references.js` | `readReference()` and request-image fitting |
+| `lib/host/apply/interpret.js` | `sessionChatTarget()`, `interpretParams()` |
+| `lib/host/apply/media-failures.js` | `mediaFailureText()` |
+| `lib/host/apply/session-status.js` | Job map, `api-session/status` heartbeat, `recordRun()` |
+| `lib/host/apply/image-jobs.js` | `runImageCommand`, `startImageJob()` |
+| `lib/host/apply/video-jobs.js` | `startVideoJob()`, `followVideoJob()`, `trackVideoJob()`, `resumeVideoJobs()`, remembered sources |
+| `lib/host/apply/video-command.js` | `runVideoCommand`, `videoMode()` |
+| `lib/host/apply/video-edit.js` | `runVideoEditCommand(mode)`, sources, `runVideoStatusCommand` |
+| `lib/host/apply/agent-tool.js` | `executeGenerateMedia()`, consent (`askNativeConfirm()` / fallback), budgets, `syncAgentTool()` |
+| `lib/host/apply/commands.js` | Slash-command registration and disposal order |
+| `lib/host/apply/http-routes.js` | Account / update / quota / media HTTP routes and `media/file` serving |
+| `lib/host/apply/lifecycle.js` | Startup refresh, video resume, credential listener, disposal |
 
 ## Host responsibilities
 

@@ -63,4 +63,31 @@
 - The panel renders no market UI when `market` is null (tests/previews).
 - New panel hooks go after the existing ones: the test harness seeds hook slots 0/1 as `update`/`loading`.
 
-<!-- MODULE-MAP: filled in by the coordinator -->
+## Module map
+
+`lib/client.js` is generated: `scripts/build-client.mjs` reads `src/client/manifest.json`, strips each fragment's one-line `@client-source` header, wraps the parts in the ModuleLoader prelude/epilogue, syntax-checks the result and writes LF output. `--check` (run by `npm run check`) fails when the committed file is stale. Fragments share one factory scope and are concatenated in manifest order, so a declaration must come before code that uses it at load time. Dictionary fragments (`i18n/{zh,en}/*.js`) are object-literal bodies and CSS fragments (`styles/*.css`) are template-literal text, both included at build time; `settings/account-panel.part.js` + `account-panel-models.part.js` are one contiguous `AccountPanel` function.
+
+To change the client: edit `src/client/**`, run `npm run build:client`, then `npm run check`, and commit sources and `lib/client.js` together. Never edit `lib/client.js` directly.
+
+| Source | Owns |
+|---|---|
+| `core/api.js` | React bindings, ids, `API` / `MARKET_API` paths |
+| `i18n/zh/*`, `i18n/en/*` | Dictionaries by feature: settings, updates, quota, accounts, media |
+| `styles/*.css` | `CSS` by feature: base, updates, tabs, quota, accounts, media, chat, badge |
+| `core/helpers.js` | Account draft, request and display helpers |
+| `updates/api.js` | Update error codes and isolated update requests |
+| `market.js` | `createMarketUpdater()`, `startAutoInstall()` |
+| `update-panel.js` | `PluginUpdatePanel`, `PluginUpdatePage` |
+| `settings/fields.js` | `InfoTip`, form controls, status summaries |
+| `settings/section.js` | `CpaSettingsPanel` |
+| `settings/add-account.js` | `AddAccountForm` |
+| `settings/account-panel*.part.js` | `AccountPanel` (Connection / Models / Generation / Quota tabs) |
+| `settings/page.js` | `CpaSectionPage` |
+| `media/helpers.js`, `media/panel.js` | `MediaPanel` and its helpers |
+| `quota/helpers.js`, `quota/store.js`, `quota/panel.js`, `quota/badge.js` | `summarizeModelQuota()`, `createQuotaStore()`, `QuotaPanel`, `QuotaBadge` |
+| `core/presence.js` | Composer/hero presence, `useDirectory()`, clock hooks |
+| `media/chip.js` | `MediaChip` |
+| `media/confirmation-dock.js` | `MediaConfirmationDock` |
+| `chat/tool-id.js`, `chat/tool-row.js` | `toolRunId()`, `mediaConversationDefinition`, `MediaToolRow` / `MediaCommandRow` |
+| `chat/command-helpers.js`, `chat/command-card.js` | `ImageCommandCard` and its helpers |
+| `apply.js` | `apply()`: styles, slot registrations (`registerListEntry()`), shared stores, exports |

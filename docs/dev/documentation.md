@@ -28,4 +28,3 @@
 Detailed user guides are GitHub-only and may use relative document links, but screenshot images still use absolute raw URLs.
 README links, including section links, must be absolute for npm rendering.
 Repair old intra-README anchors when moving sections.
-See [Documentation coverage](documentation-coverage.md) for the original section destinations and identifier audit.

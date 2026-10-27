@@ -8,9 +8,7 @@
 - Preferences: `loadMediaSettings()` / `saveMediaSettings()` / `applyMediaPatch()` (strict, `MediaError` codes) over `<profileDir>/.dsh-cliproxyapi/media-settings.json` `{ version: 1, agentTool, outputDir, defaultVideoSeconds, defaultVideoResolution, imageConfirm, videoConfirm, videoBudget, lastSelection, accounts: { [id]: { disabledModels, kindOverrides } } }`; every field has an effect (`agentTool`, `imageConfirm`, `videoConfirm` and `videoBudget` drive the agent tool).
 ## Model choice and image admission
 
-- Model choice: `mediaOptions()` (enabled models of enabled accounts, ref `accountId/modelId`), `matchMediaModel()` (ref → exact id → unique fragment; ambiguity is an error, never a guess) and `chooseMediaModel()` (request → session pick → last pick → only option). `createMediaSessionStore()` owns `media-sessions.json` (per-session `image`/`video` picks, the newest 48 `runs` — display records normalized by `normalizeRun()`: status `running`/`done`/`error`, model, prompt, options, times, folder label, error code/summary, never paths — and the newest 48 output paths with their `commandId`, 500 sessions; `media/session` lists 12). `/cpa-image` (`runImageCommand` in `apply`) admits synchronously: `parseImageCommand()` → `chooseMediaModel()` → working directory → attachment bytes via `attachments.readImage()` → `controller.mediaEndpoint()` (the model's own account only) → records a `running` run and returns success at once (the composer keeps the draft until the handler returns, so a long handler left the command in the input). `startImageJob()` then runs `generateImages()` (`b64_json`;
-  - URL results only `data:`/HTTPS, bounded, without the key; 3-minute timeout;
-  - URL-free error summaries) → `writeOutputFiles()` (`wx`, never replaces a file) under `outputDirectory(cwd, outputDir)` in the background (own `AbortController`, aborted on dispose → `interrupted`) and records `done`/`error` through `recordRun()`.
+- Model choice: `mediaOptions()` (enabled models of enabled accounts, ref `accountId/modelId`), `matchMediaModel()` (ref → exact id → unique fragment; ambiguity is an error, never a guess) and `chooseMediaModel()` (request → session pick → last pick → only option). `createMediaSessionStore()` owns `media-sessions.json` (per-session `image`/`video` picks, the newest 48 `runs` — display records normalized by `normalizeRun()`: status `running`/`done`/`error`, model, prompt, options, times, folder label, error code/summary, never paths — and the newest 48 output paths with their `commandId`, 500 sessions; `media/session` lists 12). `/cpa-image` (`runImageCommand` in `apply`) admits synchronously: `parseImageCommand()` → `chooseMediaModel()` → working directory → attachment bytes via `attachments.readImage()` → `controller.mediaEndpoint()` (the model's own account only) → records a `running` run and returns success at once (the composer keeps the draft until the handler returns, so a long handler left the command in the input). `startImageJob()` then runs `generateImages()` (`b64_json`; URL results only `data:`/HTTPS, bounded, without the key; 3-minute timeout; URL-free error summaries) → `writeOutputFiles()` (`wx`, never replaces a file) under `outputDirectory(cwd, outputDir)` in the background (own `AbortController`, aborted on dispose → `interrupted`) and records `done`/`error` through `recordRun()`.
 ## Session running status and file results
 
 - DSH counts only agent turns as running and has no plugin API for it, so while a job runs the plugin emits the host event `api-session/status` (`sessionId`, `true`) — at start, every 5 s (`MEDIA_HEARTBEAT_MS`; list refreshes reset it) and after `agent/status` goes idle — and `false` when the session's last job settles unless the agent itself is running.
@@ -68,4 +66,25 @@
   - It never treats a non-grant as allowed, counts every agent video's seconds on the root session (also when confirmed), refuses over the limit only in `auto`, refunds only when the run ended without a request id and with a not-submitted error code, and restarts the count when the limit changes or confirmation turns from `ask` to `auto`.
   - The only host event the plugin emits is `api-session/status` for a session with a running generation job, and it always settles it back to idle (unless the agent runs) when the jobs end or the plugin is disposed.
 
-<!-- MODULE-MAP: filled in by the coordinator -->
+## Module map
+
+`lib/media/index.js` is the barrel (exactly the former `lib/media.js` surface). Apply-level orchestration lives in `lib/host/apply/` (see the [host map](architecture.md#module-map)).
+
+| Module | Owns |
+|---|---|
+| `constants.js` | Shared limits, option domains, identifier patterns |
+| `util.js` | `MediaError`, validation, bounded response reads, safe error text |
+| `classify.js` | `detectMediaKind()`, `effectiveKind()`, CPA model aliases |
+| `settings.js` | `loadMediaSettings()` / `saveMediaSettings()` / `applyMediaPatch()` |
+| `diagnose.js` | `diagnoseMedia()` (GET-only) |
+| `choice.js` | `mediaOptions()`, `matchMediaModel()`, `chooseMediaModel()` |
+| `session-store.js` | `createMediaSessionStore()`, `normalizeRun()`, `agentPolicy()`, `applySessionPolicy()`, `chargeSeconds()` |
+| `commands/parsing.js` | `takeNaturalOptions()`, `parseImageCommand()`, `parseVideoCommand()`, `parseVideoEditCommand()` |
+| `images.js` | `generateImages()` and bounded result downloads |
+| `output-files.js` | `outputDirectory()`, output stems, `writeOutputFiles()` (`wx`) |
+| `mp4.js` | `isMp4()`, `mp4Duration()` |
+| `video.js` | `submitVideo()`, `submitVideoEdit()`, `retrieveVideo()`, `videoState()`, `downloadVideo()` |
+| `interpret.js` | `interpretationRequest()`, `parseInterpretation()`, `interpretedPrompt()`, `interpretationLabels()` |
+| `job-store.js` | `createMediaJobStore()`, `normalizeJob()` |
+| `codec/png.js`, `codec/jpeg.js`, `codec/fit.js` | `decodePng()`, `encodeJpeg()`, `fitRgb()` / `fitReferenceImage()` |
+| `agent-tool.js` | `GENERATE_MEDIA_TOOL`, `parseToolArgs()`, `toolCommandLine()`, `toolRunId()`, `approvalText()` |
