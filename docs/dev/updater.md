@@ -46,4 +46,17 @@
   - Requests racing settings changes or unmount must not overwrite newer state.
   - Dispose timers and abort in-flight work on HMR/unmount.
 
-<!-- MODULE-MAP: filled in by the coordinator -->
+## Module map
+
+`lib/updater/index.js` is the barrel (exactly the former `lib/updater.js` surface). Host wiring is `lib/host/apply/updates.js`.
+
+| Module | Owns |
+|---|---|
+| `constants.js` | `UPDATE_PACKAGE`, `UPDATE_REGISTRIES`, `UPDATE_TAGS`, `UPDATE_INTERVAL_MS`, `DEFAULT_UPDATE_SETTINGS`, size / entry / path limits, `SAFE_SEGMENT`, `ALWAYS_PACKED`, `REQUIRED_FILES` |
+| `errors.js` | `UpdateError` (page code + log-only `detail`) |
+| `settings.js` | `normalizeUpdateSettings()`, `loadUpdateSettings()`, `saveUpdateSettings()` |
+| `version.js` | `parseUpdateVersion()`, `compareUpdateVersions()` |
+| `registry.js` | `validateUpdateMetadata()`, SRI parsing, bounded fetches and validated tarball redirects |
+| `verify.js` | `packageFilePatterns()`, `verifyUpdatePackage()` |
+| `updater.js` | `createPluginUpdater()`: checks, region racing, candidate generations, downloads, `save()` |
+| `store.js` | `storeUpdatePackage()` |
