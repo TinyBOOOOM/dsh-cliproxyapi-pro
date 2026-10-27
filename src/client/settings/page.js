@@ -3,4 +3,3 @@
     function CpaSectionPage({ t }) {
       return h(CpaSettingsPanel, { t });
     }
-

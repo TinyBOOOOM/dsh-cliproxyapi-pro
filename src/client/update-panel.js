@@ -457,4 +457,3 @@
         h(PluginUpdatePanel, { t, market: sharedMarket, initiallyOpen: true })
       );
     }
-

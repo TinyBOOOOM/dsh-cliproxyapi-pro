@@ -196,9 +196,3 @@
       }
       return out;
     }
-
-    /**
-     * One page-wide quota client: GET the host snapshot (cached by the host,
-     * which refreshes stale accounts in the background) while anything is
-     * subscribed; POST refresh / key changes. Disposed with the activation.
-     */

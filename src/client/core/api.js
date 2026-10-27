@@ -44,4 +44,3 @@
       restart: "dsh-market/api/v1/restart",
     };
     const MARKET_SCHEMA = "dsh-market/update-api/v1";
-

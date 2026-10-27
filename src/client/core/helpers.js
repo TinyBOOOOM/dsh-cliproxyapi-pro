@@ -52,4 +52,3 @@
         ? "dcpa-dot dcpa-dot-error"
         : "dcpa-dot dcpa-dot-idle";
     }
-

@@ -23,11 +23,15 @@ function readPart(path) {
   // particular, do not inject comments into dictionary or CSS literal values.
   const header = path.endsWith(".css") ? /^\/\* @client-source [^\n]+ \*\/\n/ : /^\/\/ @client-source [^\n]+\n/;
   if (!header.test(text)) throw new Error(`Missing ownership header: src/client/${path}`);
-  return text.replace(header, "");
+  const body = text.replace(header, "");
+  // JavaScript fragments end with exactly one newline; the generator owns the
+  // blank line between fragments (CSS parts are template text, kept verbatim).
+  return path.endsWith(".js") ? body.replace(/\n+$/, "\n") : body;
 }
 
-function assemble(entry) {
-  if (typeof entry === "string") return readPart(entry);
+function assemble(entry, index) {
+  const gap = index === manifest.length - 1 ? "" : "\n";
+  if (typeof entry === "string") return readPart(entry) + gap;
   if (entry.dictionary) {
     if (!["zh", "en"].includes(entry.dictionary)) throw new Error("Invalid dictionary name");
     return `    const ${entry.dictionary} = {\n` + entry.parts.map(readPart).join("") + "    };\n\n";
@@ -35,12 +39,13 @@ function assemble(entry) {
   if (entry.css) return "    const CSS = `\n" + entry.css.map(readPart).join("") + "`;\n\n";
   // AccountPanel exceeds 800 lines. These two .part.js files are contiguous
   // text of that ONE unchanged function, not independent modules. Concatenate
-  // without separators or wrappers so closure capture and hook order stay exact.
-  if (entry.contiguous) return entry.contiguous.map(readPart).join("");
+  // with only the blank line that separated them, never wrappers, so closure
+  // capture and hook order stay exact.
+  if (entry.contiguous) return entry.contiguous.map(readPart).join("\n") + gap;
   throw new Error("Unknown client manifest entry");
 }
 
-const text = prelude + manifest.map(assemble).join("") + epilogue;
+const text = prelude + manifest.map((entry, index) => assemble(entry, index)).join("") + epilogue;
 // Parse the entire assembled output even in --check mode, including literal
 // fragments/continuations that are intentionally not standalone JavaScript.
 new vm.Script(text, { filename: fileURLToPath(output) });

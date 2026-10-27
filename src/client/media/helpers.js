@@ -47,4 +47,3 @@
       if (current?.mode === "limited" && !list.includes(current.seconds)) list.push(current.seconds);
       return list.sort((a, b) => a - b);
     };
-

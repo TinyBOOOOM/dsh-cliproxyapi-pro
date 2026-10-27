@@ -1,4 +1,9 @@
 // @client-source Shared quota status store and subscription hook.
+    /**
+     * One page-wide quota client: GET the host snapshot (cached by the host,
+     * which refreshes stale accounts in the background) while anything is
+     * subscribed; POST refresh / key changes. Disposed with the activation.
+     */
     function createQuotaStore(io = {}) {
       const fetchImpl = io.fetch ?? ((...args) => fetch(...args));
       const setT = io.setTimeout ?? ((fn, ms) => setTimeout(fn, ms));
@@ -140,4 +145,3 @@
       }, [store]);
       return store ? store.getSnapshot() : { data: null, loading: false, error: null, busy: null };
     }
-

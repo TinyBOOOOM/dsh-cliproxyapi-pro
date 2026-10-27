@@ -69,4 +69,3 @@
           h("p", { className: "dcpa-chat-note" }, t("mediaConfirmNote")))),
         notice ? h("p", { role: "alert", className: "dcpa-chat-note" }, notice) : null);
     }
-
