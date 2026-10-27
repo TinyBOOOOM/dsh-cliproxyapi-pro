@@ -9,7 +9,7 @@ import { gzipSync } from "node:zlib";
 import {
   DEFAULT_UPDATE_SETTINGS, UPDATE_INTERVAL_MS, UPDATE_PACKAGE, UPDATE_REGISTRIES, UPDATE_TAGS,
   UpdateError, compareUpdateVersions, createPluginUpdater, loadUpdateSettings,
-  normalizeUpdateSettings, parseUpdateVersion, saveUpdateSettings, storeUpdatePackage,
+  normalizeUpdateSettings, packageFilePatterns, parseUpdateVersion, saveUpdateSettings, storeUpdatePackage,
   validateUpdateMetadata, verifyUpdatePackage,
 } from "../lib/updater.js";
 
@@ -472,12 +472,19 @@ describe("SRI, gzip and restricted tar verification without extraction", () => {
   test("the repository's real package.json and shipped files pass verification", () => {
     const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
     const real = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+    // Expand `files` like npm does (globs included) over the working tree.
+    const patterns = packageFilePatterns(real.files);
     const shipped = new Set(["package.json"]);
-    for (const pattern of real.files) {
-      if (!pattern.includes("*")) { shipped.add(pattern); continue; }
-      const dir = dirname(pattern), suffix = basename(pattern).replace("*", "");
-      for (const name of readdirSync(join(root, dir))) if (name.endsWith(suffix)) shipped.add(`${dir}/${name}`);
-    }
+    const walk = (dir) => {
+      for (const entry of readdirSync(join(root, dir), { withFileTypes: true })) {
+        if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+        const name = dir ? `${dir}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) walk(name);
+        else if (patterns.some((re) => re.test(name))) shipped.add(name);
+      }
+    };
+    walk("");
+    for (const required of ["lib/index.js", "lib/client.js", "cordis.patch.yml", "locale/en.json", "locale/zh.json"]) assert.ok(shipped.has(required), required);
     const entries = [...shipped].map((name) => ({ name: `package/${name}`, data: readFileSync(join(root, name)) }));
     const pkg = fixture({ version: real.version, entries });
     assert.equal(verifyUpdatePackage(pkg.bytes, pkg.expected).version, real.version);
