@@ -19,7 +19,7 @@
   So wait at least one release after the `files`-based verifier before shipping a file outside the old list (`CHANGELOG.en.md` is repository-only until then), and mention in the CHANGELOG that 1.5.0–1.6.0 users should update through the market or npm once.
 - Describe only behavior the code has; the community plugin list checks descriptions against the source. Distinguish automatic downloading from automatic installation, and integrity checks from authenticity verification.
 - Screenshots live in `assets/screenshots/` and are referenced by both READMEs and by `screenshots.json` (1–8 relative paths, read by plugin storefronts such as dsh-market).
-  The storefront set is a deliberate subset, in order: `connection.png`, `model-filter.png`, `generation.png`, `quota-badge.png`; the READMEs keep all screenshots.
+  The storefront set is a deliberate subset, in order: `connection.png`, `model-filter.png`, `quota-badge.png`; the READMEs keep all screenshots.
   The storefront description itself lives in the awesome-dsh-plugin entry `data/plugins/TinyBOOOOM__dsh-cliproxyapi-pro.yml`, not in this repository.
   They are not shipped in the npm package.
   When the panel changes visibly, retake them, keep them free of real keys, server URLs and private data, and keep the captions in both READMEs accurate.
