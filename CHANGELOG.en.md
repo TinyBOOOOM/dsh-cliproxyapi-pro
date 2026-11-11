@@ -4,7 +4,7 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 1.10.0 — 2026-11-11
 
 ### Added
 - **Recommendations by product line.** **Reset to Recommended** and the first-run selection of a new account no longer take only the highest version of each family. Claude Opus / Sonnet / Haiku / Fable, GPT sol / terra / luna / astra, Gemini / Gemini Flash and so on are separate product lines: each line is represented by its newest model (by release date when known, which fixes `grok-4.20` reading as newer than `grok-4.7`), preferring models without `-thinking` / `-fast` / `-1m` suffixes and `devin/` prefixes; lines more than 180 days older than their family's newest model and models deprecated upstream are not recommended. Only flagships are recommended: lines whose online capability score reaches 80% of this server's strongest line, at most 12, so light lines and unscored niche models stay out; without scores, the non-light lines of well-known vendors. In addition, every channel the account connects (by prefix or `owned_by`) gets at least its own best model, such as `devin/swe-2` for the Devin channel and the best Grok for a Grok channel. Opaque ids (such as `model_private_12`) are judged by their display name. Recommended models carry a **Recommended** tag whose ⓘ tip gives the reason.
