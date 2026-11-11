@@ -70,6 +70,10 @@ describe("model advice", () => {
       "claude-fable 产品线的最新型号，2026-11-09 发布（依据：在线模型资料）；能力评分 64.6，接近本服务最强模型"
     );
     assert.equal(en, "Newest model of the claude-fable line (based on: version in the model name)");
+    assert.equal(
+      h.recommendationReason((k) => h.zh[k] ?? k, { id: "devin/swe-2", line: "swe", source: "name", via: "channel", channel: "devin" }),
+      "devin 渠道自己最好的模型（swe 产品线）：每个接入的渠道至少推荐一个（依据：模型名称中的版本号）"
+    );
     for (const key of Object.keys(h.zh)) assert.ok(key in h.en, `en is missing ${key}`);
   });
 });

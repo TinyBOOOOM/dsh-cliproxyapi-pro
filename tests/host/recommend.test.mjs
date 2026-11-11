@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { planRecommendations, recommendModels, selectionSuggestions } from "../../lib/index.js";
 import { lineFromText, matchKeys, modelLine, parseName } from "../../lib/host/model-names.js";
-import { FLAGSHIP_RATIO, STALE_LINE_DAYS, analyzeModels } from "../../lib/host/recommend.js";
+import { FLAGSHIP_RATIO, STALE_LINE_DAYS, analyzeModels, modelChannel } from "../../lib/host/recommend.js";
 import { RECORDED, catalog, onlineLookup } from "../helpers/model-fixtures.mjs";
 
 const m = (id, extra = {}) => ({ id, inputModalities: ["text"], reasoning: false, reasoningLevels: [], ...extra });
@@ -51,7 +51,8 @@ describe("recommendations", () => {
     assert.deepEqual(serverB.details[0], { id: "claude-fable-5-2", line: "claude-fable", family: "claude", released: "2026-11-09", score: 64.6, source: "online" });
 
     const serverA = planRecommendations(catalog("server-a").chat, { lookup, now: RECORDED });
-    assert.deepEqual(serverA.ids, [
+    const flagships = serverA.details.filter((d) => d.via === undefined);
+    assert.deepEqual(flagships.map((d) => d.id), [
       "devin/claude-opus-5-5",
       "gpt-6-astra",
       "gpt-6.1-sol",
@@ -60,10 +61,35 @@ describe("recommendations", () => {
       "devin/gemini-4-argon",
       "devin/claude-fable-5-1",
     ]);
-    const best = serverA.details[0].score;
-    assert.ok(serverA.details.every((d) => d.score >= best * FLAGSHIP_RATIO));
-    assert.ok(!serverA.ids.some((id) => /[-/](luna|haiku|flash|lite|mini)(-|$)|inkling|nemotron|swe|gpt-oss|model_private/.test(id)), "light, unscored and niche lines fall away");
-    assert.equal(planRecommendations(catalog("server-a").chat, { lookup, now: RECORDED, max: 3 }).ids.length, 3);
+    const best = flagships[0].score;
+    assert.ok(flagships.every((d) => d.score >= best * FLAGSHIP_RATIO));
+    assert.ok(!flagships.some((d) => /[-/](luna|haiku|flash|lite|mini)(-|$)|inkling|nemotron|swe|gpt-oss|model_private/.test(d.id)), "light, unscored and niche lines fall away");
+    // Every connected channel still gets its own best model.
+    assert.deepEqual(
+      serverA.details.filter((d) => d.via === "channel").map((d) => [d.channel, d.id]),
+      [["antigravity", "gemini-3.8-flash-high"], ["xai", "grok-4.7"], ["devin", "devin/swe-2"]]
+    );
+    const three = planRecommendations(catalog("server-a").chat, { lookup, now: RECORDED, max: 3 });
+    assert.deepEqual(three.ids, ["gemini-3.8-flash-high", "grok-4.7", "devin/swe-2"], "channel picks keep their place under a small cap");
+  });
+
+  it("adds the best own model of every channel that has none yet", () => {
+    const lookup = (model) => ({ "devin/claude-opus-5-5": { intelligence: 60 }, "gpt-6": { intelligence: 58 } })[model.id];
+    const models = [
+      m("gpt-6", { ownedBy: "openai" }),
+      m("devin/claude-opus-5-5", { ownedBy: "anthropic" }),
+      m("devin/swe-1-7", { ownedBy: "cognition" }),
+      m("devin/swe-2", { ownedBy: "cognition" }),
+      m("devin/inkling", { ownedBy: "devin" }),
+      m("grok-4.7", { ownedBy: "xai" }),
+      m("grok-4.7-fast", { ownedBy: "xai" }),
+    ];
+    const plan = planRecommendations(models, { lookup, now: RECORDED });
+    assert.deepEqual(plan.ids, ["devin/claude-opus-5-5", "gpt-6", "devin/swe-2", "grok-4.7"], "Devin's main own line (SWE), Grok without a variant; OpenAI is already in");
+    assert.deepEqual(plan.details[2], { id: "devin/swe-2", line: "swe", family: "swe", source: "name", via: "channel", channel: "devin" });
+    assert.equal(modelChannel(m("devin/swe-2")), "devin");
+    assert.equal(modelChannel(m("grok-4.7", { ownedBy: "xAI" })), "xai");
+    assert.equal(modelChannel(m("plain")), undefined);
   });
 
   it("without scores: fresh non-light lines of well-known families, families in turns", () => {

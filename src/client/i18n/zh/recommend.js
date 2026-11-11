@@ -2,6 +2,7 @@
       badgeRecommended: "推荐",
       recommendReason: "{line} 产品线的最新型号（依据：{source}）",
       recommendReasonDated: "{line} 产品线的最新型号，{date} 发布（依据：{source}）",
+      recommendReasonChannel: "{channel} 渠道自己最好的模型（{line} 产品线）：每个接入的渠道至少推荐一个（依据：{source}）",
       recommendReasonScore: "；能力评分 {score}，接近本服务最强模型",
       recommendSourceOnline: "在线模型资料",
       recommendSourceCatalog: "CPA 目录日期",

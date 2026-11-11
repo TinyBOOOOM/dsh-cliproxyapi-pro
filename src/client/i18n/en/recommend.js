@@ -2,6 +2,7 @@
       badgeRecommended: "Recommended",
       recommendReason: "Newest model of the {line} line (based on: {source})",
       recommendReasonDated: "Newest model of the {line} line, released {date} (based on: {source})",
+      recommendReasonChannel: "The {channel} channel's own best model ({line} line): every connected channel gets at least one (based on: {source})",
       recommendReasonScore: "; capability score {score}, close to this server's strongest model",
       recommendSourceOnline: "online model info",
       recommendSourceCatalog: "CPA catalog dates",

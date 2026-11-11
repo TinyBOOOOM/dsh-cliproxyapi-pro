@@ -3,6 +3,9 @@
     function recommendationReason(t, detail) {
       if (!detail) return "";
       const source = t(detail.source === "online" ? "recommendSourceOnline" : detail.source === "catalog" ? "recommendSourceCatalog" : "recommendSourceName");
+      if (detail.via === "channel") {
+        return fmt(t, "recommendReasonChannel", { channel: detail.channel ?? "", line: detail.line, source });
+      }
       const base = detail.released
         ? fmt(t, "recommendReasonDated", { line: detail.line, date: detail.released, source })
         : fmt(t, "recommendReason", { line: detail.line, source });
