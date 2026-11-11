@@ -2,6 +2,7 @@
       badgeRecommended: "Recommended",
       recommendReason: "Newest model of the {line} line (based on: {source})",
       recommendReasonDated: "Newest model of the {line} line, released {date} (based on: {source})",
+      recommendReasonScore: "; capability score {score}, close to this server's strongest model",
       recommendSourceOnline: "online model info",
       recommendSourceCatalog: "CPA catalog dates",
       recommendSourceName: "version in the model name",

@@ -156,7 +156,7 @@ describe("multi-account", () => {
     assert.ok(h.providers["cli-proxy-messages"], "the disabled duplicate must not remove the first account's routes");
   });
 
-  it("recommends the newest model of each family from the catalog itself", () => {
+  it("recommends from the catalog itself, newest per line, at most 12", () => {
     const m = (id, name) => ({ id, ...(name ? { name } : {}), inputModalities: ["text"], reasoning: false, reasoningLevels: [] });
     const ids = recommendModels([
       m("gpt-5.5"),
@@ -167,10 +167,11 @@ describe("multi-account", () => {
       m("gemini-3-flash"),
       m("kimi-k3"),
     ]);
+    // Offline: well-known families, non-light fresh lines; Sonnet 4.6 is a generation behind Opus 5.5.
     assert.deepEqual(ids, ["gpt-6.1", "claude-opus-5-5", "gemini-3-flash", "kimi-k3"]);
     assert.deepEqual(recommendModels([]), []);
-    const many = Array.from({ length: 30 }, (_, i) => m(`fam${String.fromCharCode(97 + (i % 26))}${i}-1`));
-    assert.equal(recommendModels(many).length, 12);
+    const words = Array.from({ length: 20 }, (_, i) => `q${String.fromCharCode(97 + i)}x`);
+    assert.equal(recommendModels(words.map((w) => m(`qwen-${w}-3`))).length, 12);
   });
 
   it("seeds a first-run selection from the server's catalog instead of fixed ids", async () => {

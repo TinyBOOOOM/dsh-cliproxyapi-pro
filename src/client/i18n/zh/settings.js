@@ -59,7 +59,7 @@
       selectAllVisibleBtn: "全选当前列表",
       deselectAllVisibleBtn: "取消当前列表",
       selectRecommendedBtn: "恢复推荐精选",
-      selectRecommendedHint: "按产品线推荐（如 Claude Opus / Sonnet / Fable 各算一条线）：每条线取最新型号，各家族轮流取最强的线，被同家族新品淘汰的旧线不推荐，最多 12 个。开启在线模型资料时参考发布日期、弃用状态和能力评分。",
+      selectRecommendedHint: "只推荐旗舰：每条产品线（如 Claude Opus / Sonnet / Fable）取最新型号，再按在线资料的能力评分只保留达到本服务最强模型 80% 的产品线，最多 12 个；轻量、无评分的小众模型和被新品淘汰的旧线不推荐。关闭在线模型资料时改为推荐主流厂商的非轻量产品线。",
       badgeVision: "视觉 Image",
       badgeReasoning: "推理",
        badgeSelected: "已启用",

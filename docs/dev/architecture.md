@@ -36,7 +36,7 @@ The Host entry `lib/index.js` only re-exports; behavior lives in these modules (
 | `lib/host/discovery.js` | `discoveryCandidates()`, `discoverCpa()`, `parseCatalog()`, plain-listing merge |
 | `lib/host/models.js` | Filtering, families (`KNOWN_FAMILY`, `modelFamily()`), version ordering |
 | `lib/host/model-names.js` | Id tokenization: line words, versions, variants, `modelLine()`, `matchKeys()` for online matching |
-| `lib/host/recommend.js` | `analyzeModels()` (lines, families, staleness), `planRecommendations()` / `recommendModels()`, `selectionSuggestions()` |
+| `lib/host/recommend.js` | `analyzeModels()` (lines, families, staleness, line scores), `planRecommendations()` / `recommendModels()` (flagships, `FLAGSHIP_RATIO`), `selectionSuggestions()` |
 | `lib/host/model-info.js` | Online model info: models.dev / OpenRouter parsing, compact `model-info.json` cache, `createModelInfo()` service, `withOnlineLimits()` |
 | `lib/host/routes.js` | `nativeProtocol()`, overrides, `buildPiAiRoutes()`, `managedRouteKeys()` |
 | `lib/host/runtime.js` | `CpaRuntime`: discover → build → diff-write → follow default model |

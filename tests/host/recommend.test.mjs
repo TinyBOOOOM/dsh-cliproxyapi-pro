@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { planRecommendations, recommendModels, selectionSuggestions } from "../../lib/index.js";
 import { lineFromText, matchKeys, modelLine, parseName } from "../../lib/host/model-names.js";
-import { STALE_LINE_DAYS } from "../../lib/host/recommend.js";
+import { FLAGSHIP_RATIO, STALE_LINE_DAYS, analyzeModels } from "../../lib/host/recommend.js";
 import { RECORDED, catalog, onlineLookup } from "../helpers/model-fixtures.mjs";
 
 const m = (id, extra = {}) => ({ id, inputModalities: ["text"], reasoning: false, reasoningLevels: [], ...extra });
@@ -44,40 +44,37 @@ describe("model names", () => {
 });
 
 describe("recommendations", () => {
-  it("recommends one model per product line, not one per vendor", () => {
-    const { chat } = catalog("server-b");
-    // Offline: the CPA listing's own `created` dates order the lines.
-    const plan = planRecommendations(chat, { now: RECORDED });
-    assert.deepEqual([...plan.ids].sort(), ["claude-fable-5-2", "claude-haiku-5-5", "claude-opus-5-5", "claude-sonnet-5-5"]);
-    assert.deepEqual(plan.details.find((d) => d.id === "claude-fable-5-2"), {
-      id: "claude-fable-5-2",
-      line: "claude-fable",
-      family: "claude",
-      released: "2026-11-09",
-      source: "catalog",
-    });
-  });
-
-  it("uses online capability scores to order lines and release dates to pick models", () => {
+  it("recommends flagships by capability score, not one model per family", () => {
     const lookup = onlineLookup();
     const serverB = planRecommendations(catalog("server-b").chat, { lookup, now: RECORDED });
-    assert.deepEqual(serverB.ids, ["claude-fable-5-2", "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]);
-    assert.ok(serverB.details.every((d) => d.source === "online"));
+    assert.deepEqual(serverB.ids, ["claude-fable-5-2", "claude-opus-5-5", "claude-sonnet-5-5"], "Haiku (36.5) is far below Fable (64.6)");
+    assert.deepEqual(serverB.details[0], { id: "claude-fable-5-2", line: "claude-fable", family: "claude", released: "2026-11-09", score: 64.6, source: "online" });
 
     const serverA = planRecommendations(catalog("server-a").chat, { lookup, now: RECORDED });
-    assert.equal(serverA.ids.length, 12);
-    assert.ok(serverA.ids.includes("grok-4.7"), "dates beat the 4.20 > 4.7 version reading");
-    assert.ok(!serverA.ids.some((id) => /non-reasoning|thinking|model_private/.test(id)), "no variants or opaque ids");
-    assert.ok(serverA.ids.includes("devin/gemini-4-argon"), "a line a newer one left behind (gemini 3.1 pro) is stale");
-    assert.ok(serverA.ids.includes("devin/claude-opus-5-5"));
-    const families = serverA.details.map((d) => d.family);
-    assert.equal(new Set(families.slice(0, 11)).size, 11, "first round: one line of each of the 11 families");
-    assert.deepEqual(serverA.details[11], { id: "gpt-6.1-sol", line: "gpt-sol", family: "gpt", released: "2026-09-29", source: "online" }, "then the next line of the first family");
-    assert.ok(!serverA.ids.includes("grok-composer-2.5-fast"), "a 2025 grok line is stale next to grok 4.7");
+    assert.deepEqual(serverA.ids, [
+      "devin/claude-opus-5-5",
+      "gpt-6-astra",
+      "gpt-6.1-sol",
+      "devin/claude-sonnet-5-5",
+      "gpt-6.1-terra",
+      "devin/gemini-4-argon",
+      "devin/claude-fable-5-1",
+    ]);
+    const best = serverA.details[0].score;
+    assert.ok(serverA.details.every((d) => d.score >= best * FLAGSHIP_RATIO));
+    assert.ok(!serverA.ids.some((id) => /[-/](luna|haiku|flash|lite|mini)(-|$)|inkling|nemotron|swe|gpt-oss|model_private/.test(id)), "light, unscored and niche lines fall away");
+    assert.equal(planRecommendations(catalog("server-a").chat, { lookup, now: RECORDED, max: 3 }).ids.length, 3);
+  });
 
-    const more = planRecommendations(catalog("server-a").chat, { lookup, now: RECORDED, max: 40 });
-    assert.ok(more.ids.includes("gpt-6.1-sol") && more.ids.includes("devin/claude-sonnet-5-5"), "later rounds add the next lines");
-    assert.ok(!more.ids.includes("devin/gpt-5-5"), "old generations stay out even with room");
+  it("without scores: fresh non-light lines of well-known families, families in turns", () => {
+    const serverB = planRecommendations(catalog("server-b").chat, { now: RECORDED });
+    assert.deepEqual([...serverB.ids].sort(), ["claude-fable-5-2", "claude-opus-5-5", "claude-sonnet-5-5"]);
+    assert.equal(serverB.details.find((d) => d.id === "claude-fable-5-2").source, "catalog", "the CPA listing's own dates");
+    const serverA = planRecommendations(catalog("server-a").chat, { now: RECORDED });
+    assert.ok(serverA.ids.includes("grok-4.7"), "dates beat the 4.20 > 4.7 version reading");
+    assert.ok(!serverA.ids.some((id) => /inkling|nemotron|non-reasoning|thinking|model_private/.test(id)), "unknown families, variants and opaque ids stay out");
+    assert.ok(!serverA.ids.includes("devin/gemini-3-1-pro"), "a line a newer one left behind is stale");
+    assert.equal(serverA.ids.length, 12);
   });
 
   it("prefers plain ids, newest dates and non-variants inside a line", () => {
@@ -90,32 +87,38 @@ describe("recommendations", () => {
     ]);
     assert.deepEqual(ids, ["gpt-6.1", "claude-opus-5-5"]);
     assert.deepEqual(recommendModels([]), []);
-    const many = Array.from({ length: 30 }, (_, i) => m(`fam${String.fromCharCode(97 + (i % 26))}${i}-1`));
-    assert.equal(recommendModels(many).length, 12);
   });
 
-  it("drops lines left behind by their family", () => {
+  it("marks lines left behind by their family as stale", () => {
     const t = (days) => Math.floor(RECORDED / 1000) - days * DAY;
-    const dated = recommendModels(
-      [m("acme-pro-3", { created: t(STALE_LINE_DAYS + 30) }), m("acme-max-4", { created: t(10) }), m("acme-mini-4", { created: t(STALE_LINE_DAYS - 30) })],
-      { now: RECORDED }
+    const staleOf = (models) => Object.fromEntries(analyzeModels(models, { now: RECORDED }).lines.map((l) => [l.label, l.stale]));
+    assert.deepEqual(
+      staleOf([m("qwen-pro-3", { created: t(STALE_LINE_DAYS + 30) }), m("qwen-max-4", { created: t(10) }), m("qwen-plus-4", { created: t(STALE_LINE_DAYS - 30) })]),
+      { "qwen-pro": true, "qwen-max": false, "qwen-plus": false }
     );
-    assert.deepEqual(dated, ["acme-max-4", "acme-mini-4"]);
     // Without dates, an older major version is stale.
-    assert.deepEqual(recommendModels([m("acme-pro-3"), m("acme-max-4"), m("acme-mini-4")]), ["acme-max-4", "acme-mini-4"]);
+    assert.deepEqual(staleOf([m("qwen-pro-3"), m("qwen-max-4"), m("qwen-plus-4")]), { "qwen-pro": true, "qwen-max": false, "qwen-plus": false });
+    assert.deepEqual(recommendModels([m("qwen-pro-3"), m("qwen-max-4"), m("qwen-plus-4")]), ["qwen-max-4", "qwen-plus-4"]);
   });
 
   it("never recommends retired models and borrows dates for prefixed twins", () => {
     const lookup = (model) =>
-      model.id === "acme-max-5" ? { status: "deprecated", exact: true } : model.id === "acme-max-4" ? { expires: "2026-01-01", exact: true } : undefined;
-    assert.deepEqual(recommendModels([m("acme-max-5"), m("acme-max-4"), m("acme-max-3")], { lookup, now: RECORDED }), ["acme-max-3"]);
-    const twins = [m("acme-4.20", { created: 1000 }), m("acme-4.7", { created: 9000 }), m("vendor/acme-4-7")];
-    assert.deepEqual(recommendModels(twins, { now: RECORDED }), ["acme-4.7"], "the twin's date keeps the line dated: 4.7 is newer than 4.20");
+      model.id === "qwen-max-5" ? { status: "deprecated", exact: true } : model.id === "qwen-max-4" ? { expires: "2026-01-01", exact: true } : undefined;
+    assert.deepEqual(recommendModels([m("qwen-max-5"), m("qwen-max-4"), m("qwen-max-3")], { lookup, now: RECORDED }), ["qwen-max-3"]);
+    const twins = [m("qwen-4.20", { created: 1000 }), m("qwen-4.7", { created: 9000 }), m("vendor/qwen-4-7")];
+    assert.deepEqual(recommendModels(twins, { now: RECORDED }), ["qwen-4.7"], "the twin's date keeps the line dated: 4.7 is newer than 4.20");
     const ids = recommendModels(
-      [m("acme-4.1", { created: 1000 }), m("acme-4.7", { created: 9000 }), m("vendor/acme-4-7"), m("vendor/acme-4-8")],
+      [m("qwen-4.1", { created: 1000 }), m("qwen-4.7", { created: 9000 }), m("vendor/qwen-4-7"), m("vendor/qwen-4-8")],
       { now: RECORDED }
     );
-    assert.deepEqual(ids, ["vendor/acme-4-8"], "dates only decide when every member has one");
+    assert.deepEqual(ids, ["vendor/qwen-4-8"], "dates only decide when every member has one");
+  });
+
+  it("scores a line by its best known member when the newest is not scored yet", () => {
+    const lookup = (model) => ({ "qwen-max-4": { intelligence: 60 }, "qwen-plus-5": { intelligence: 40 }, "qwen-turbo-5": { intelligence: 50 } })[model.id];
+    const t = Math.floor(RECORDED / 1000);
+    const plan = planRecommendations([m("qwen-max-4", { created: t - 100 * DAY }), m("qwen-max-5", { created: t }), m("qwen-plus-5"), m("qwen-turbo-5")], { lookup, now: RECORDED });
+    assert.deepEqual(plan.details.map((d) => [d.id, d.score]), [["qwen-max-5", 60], ["qwen-turbo-5", 50]], "40 < 60 x 0.8");
   });
 });
 

@@ -65,6 +65,10 @@ describe("model advice", () => {
     const zh = h.recommendationReason((k) => h.zh[k] ?? k, detail);
     const en = h.recommendationReason((k) => h.en[k] ?? k, { ...detail, released: undefined, source: "name" });
     assert.equal(zh, "claude-fable 产品线的最新型号，2026-11-09 发布（依据：在线模型资料）");
+    assert.equal(
+      h.recommendationReason((k) => h.zh[k] ?? k, { ...detail, score: 64.6 }),
+      "claude-fable 产品线的最新型号，2026-11-09 发布（依据：在线模型资料）；能力评分 64.6，接近本服务最强模型"
+    );
     assert.equal(en, "Newest model of the claude-fable line (based on: version in the model name)");
     for (const key of Object.keys(h.zh)) assert.ok(key in h.en, `en is missing ${key}`);
   });

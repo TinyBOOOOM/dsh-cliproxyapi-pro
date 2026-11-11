@@ -38,7 +38,7 @@ describe("recommendations in the account controller", () => {
     const payload = await h.controller.statusPayload();
     const [account] = payload.accounts;
     assert.equal(account.status.state, "connected", account.status.error);
-    assert.deepEqual(account.recommendedModels, ["claude-fable-5-2", "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]);
+    assert.deepEqual(account.recommendedModels, ["claude-fable-5-2", "claude-opus-5-5", "claude-sonnet-5-5"]);
     assert.equal(account.recommendations[0].source, "online");
     assert.deepEqual(account.suggestions.upgrades.map((u) => [u.from, u.to]), [[["claude-fable-5-1"], "claude-fable-5-2"]]);
     assert.deepEqual(account.suggestions.missing, [{ id: "claude-gone-1" }]);
@@ -53,7 +53,7 @@ describe("recommendations in the account controller", () => {
     const h = harness({ accounts: [{ id: "default", baseURL: "http://b.test" }] }, {}, { fetch: recordedFetch({ "b.test": "server-b" }), modelInfo });
     await h.controller.refreshAll();
     assert.equal(modelInfo.state.readyCalls, 1);
-    assert.deepEqual(h.state().accounts[0].selectedModels, ["claude-fable-5-2", "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]);
+    assert.deepEqual(h.state().accounts[0].selectedModels, ["claude-fable-5-2", "claude-opus-5-5", "claude-sonnet-5-5"], "flagships by score, not the offline order");
     // A saved selection never waits again.
     await h.controller.refreshAll();
     assert.equal(modelInfo.state.readyCalls, 1);

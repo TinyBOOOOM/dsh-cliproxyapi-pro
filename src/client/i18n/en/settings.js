@@ -59,7 +59,7 @@
       selectAllVisibleBtn: "Check Visible",
       deselectAllVisibleBtn: "Uncheck Visible",
       selectRecommendedBtn: "Reset to Recommended",
-      selectRecommendedHint: "Recommends by product line (Claude Opus, Sonnet and Fable are separate lines): the newest model of each line, the strongest lines of every family in turn, skipping lines a newer one in the family left behind; at most 12. With online model info on, release dates, retirement and capability scores are used too.",
+      selectRecommendedHint: "Flagships only: the newest model of each product line (Claude Opus, Sonnet, Fable, …), keeping only lines whose online capability score reaches 80% of this server's strongest, at most 12; light, unscored niche models and lines a newer one left behind are skipped. With online model info off, the non-light lines of well-known vendors are recommended instead.",
       badgeVision: "Image",
       badgeReasoning: "Reasoning",
       badgeSelected: "Active",

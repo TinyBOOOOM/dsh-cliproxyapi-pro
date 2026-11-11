@@ -3,9 +3,10 @@
     function recommendationReason(t, detail) {
       if (!detail) return "";
       const source = t(detail.source === "online" ? "recommendSourceOnline" : detail.source === "catalog" ? "recommendSourceCatalog" : "recommendSourceName");
-      return detail.released
+      const base = detail.released
         ? fmt(t, "recommendReasonDated", { line: detail.line, date: detail.released, source })
         : fmt(t, "recommendReason", { line: detail.line, source });
+      return typeof detail.score === "number" ? `${base}${fmt(t, "recommendReasonScore", { score: detail.score })}` : base;
     }
 
     function modelInfoStatusText(t, info) {
