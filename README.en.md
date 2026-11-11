@@ -76,7 +76,7 @@ All versions are listed under [Releases](https://github.com/TinyBOOOOM/dsh-clipr
 
 1. **Open the settings panel**: **Settings** → the **CLIProxyAPI** page in the left navigation (accounts, models and protocols live there). The plugin's own updates are on sidebar **Plugins** → **CLIProxyAPI** and on **Settings** → **Built-in plugins** → the **CLIProxyAPI** tab; those two places contain only update features.
 2. **Add an account**: click **+ Add Account**, enter an account name, the **Base URL** (e.g. `http://127.0.0.1:8317`, without `/v1`) and the **API Key** (leave it empty for a local CPA without authentication), then click **Connect**. A successful connection creates and enables the account; on failure the reason is shown so you can fix it, or choose **Add Anyway (Disabled)**.
-3. **Choose models**: the account's **Models** tab lists every model on the server, with the newest model of each family already checked. Adjust the selection and click **Save & Apply** at the bottom.
+3. **Choose models**: the account's **Models** tab lists every model on the server, with the recommended models already checked by product line (the newest Claude Opus, Sonnet, Fable, …, informed by [online model info](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/en/accounts-and-models.md#recommendations-and-suggestions), on by default and download only). Adjust the selection and click **Save & Apply** at the bottom.
 4. **Use them**: open the model picker in a conversation; the models appear in a group named after the account.
 
 If CPA runs on this machine on the default port `8317` without a key, there is nothing to fill in: the plugin finds it automatically.

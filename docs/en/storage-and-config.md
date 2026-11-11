@@ -9,6 +9,7 @@
     "version": 2,
     "refreshIntervalSeconds": 300,
     "probeTimeoutMs": 5000,
+    "onlineModelInfo": true,
     "accounts": [
       {
         "id": "default", "enabled": true, "provider": "cli-proxy", "displayName": "CLI Proxy API",
@@ -20,7 +21,7 @@
   }
   ```
 
-  The file is re-read on every access; after a manual edit, click **Probe & Refresh** in the account's **⋯** menu. A single-account file from 1.3.x and earlier migrates automatically into account `default` with the same routes, key and selection, and the original is kept as `state.v1.json`.
+  `onlineModelInfo` is the all-account **Online Model Info** switch; a file without it reads as on (see [Recommendations and suggestions](accounts-and-models.md#recommendations-and-suggestions)). The file is re-read on every access; after a manual edit, click **Probe & Refresh** in the account's **⋯** menu. A single-account file from 1.3.x and earlier migrates automatically into account `default` with the same routes, key and selection, and the original is kept as `state.v1.json`.
 
 - **Update settings**: stored separately at `<profile dir>/.dsh-cliproxyapi/update-settings.json`. They neither extend nor rewrite the account `state.json` v2 file, nor access credentials. When this file does not yet exist, defaults are:
 
@@ -58,6 +59,7 @@
 
 - **Per-session generation records**: `<profile dir>/.dsh-cliproxyapi/media-sessions.json` keeps each session's picked generation models, records of its last 48 runs (status, model, prompt, options, start and end times, a display name for the save folder, error summary), and the paths of its last 48 generated files with the command id that produced them (for the command rows in the conversation), for the 500 most recently updated sessions. Deleting it only clears those picks and records, never generated files. A damaged file is treated as empty and kept as `media-sessions.corrupt-<time>.json` before the next write.
 - **Video jobs**: `<profile dir>/.dsh-cliproxyapi/media-jobs.json` keeps submitted video jobs (CPA request id, account, model, session and command id, working directory and save location, prompt, length, submission time, state) so a reload or restart can keep waiting; at most 200, finished ones kept 7 days. No keys and no video URLs. A damaged file is treated as empty and kept as `media-jobs.corrupt-<time>.json` before the next write.
+- **Online model info cache**: `<profile dir>/.dsh-cliproxyapi/model-info.json` holds the compact model data downloaded from models.dev and OpenRouter (model id, product line, release date, status, limits, price, capability score) plus each source's download time, ETag and latest error; it contains no account data. Deleting it only makes the next check download again; with **Online Model Info** off it is neither used nor updated.
 - **Management key failures**: `<profile dir>/.dsh-cliproxyapi/quota-state.json` records, per account, how many times in a row the CPA management API rejected the key (401/403), the last error code and time, so automatic checks stop after 3; it never holds the key. Deleting it only resets the counts.
 - **Keys**: stored and resolved by ref through the DSH `credentials` service, falling back to an environment variable of the same name.
 - **Environment**: `CLIPROXYAPI_BASE_URL` is used only for auto-discovery of accounts without a base URL.

@@ -167,3 +167,19 @@ select.dcpa-q-input { appearance: auto; padding-right: 8px; }
 .dcpa-models .dcpa-model-row:hover { background: var(--dsw-alias-interactive-bg-hover, transparent); }
 .dcpa-models .dcpa-badge { border: 0; background: var(--dsw-alias-interactive-bg-hover, var(--dsw-alias-bg-layer-2)); border-radius: 999px; padding: 1px 8px; }
 .dcpa-models .dcpa-editor { border-top: 0; padding: 4px 0 6px 25px; }
+/* Online model info switch, recommendation badge and selection suggestions. */
+.dcpa-advice { display: flex; flex-direction: column; gap: 8px; }
+.dcpa-advice-online { justify-content: space-between; gap: 12px; padding: 4px 0; }
+.dcpa-advice-label { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.dcpa-advice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: var(--dsw-radius-md, 10px);
+  background: var(--dsw-alias-interactive-bg-hover, var(--dsw-alias-bg-layer-2));
+}
+.dcpa-advice-list > .dcpa-q-sub { display: flex; align-items: center; gap: 4px; }
+.dcpa-advice-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.dcpa-advice-text { font-size: 13px; line-height: 18px; color: var(--dsw-alias-label-primary); overflow-wrap: anywhere; }
+.dcpa-models .dcpa-badge-rec { display: inline-flex; align-items: center; gap: 4px; color: var(--dsw-alias-brand-primary, var(--dsw-alias-label-primary)); }

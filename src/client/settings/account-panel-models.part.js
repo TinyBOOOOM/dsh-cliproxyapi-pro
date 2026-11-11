@@ -3,6 +3,7 @@
         "div",
         { className: "dcpa-tabbody dcpa-models" },
         h("p", { className: "dcpa-q-sub" }, t("modelsEmptyRule")),
+        h(ModelAdvice, { t, account, global, selectedIds, busy, onSelection: setSelectedIds, onToggleOnline: toggleOnlineInfo }),
           // Search + Segmented Filter + Batch Actions
           h(
             "div",
@@ -170,6 +171,14 @@
                       h(
                         "div",
                         { className: "dcpa-model-tags" },
+                        recommendedById.has(m.id)
+                          ? h(
+                              "span",
+                              { className: "dcpa-badge dcpa-badge-rec" },
+                              t("badgeRecommended"),
+                              h(InfoTip, { t, text: recommendationReason(t, recommendedById.get(m.id)) })
+                            )
+                          : null,
                         hasOverride
                           ? h("span", { className: "dcpa-badge dcpa-badge-warn" }, t("customParamsBadge"))
                           : null,
@@ -237,7 +246,9 @@
                               h(
                                 "p",
                                 { className: "dcpa-hint" },
-                                `${t("discoveredValue")}: ${formatTokens(m.discovered?.contextWindow)}`
+                                `${t("discoveredValue")}: ${formatTokens(m.discovered?.contextWindow)}${
+                                  m.discovered?.onlineLimits?.includes?.("contextWindow") ? t("onlineLimitsNote") : ""
+                                }`
                               )
                             ),
                             h(
@@ -259,7 +270,9 @@
                               h(
                                 "p",
                                 { className: "dcpa-hint" },
-                                `${t("discoveredValue")}: ${formatTokens(m.discovered?.maxTokens)}`
+                                `${t("discoveredValue")}: ${formatTokens(m.discovered?.maxTokens)}${
+                                  m.discovered?.onlineLimits?.includes?.("maxTokens") ? t("onlineLimitsNote") : ""
+                                }`
                               )
                             )
                           ),

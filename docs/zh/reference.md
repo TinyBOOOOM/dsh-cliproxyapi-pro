@@ -21,9 +21,9 @@
 
 | 方法 | 路径 | 请求体 | 说明 |
 |---|---|---|---|
-| GET | `/api/dsh-cliproxyapi/status` | — | `{ ok, global, accounts[] }` |
+| GET | `/api/dsh-cliproxyapi/status` | — | `{ ok, global, accounts[] }`。`global` 含 `onlineModelInfo` 和在线资料状态 `modelInfo`（`state`：`off` / `idle` / `loading` / `ready` / `partial` / `error`，以及各来源的型号数、下载时间和错误）；每个账号含 `recommendedModels`、带理由的 `recommendations[]`（`id`、`line`、`family`、`released?`、`source`：`online` / `catalog` / `name`）和针对已保存勾选的 `suggestions`（`upgrades[]`、`missing[]`、`retired[]`）。不触发在线资料下载 |
 | POST | `/api/dsh-cliproxyapi/refresh` | `{ accountId? }` | 刷新一个或全部账号 |
-| POST | `/api/dsh-cliproxyapi/save` | `{ accountId?, …账号字段, apiKey?, clearApiKey?, refreshIntervalSeconds?, probeTimeoutMs? }` | 保存账号（缺省为第一个）；只有全局字段时只保存全局设置 |
+| POST | `/api/dsh-cliproxyapi/save` | `{ accountId?, …账号字段, apiKey?, clearApiKey?, refreshIntervalSeconds?, probeTimeoutMs?, onlineModelInfo? }` | 保存账号（缺省为第一个）；只有全局字段时只保存全局设置。`onlineModelInfo` 改变时立即开始（或停止使用）在线模型资料并重新同步所有账号 |
 | POST | `/api/dsh-cliproxyapi/accounts/add` | 账号字段（可选） | 新增账号，默认停用；返回 `createdId` |
 | POST | `/api/dsh-cliproxyapi/accounts/remove` | `{ accountId }` | 删除账号及其路由 |
 | POST | `/api/dsh-cliproxyapi/accounts/test` | `{ accountId?, baseURL?, apiKey? }` | 用未保存的地址和密钥测试连接，不保存、不写路由；`apiKey` 留空时用该账号已保存的密钥；不返回密钥 |

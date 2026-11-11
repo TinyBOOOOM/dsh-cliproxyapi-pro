@@ -7,7 +7,8 @@
       "i18n/zh/updates.js",
       "i18n/zh/quota.js",
       "i18n/zh/accounts.js",
-      "i18n/zh/media.js"
+      "i18n/zh/media.js",
+      "i18n/zh/recommend.js"
     ]
   },
   {
@@ -17,7 +18,8 @@
       "i18n/en/updates.js",
       "i18n/en/quota.js",
       "i18n/en/accounts.js",
-      "i18n/en/media.js"
+      "i18n/en/media.js",
+      "i18n/en/recommend.js"
     ]
   },
   {
@@ -39,6 +41,7 @@
   "settings/fields.js",
   "settings/section.js",
   "settings/add-account.js",
+  "settings/model-advice.js",
   {
     "contiguous": [
       "settings/account-panel.part.js",

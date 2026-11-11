@@ -11,6 +11,7 @@
   - The **Enabled** switch and **Clear Key** call `actions.patch` with one field and never bump `rev`; `actions.save` sends the full draft (without `enabled`) and bumps `rev`.
   - Dirty state = draft vs live `account.config` + selection/overrides + key draft; one sticky save bar; account switches confirm before discarding.
   - Secondary help text uses `InfoTip` (button + `role="tooltip"`), never `title` attributes.
+  - The Models tab starts with the stateless `ModelAdvice`: the global **Online Model Info** switch (saved at once through `actions.patch` with `onlineModelInfo`, no `rev` bump) with `global.modelInfo` status, and `account.suggestions` filtered to the current draft; its buttons only edit the draft selection. Recommended rows carry a badge whose reason (`recommendationReason()` over `account.recommendations`) is an `InfoTip`.
 - `conversation.input.right` also holds `${NS}:media` (order 9990, left of the quota badge) and `conversation.hero.options` holds `${NS}:media-hero`: `MediaChip`, the session's **two separate** image- and video-model buttons (picture / camera icon + the model used; each opens only its own kind's menu, grouped by account; no thumbnails; results live in the chat rows).
   - This session's agent rules are a **secondary menu** reached from an "agent generation settings" footer button in either model menu, never mixed into the model lists.
   - Its inject passes only `{ sessionId }`; it loads `media/session` on mount, session change and each open, and retries (3 s, 10 s, then every 30 s) only while the host offers no generation model or reports `catalogIncomplete`, uses its own `mediaChips` presence like the badge, and renders nothing without a generation model.
@@ -72,7 +73,7 @@ To change the client: edit `src/client/**`, run `npm run build:client`, then `np
 | Source | Owns |
 |---|---|
 | `core/api.js` | React bindings, ids, `API` / `MARKET_API` paths |
-| `i18n/zh/*`, `i18n/en/*` | Dictionaries by feature: settings, updates, quota, accounts, media |
+| `i18n/zh/*`, `i18n/en/*` | Dictionaries by feature: settings, updates, quota, accounts, media, recommend |
 | `styles/*.css` | `CSS` by feature: base, updates, tabs, quota, accounts, media, chat, badge |
 | `core/helpers.js` | Account draft, request and display helpers |
 | `updates/api.js` | Update error codes and isolated update requests |
@@ -81,6 +82,7 @@ To change the client: edit `src/client/**`, run `npm run build:client`, then `np
 | `settings/fields.js` | `InfoTip`, form controls, status summaries |
 | `settings/section.js` | `CpaSettingsPanel` |
 | `settings/add-account.js` | `AddAccountForm` |
+| `settings/model-advice.js` | `ModelAdvice` (online-info switch, selection suggestions), `recommendationReason()` |
 | `settings/account-panel*.part.js` | `AccountPanel` (Connection / Models / Generation / Quota tabs) |
 | `settings/page.js` | `CpaSectionPage` |
 | `media/helpers.js`, `media/panel.js` | `MediaPanel` and its helpers |

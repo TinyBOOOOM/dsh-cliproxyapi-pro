@@ -4,6 +4,14 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Added
+- **Recommendations by product line.** **Reset to Recommended** and the first-run selection of a new account no longer take only the highest version of each family. Claude Opus / Sonnet / Haiku / Fable, GPT sol / terra / luna / astra, Gemini / Gemini Flash and so on are separate product lines: each line is represented by its newest model (by release date when known, which fixes `grok-4.20` reading as newer than `grok-4.7`), preferring models without `-thinking` / `-fast` / `-1m` suffixes and `devin/` prefixes; lines more than 180 days older than their family's newest model and models deprecated upstream are not recommended; families take turns contributing their strongest lines, at most 12. Opaque ids (such as `model_private_12`) are judged by their display name. Recommended models carry a **Recommended** tag whose ⓘ tip gives the reason.
+- **Online model info (on by default).** Public model data (product lines, release dates, deprecation and end dates, context and output limits, prices, capability scores) is downloaded daily from models.dev and OpenRouter to rank recommendations; download only, no account, key, address or model list is sent. It is cached in `.dsh-cliproxyapi/model-info.json`; after a failure the old cache stays in use and the download is retried an hour later. It can be turned off at the top of the **Models** tab (shared by all accounts, stored in the new global `state.json` field `onlineModelInfo`, which reads as on when absent). When the CPA catalog gives no context window or max output, the value of an exact online match (max output capped at 128K) replaces the fixed 262144 / 64000.
+- **Suggestions.** The **Models** tab points out newer models of checked lines (for example Fable 5.2 while 5.1 is checked: **Add** or **Replace**), checked models no longer in the server's catalog (switch to a same-named prefixed model when there is one) and checked models deprecated upstream. They only edit the draft; **Save & Apply** still applies them.
+- The `created` date of the CPA plain model listing is read to tell newer models from older ones.
+
 ## 1.9.1 — 2026-10-27
 
 ### Fixed

@@ -24,7 +24,9 @@ export function mountPlugin({ state, fetchImpl, extraServices = {}, files = {}, 
   const dir = reuseDir ?? mkdtempSync(join(tmpdir(), "cpa-mount-"));
   const stateDir = join(dir, ".dsh-cliproxyapi");
   mkdirSync(stateDir, { recursive: true });
-  writeFileSync(join(stateDir, "state.json"), JSON.stringify(state));
+  // Online model info stays off unless a test asks for it, so no mount can
+  // reach models.dev / OpenRouter after its fake fetch is restored.
+  writeFileSync(join(stateDir, "state.json"), JSON.stringify({ onlineModelInfo: false, ...state }));
   // Generation is off on a fresh profile; most tests use it, so switch it on
   // unless the test brings its own settings file or asks for a fresh profile.
   if (generation && reuseDir === undefined && files["media-settings.json"] === undefined) {
