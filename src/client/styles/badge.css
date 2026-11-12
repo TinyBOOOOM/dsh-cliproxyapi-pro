@@ -49,20 +49,12 @@
   border-radius: var(--dsw-radius-lg, 12px);
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
   box-shadow: var(--dsw-elevation-prominent, 0 8px 24px var(--dsw-alias-border-l2));
+  background: var(--dsw-menu-surface-fill, var(--dsw-alias-bg-layer-1));
+  backdrop-filter: var(--dsw-menu-backdrop-filter, none);
   color: var(--dsw-alias-label-primary);
   font-size: 13px;
   line-height: 20px;
   text-align: left;
-}
-.dcpa-q-pop::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  background: var(--dsw-menu-surface-fill, var(--dsw-alias-bg-layer-1));
-  backdrop-filter: var(--dsw-menu-backdrop-filter, none);
-  pointer-events: none;
 }
 .dcpa-q-pop-head { padding: 8px 8px 6px; }
 .dcpa-q-pop-model { font-weight: 500; overflow-wrap: anywhere; }
