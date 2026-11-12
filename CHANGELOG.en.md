@@ -4,7 +4,7 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 1.11.0 — 2026-11-12
 
 ### Added
 - **Sidebar quota.** A **CPA Quota** row at the bottom of the left sidebar (above **Settings**) sums up, with signal bars, the credentials of every enabled account with a management key and shows healthy / usable credentials on the right; a collapsed sidebar shows the bars only. Clicking it lists each account's distribution, every credential's quota windows and reset times, with a per-account refresh. It uses DSH's native `sidebar.footer.action` slot and matches the native footer buttons. The very top of **Settings → CLIProxyAPI** has a new all-account **Show quota in the sidebar** master switch (on by default, stored in the new global `state.json` field `sidebarQuota`), and the sidebar peek has **Hide from sidebar**; when off, the sidebar shows nothing and stops reading quota status for it. Suggested by [@Six6stRINgs](https://github.com/Six6stRINgs) (#2).
