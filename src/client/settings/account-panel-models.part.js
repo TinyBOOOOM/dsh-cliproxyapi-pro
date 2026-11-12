@@ -485,7 +485,7 @@
             ? modelsTab
             : tab === "media"
             ? h(MediaPanel, { t, account, onStatus: actions.adopt })
-            : h(QuotaPanel, { t, store: sharedQuota, accountId: account.id, sidebar: global?.sidebarQuota !== false, onToggleSidebar: toggleSidebarQuota, settingsBusy: busy })
+            : h(QuotaPanel, { t, store: sharedQuota, accountId: account.id })
         ),
         dirty || notice
           ? h(

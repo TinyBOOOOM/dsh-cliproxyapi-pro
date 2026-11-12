@@ -217,24 +217,67 @@ describe("quota client", () => {
     assert.deepEqual(log.slice(4), ["unsub"]);
   });
 
-  it("puts the global sidebar switch on the account's Quota tab", () => {
-    const h = clientHarness();
+  it("puts the all-account sidebar switch at the top of the CLIProxyAPI settings section", async () => {
+    const posted = [];
+    const status = (on) => ({ ok: true, global: { sidebarQuota: on }, accounts: [{ id: "default", config: { displayName: "BCPA" }, status: { state: "connected" } }] });
+    const fetch = async (url, init) => {
+      if (init?.method === "POST") {
+        const body = JSON.parse(init.body);
+        posted.push({ url: String(url), body });
+        return { ok: true, status: 200, json: async () => status(body.sidebarQuota) };
+      }
+      return { ok: true, status: 200, json: async () => status(true) };
+    };
+    // CpaSettingsPanel hooks 0/1 are loading / busy.
+    const h = clientHarness({ update: false, loading: null, fetch });
     const t = (key) => h.zh[key] ?? key;
-    const store = { getSnapshot: () => ({ data: quotaData, loading: false, error: null, busy: null }), subscribe: () => () => {}, refresh: async () => ({ ok: true }) };
-    const toggles = [];
-    const tree = h.rerender("QuotaPanel", { t, store, accountId: "default", sidebar: true, onToggleSidebar: (on) => toggles.push(on), settingsBusy: null });
-    const row = nodes(tree, (n) => typeof n.type === "function" && n.props?.onToggle)[0];
-    const rendered = row.type(row.props);
-    const sw = nodes(rendered, (n) => n.props?.role === "switch")[0];
-    assert.equal(sw.props["aria-label"], "在侧边栏显示额度");
-    assert.equal(sw.props["aria-checked"], true);
-    assert.equal(sw.props.disabled, false);
-    sw.props.onClick();
-    assert.deepEqual(toggles, [false]);
-    const none = h.rerender("QuotaPanel", { t, store, accountId: "default" });
-    assert.equal(nodes(none, (n) => typeof n.type === "function" && n.props?.onToggle).length, 0, "no switch without a settings owner");
+    const heard = [];
+    const listener = (on) => heard.push(on);
+    h.sidebarQuotaListeners.add(listener);
+    try {
+      h.rerender("CpaSettingsPanel", { t });
+      h.flushEffects();
+      await flushClient();
+      const tree = h.rerender("CpaSettingsPanel", { t });
+      assert.equal(tree.children[0].type, h.SidebarQuotaSwitch, "first row of the section, above the account bar");
+      assert.equal(tree.children[1].props.className, "dcpa-acct-bar");
+      const sw = nodes(tree.children[0].type(tree.children[0].props), (n) => n.props?.role === "switch")[0];
+      assert.equal(sw.props["aria-label"], "在侧边栏显示额度");
+      assert.equal(sw.props["aria-checked"], true);
+      sw.props.onClick();
+      for (let i = 0; i < 4; i++) await flushClient();
+      assert.deepEqual(posted.map((p) => p.body), [{ sidebarQuota: false }], "a globals-only save: no account id, no account fields");
+      assert.deepEqual(heard, [false], "the sidebar entry on this page is told at once");
+      const after = h.rerender("CpaSettingsPanel", { t });
+      assert.equal(after.children[0].props.on, false);
+      // The peek's hide button announces too; the section follows without a reload.
+      h.announceSidebarQuota(true);
+      assert.equal(h.rerender("CpaSettingsPanel", { t }).children[0].props.on, true);
+    } finally {
+      h.sidebarQuotaListeners.delete(listener);
+    }
   });
 
+  it("hides itself from the sidebar peek through the same global switch", async () => {
+    const posted = [];
+    const fetch = async (_url, init) => {
+      posted.push(JSON.parse(init.body));
+      return { ok: true, status: 200, json: async () => ({ ok: true, global: { sidebarQuota: false }, accounts: [] }) };
+    };
+    const h = clientHarness({ loading: false, fetch });
+    const t = (key) => h.zh[key] ?? key;
+    const store = { getSnapshot: () => ({ data: quotaData, loading: false, error: null, busy: null }), subscribe: () => () => {}, load: async () => {}, refresh: async () => ({ ok: true }) };
+    h.flushEffects();
+    nodes(h.rerender("SidebarQuota", { t, store }), (n) => n.type === "button")[0].props.onClick();
+    h.flushEffects();
+    const opened = h.rerender("SidebarQuota", { t, store });
+    const hide = nodes(opened, (n) => n.type === "button" && n.children.includes("从侧边栏隐藏"))[0];
+    assert.ok(hide, "the peek footer has a hide button");
+    hide.props.onClick();
+    for (let i = 0; i < 4; i++) await flushClient();
+    assert.deepEqual(posted, [{ sidebarQuota: false }]);
+    assert.equal(h.rerender("SidebarQuota", { t, store }), null, "hidden at once, before any new snapshot");
+  });
   it("registers the sidebar footer entry", () => {
     const h = clientHarness();
     const registrations = [];

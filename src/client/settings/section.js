@@ -1,6 +1,7 @@
 // @client-source Account settings section state and actions.
     /**
-     * The CLIProxyAPI settings section: one account bar for every tab, then the
+     * The CLIProxyAPI settings section: the all-account sidebar-quota switch,
+     * one account bar for every tab, then the
      * selected account's header, its 连接 / 模型 / 额度 tabs and one save bar.
      * Owns the account server data; the add-account form creates an account only
      * when the user connects it.
@@ -132,11 +133,31 @@
           }),
       };
 
+      // The sidebar peek's "hide" button (or this switch) changed the global:
+      // follow it here without reloading the drafts.
+      useEffect(() => {
+        const listener = (on) =>
+          setData((d) => (d && d.global?.sidebarQuota !== on ? { ...d, global: { ...d.global, sidebarQuota: on } } : d));
+        sidebarQuotaListeners.add(listener);
+        return () => {
+          sidebarQuotaListeners.delete(listener);
+        };
+      }, []);
+      const toggleSidebarQuota = (next) =>
+        void run("patch", async () => {
+          setData(await saveSidebarQuota(next));
+          setNotice({ tone: "ok", text: next ? t("qSideOnToast") : t("qSideOffToast") });
+        });
+
       const showAdd = adding || (!loading && data !== null && accounts.length === 0);
 
       return h(
         "div",
         { className: "dcpa-wrap dcpa-q", "data-dsh-plugin": MODULE_ID },
+        // All-account settings that are not part of any account draft.
+        data !== null
+          ? h(SidebarQuotaSwitch, { t, on: data.global?.sidebarQuota !== false, busy: busy !== null, onToggle: toggleSidebarQuota })
+          : null,
         h(
           "div",
           { className: "dcpa-acct-bar" },

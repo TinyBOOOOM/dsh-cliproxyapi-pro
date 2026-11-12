@@ -21,6 +21,49 @@
       return { stats, usable, level, loading };
     }
 
+    /**
+     * Save the global `sidebarQuota` switch (a globals-only save leaves every
+     * account alone) and tell this page's sidebar entry and settings section.
+     */
+    async function saveSidebarQuota(on) {
+      const body = await postJson(API.save, { sidebarQuota: on === true });
+      announceSidebarQuota(body?.global?.sidebarQuota !== false);
+      return body;
+    }
+
+    /**
+     * The all-account switch at the top of the CLIProxyAPI settings section
+     * (the sidebar peek also has a "hide" button for the same setting).
+     */
+    function SidebarQuotaSwitch({ t, on, busy, onToggle }) {
+      return h(
+        "div",
+        { className: "dcpa-q-row dcpa-q-side-switch" },
+        h(
+          "div",
+          { className: "dcpa-q-row-main" },
+          h("div", { className: "dcpa-q-title" }, t("qSideSwitch"), h(InfoTip, { t, text: t("qSideSwitchHint") }))
+        ),
+        h(
+          "div",
+          { className: "dcpa-q-actions" },
+          h(
+            "button",
+            {
+              type: "button",
+              role: "switch",
+              className: "dcpa-switch",
+              "aria-checked": on,
+              "aria-label": t("qSideSwitch"),
+              disabled: busy,
+              onClick: () => onToggle(!on),
+            },
+            h("span", { className: "dcpa-switch-thumb" })
+          )
+        )
+      );
+    }
+
     /** Problems last, then least remaining first, like the Quota tab. */
     function sidebarCredentialOrder(a, b) {
       const rank = (c) => (c.status !== "active" ? 1 : 0);
@@ -98,9 +141,12 @@
       const snap = useQuota(off ? null : store);
       const now = useNow(60 * 1000);
       const [open, setOpen] = useState(false);
+      const [hiding, setHiding] = useState(false);
+      const [hideError, setHideError] = useState(null);
       const wrapRef = useRef(null);
       const buttonRef = useRef(null);
       const popRef = useRef(null);
+      const mounted = useRef(true);
       const popStyle = useAnchoredPeek(open, buttonRef, popRef);
       const flagOff = override === null && snap.data?.sidebar === false;
       const accounts = sidebarQuotaAccounts(snap.data);
@@ -120,6 +166,27 @@
       useEffect(() => {
         if (flagOff) setSeenOff(true);
       }, [flagOff]);
+
+      useEffect(() => {
+        mounted.current = true;
+        return () => {
+          mounted.current = false;
+        };
+      }, []);
+
+      // Turn the global switch off from the peek itself; the Settings switch
+      // brings the entry back.
+      const hide = async () => {
+        setHiding(true);
+        setHideError(null);
+        try {
+          await saveSidebarQuota(false);
+        } catch (error) {
+          if (mounted.current) setHideError(error instanceof Error ? error.message : String(error));
+        } finally {
+          if (mounted.current) setHiding(false);
+        }
+      };
       useDismissPeek(open, wrapRef, buttonRef, () => setOpen(false));
 
       useEffect(() => {
@@ -137,7 +204,13 @@
             { ref: popRef, className: "dcpa-q-pop dcpa-q-side-pop", role: "dialog", "aria-label": t("qSideLabel"), style: popStyle },
             accounts.map((account) => h(SidebarQuotaAccount, { key: account.accountId, t, account, snap, store, now })),
             snap.error ? h("p", { className: "dcpa-q-pop-text", "data-tone": "error" }, fmt(t, "qErrLoad", { error: snap.error })) : null,
-            h("p", { className: "dcpa-q-pop-text dcpa-q-side-hint" }, t("qPeekFooter"))
+            hideError ? h("p", { className: "dcpa-q-pop-text", "data-tone": "error", role: "alert" }, fmt(t, "qSideHideFailed", { error: hideError })) : null,
+            h(
+              "div",
+              { className: "dcpa-q-pop-foot dcpa-q-side-foot" },
+              h("span", null, t("qPeekFooter")),
+              h("button", { type: "button", className: "dcpa-q-btn", disabled: hiding, onClick: () => void hide() }, t("qSideHide"))
+            )
           )
         : null;
 
