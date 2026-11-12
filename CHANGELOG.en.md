@@ -4,6 +4,11 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixed
+- **The quota peek and generation-model menu keep their background while scrolling.** When many credentials made the peek taller than its maximum height, its background and blur were painted on a `::before` layer that scrolled away with the content, so the peek turned transparent as you scrolled down; they are now painted on the peek itself, like DSH's native scrollable popovers. Thanks to [@Six6stRINgs](https://github.com/Six6stRINgs) (#3).
+
 ## 1.10.1 — 2026-11-12
 
 ### Fixed
