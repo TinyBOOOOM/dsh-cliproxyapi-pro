@@ -10,6 +10,7 @@
     "refreshIntervalSeconds": 300,
     "probeTimeoutMs": 5000,
     "onlineModelInfo": true,
+    "sidebarQuota": true,
     "accounts": [
       {
         "id": "default", "enabled": true, "provider": "cli-proxy", "displayName": "CLI Proxy API",
@@ -21,7 +22,7 @@
   }
   ```
 
-  `onlineModelInfo` 是所有账号共用的「在线模型资料」开关，缺省视为开启（见 [推荐与选择建议](accounts-and-models.md#推荐与选择建议)）。文件每次读取都会重新加载，手动修改后在账号「⋯」菜单里点「立即探测刷新」即可生效。旧版（1.3.x 及以前）的单账号文件会自动迁移为 id 为 `default` 的账号，路由、密钥和勾选保持不变，原文件备份为 `state.v1.json`。
+  `onlineModelInfo` 是所有账号共用的「在线模型资料」开关，缺省视为开启（见 [推荐与选择建议](accounts-and-models.md#推荐与选择建议)）；`sidebarQuota` 是所有账号共用的「在侧边栏显示额度」开关，缺省同样视为开启（见 [渠道额度](quota.md)）。文件每次读取都会重新加载，手动修改后在账号「⋯」菜单里点「立即探测刷新」即可生效。旧版（1.3.x 及以前）的单账号文件会自动迁移为 id 为 `default` 的账号，路由、密钥和勾选保持不变，原文件备份为 `state.v1.json`。
 
 - **更新设置**：独立保存在 `<Profile 目录>/.dsh-cliproxyapi/update-settings.json`，不扩展或改写账号的 `state.json` v2，也不接触凭证。首次没有此文件时采用下列默认值：
 

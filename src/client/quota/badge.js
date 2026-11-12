@@ -39,24 +39,7 @@
       const summary = selection ? summarizeModelQuota(snap.data, selection.provider, selection.model) : null;
       const visible = !shadowed && summary !== null && summary.account.keyConfigured === true;
 
-      useEffect(() => {
-        if (!open) return undefined;
-        const onDown = (e) => {
-          if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
-        };
-        const onKey = (e) => {
-          if (e.key === "Escape") {
-            setOpen(false);
-            buttonRef.current?.focus?.();
-          }
-        };
-        document.addEventListener("mousedown", onDown, true);
-        document.addEventListener("keydown", onKey, true);
-        return () => {
-          document.removeEventListener("mousedown", onDown, true);
-          document.removeEventListener("keydown", onKey, true);
-        };
-      }, [open]);
+      useDismissPeek(open, wrapRef, buttonRef, () => setOpen(false));
 
       useEffect(() => {
         if (!visible && open) setOpen(false);

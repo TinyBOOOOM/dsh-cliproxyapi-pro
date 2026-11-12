@@ -132,16 +132,22 @@
     /** Subscribe a component to the shared quota store (null when inactive). */
     function useQuota(store) {
       const [, setTick] = useState(0);
+      const snapshot = store ? store.getSnapshot() : { data: null, loading: false, error: null, busy: null };
+      // The snapshot this render used: another subscriber's load can finish
+      // between this render and the effect below, without notifying us.
+      const rendered = useRef(snapshot);
+      rendered.current = snapshot;
       useEffect(() => {
         if (store === null || store === undefined) return undefined;
         let alive = true;
         const off = store.subscribe(() => {
           if (alive) setTick((n) => n + 1);
         });
+        if (store.getSnapshot() !== rendered.current) setTick((n) => n + 1);
         return () => {
           alive = false;
           off();
         };
       }, [store]);
-      return store ? store.getSnapshot() : { data: null, loading: false, error: null, busy: null };
+      return snapshot;
     }

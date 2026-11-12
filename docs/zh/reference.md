@@ -21,9 +21,9 @@
 
 | 方法 | 路径 | 请求体 | 说明 |
 |---|---|---|---|
-| GET | `/api/dsh-cliproxyapi/status` | — | `{ ok, global, accounts[] }`。`global` 含 `onlineModelInfo` 和在线资料状态 `modelInfo`（`state`：`off` / `idle` / `loading` / `ready` / `partial` / `error`，以及各来源的型号数、下载时间和错误）；每个账号含 `recommendedModels`、带理由的 `recommendations[]`（`id`、`line`、`family`、`released?`、`source`：`online` / `catalog` / `name`）和针对已保存勾选的 `suggestions`（`upgrades[]`、`missing[]`、`retired[]`）。不触发在线资料下载 |
+| GET | `/api/dsh-cliproxyapi/status` | — | `{ ok, global, accounts[] }`。`global` 含 `onlineModelInfo`、`sidebarQuota` 和在线资料状态 `modelInfo`（`state`：`off` / `idle` / `loading` / `ready` / `partial` / `error`，以及各来源的型号数、下载时间和错误）；每个账号含 `recommendedModels`、带理由的 `recommendations[]`（`id`、`line`、`family`、`released?`、`source`：`online` / `catalog` / `name`）和针对已保存勾选的 `suggestions`（`upgrades[]`、`missing[]`、`retired[]`）。不触发在线资料下载 |
 | POST | `/api/dsh-cliproxyapi/refresh` | `{ accountId? }` | 刷新一个或全部账号 |
-| POST | `/api/dsh-cliproxyapi/save` | `{ accountId?, …账号字段, apiKey?, clearApiKey?, refreshIntervalSeconds?, probeTimeoutMs?, onlineModelInfo? }` | 保存账号（缺省为第一个）；只有全局字段时只保存全局设置。`onlineModelInfo` 改变时立即开始（或停止使用）在线模型资料并重新同步所有账号 |
+| POST | `/api/dsh-cliproxyapi/save` | `{ accountId?, …账号字段, apiKey?, clearApiKey?, refreshIntervalSeconds?, probeTimeoutMs?, onlineModelInfo?, sidebarQuota? }` | 保存账号（缺省为第一个）；只有全局字段时只保存全局设置。`onlineModelInfo` 改变时立即开始（或停止使用）在线模型资料并重新同步所有账号；`sidebarQuota` 只控制侧边栏额度入口 |
 | POST | `/api/dsh-cliproxyapi/accounts/add` | 账号字段（可选） | 新增账号，默认停用；返回 `createdId` |
 | POST | `/api/dsh-cliproxyapi/accounts/remove` | `{ accountId }` | 删除账号及其路由 |
 | POST | `/api/dsh-cliproxyapi/accounts/test` | `{ accountId?, baseURL?, apiKey? }` | 用未保存的地址和密钥测试连接，不保存、不写路由；`apiKey` 留空时用该账号已保存的密钥；不返回密钥 |
@@ -31,7 +31,7 @@
 | POST | `/api/dsh-cliproxyapi/updates/check` | `{}` | 主动检查所选通道与区域；手动检查不触发自动下载 |
 | POST | `/api/dsh-cliproxyapi/updates/save` | `{ autoCheck?, autoDownload?, autoInstall?, channel?, region? }` | 只保存这五项更新设置，与账号配置独立 |
 | POST | `/api/dsh-cliproxyapi/updates/download` | `{ version }` | 下载最近一次检查确认的新版本，完成校验后保存离线包；不安装 |
-| GET | `/api/dsh-cliproxyapi/quota/status` | — | `{ ok, quota }`：缓存的额度快照；仅未暂停的过期账号 / 凭证在后台刷新；账号与凭证的 `autoRefreshPaused` 表示失败暂停 |
+| GET | `/api/dsh-cliproxyapi/quota/status` | — | `{ ok, quota }`：缓存的额度快照（`quota.sidebar` 为全局 `sidebarQuota` 开关）；仅未暂停的过期账号 / 凭证在后台刷新；账号与凭证的 `autoRefreshPaused` 表示失败暂停 |
 | POST | `/api/dsh-cliproxyapi/quota/refresh` | `{ accountId? }` | 开始刷新并立即返回；指定账号会重试其暂停查询，未指定时跳过暂停项；正在刷新时 `refreshing` 为真 |
 | POST | `/api/dsh-cliproxyapi/quota/save` | `{ accountId, managementKey?, clear? }` | 保存或清除该账号的管理密钥，并开始刷新额度；响应不含密钥 |
 | GET | `/api/dsh-cliproxyapi/media/status` | — | `{ ok, media }`：生成设置与每个账号识别出的生图 / 生视频模型；不联网 |

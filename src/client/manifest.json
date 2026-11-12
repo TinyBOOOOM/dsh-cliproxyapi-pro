@@ -57,6 +57,7 @@
   "quota/panel.js",
   "settings/page.js",
   "quota/badge.js",
+  "quota/sidebar.js",
   "media/chip.js",
   "chat/tool-id.js",
   "media/confirmation-dock.js",

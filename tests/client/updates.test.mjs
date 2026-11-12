@@ -45,7 +45,7 @@ describe("plugin update client", () => {
     h.apply(ctx);
     const byName = Object.fromEntries(registrations.map((r) => [r.meta.name, r]));
     // Without modelDirectories only the generation-model button joins the composer and hero.
-    assert.deepEqual(Object.keys(byName).sort(), ["conversation.chat.commandview", "conversation.composer.dock", "conversation.hero.options", "conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section", "tool.call.toolview"]);
+    assert.deepEqual(Object.keys(byName).sort(), ["conversation.chat.commandview", "conversation.composer.dock", "conversation.hero.options", "conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section", "sidebar.footer.action", "tool.call.toolview"]);
     const row = byName["conversation.chat.commandview"];
     assert.deepEqual(registrations.filter((r) => r.meta.name === "conversation.chat.commandview").map((r) => r.meta.key), ["cpa-image", "cpa-video", "cpa-video-edit", "cpa-video-extend"], "only the generation command rows are replaced");
     assert.equal(JSON.stringify(row.meta.inject("s-1")), JSON.stringify({ sessionId: "s-1" }));

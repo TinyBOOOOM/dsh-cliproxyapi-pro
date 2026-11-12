@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 
 export function clientHarness({ update = null, loading = true, withMarket = false, fetch = async () => { throw new Error("fake fetch required"); } } = {}) {
   const slots = [], effects = [], timers = new Map();
-  let cursor = 0, active = true, afterUnmountWrites = 0, nextTimer = 0;
+  let cursor = 0, active = true, afterUnmountWrites = 0, writes = 0, nextTimer = 0;
   const sameDeps = (a, b) => a && b && a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
   const React = {
     Fragment: Symbol("Fragment"),
@@ -14,6 +14,7 @@ export function clientHarness({ update = null, loading = true, withMarket = fals
       const index = cursor++;
       if (!slots[index]) slots[index] = { value: index === 0 ? update : index === 1 ? loading : typeof initial === "function" ? initial() : initial };
       return [slots[index].value, (value) => {
+        writes++;
         if (!active) afterUnmountWrites++;
         slots[index].value = typeof value === "function" ? value(slots[index].value) : value;
       }];
@@ -40,8 +41,11 @@ export function clientHarness({ update = null, loading = true, withMarket = fals
     AbortController, Date, console, fetch,
     setTimeout(fn, ms) { const id = ++nextTimer; timers.set(id, { fn, ms }); return id; },
     clearTimeout(id) { timers.delete(id); },
+    // Clock hooks (useNow) only need an id; intervals never fire here.
+    setInterval() { return ++nextTimer; },
+    clearInterval() {},
   };
-  const source = readFileSync(new URL("../../lib/client.js", import.meta.url), "utf8").replace("return module.exports;", "exports.__test = {API, PluginUpdatePanel, PluginUpdatePage, CpaSettingsPanel, CpaSectionPage, ModelAdvice, recommendationReason, QuotaPanel, QuotaBadge, MediaPanel, MediaChip, ImageCommandCard, MediaToolRow, MediaCommandRow, MediaConfirmationDock, mediaConversationDefinition, MEDIA_NODE_KIND, hasMediaNode, toolRunId, apply, CSS, zh, en, createMarketUpdater, startAutoInstall, compareVersions, createQuotaStore, summarizeModelQuota, windowAppliesTo, credentialHeadroom, quotaLevel, quotaStats, quotaErrorText, placePeek, PEEK_HIDDEN}; return module.exports;");
+  const source = readFileSync(new URL("../../lib/client.js", import.meta.url), "utf8").replace("return module.exports;", "exports.__test = {API, PluginUpdatePanel, PluginUpdatePage, CpaSettingsPanel, CpaSectionPage, ModelAdvice, recommendationReason, QuotaPanel, QuotaBadge, MediaPanel, MediaChip, ImageCommandCard, MediaToolRow, MediaCommandRow, MediaConfirmationDock, mediaConversationDefinition, MEDIA_NODE_KIND, hasMediaNode, toolRunId, apply, CSS, zh, en, createMarketUpdater, startAutoInstall, compareVersions, createQuotaStore, summarizeModelQuota, windowAppliesTo, credentialHeadroom, quotaLevel, quotaStats, quotaErrorText, placePeek, PEEK_HIDDEN, SidebarQuota, sidebarQuotaSummary, announceSidebarQuota}; return module.exports;");
   vm.runInNewContext(source, context, { filename: "client.js" });
   // One shared market client per harness, using the fake fetch and timers.
   const market = withMarket ? exports.__test.createMarketUpdater() : null;
@@ -90,11 +94,14 @@ export function clientHarness({ update = null, loading = true, withMarket = fals
       if (mountEffects) for (const effect of effects.splice(0)) effect();
       return tree;
     },
-    // Re-render any exported component with persistent hook state (no effects).
+    // Re-render any exported component with persistent hook state; effects
+    // stay queued until flushEffects().
     rerender(name, props) {
       cursor = 0;
       return exports.__test[name](props);
     },
+    flushEffects() { for (const effect of effects.splice(0)) effect(); },
+    get writes() { return writes; },
     unmount() { active = false; for (const slot of slots) slot?.cleanup?.(); },
     get afterUnmountWrites() { return afterUnmountWrites; },
   };

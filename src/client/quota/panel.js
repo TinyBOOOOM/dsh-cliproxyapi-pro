@@ -164,8 +164,38 @@
       );
     }
 
+    /** Global switch for the sidebar entry (saved at once, like online model info). */
+    function SidebarQuotaSwitch({ t, on, busy, onToggle }) {
+      return h(
+        "div",
+        { className: "dcpa-q-row dcpa-q-side-switch" },
+        h(
+          "div",
+          { className: "dcpa-q-row-main" },
+          h("div", { className: "dcpa-q-title" }, t("qSideSwitch"), h(InfoTip, { t, text: t("qSideSwitchHint") }))
+        ),
+        h(
+          "div",
+          { className: "dcpa-q-actions" },
+          h(
+            "button",
+            {
+              type: "button",
+              role: "switch",
+              className: "dcpa-switch",
+              "aria-checked": on,
+              "aria-label": t("qSideSwitch"),
+              disabled: busy,
+              onClick: () => onToggle(!on),
+            },
+            h("span", { className: "dcpa-switch-thumb" })
+          )
+        )
+      );
+    }
+
     /** The "额度" tab: flat DSH settings rows, one account at a time. */
-    function QuotaPanel({ t, store = sharedQuota, accountId }) {
+    function QuotaPanel({ t, store = sharedQuota, accountId, sidebar = true, onToggleSidebar = null, settingsBusy = null }) {
       const snap = useQuota(store);
       const now = useNow(30 * 1000);
       const [activeId, setActiveId] = useState(null);
@@ -247,6 +277,9 @@
               h("h3", { className: "dcpa-q-h" }, t("qTitle")),
               h("p", { className: "dcpa-q-desc" }, t("qSubtitle"))
             ),
+        typeof onToggleSidebar === "function"
+          ? h(SidebarQuotaSwitch, { t, on: sidebar !== false, busy: settingsBusy !== null && settingsBusy !== undefined, onToggle: onToggleSidebar })
+          : null,
         scoped && account === null ? h("p", { className: "dcpa-q-msg" }, t("qPeekLoading")) : null,
         !scoped && accounts.length > 1
           ? h(

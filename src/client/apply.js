@@ -169,6 +169,22 @@
         });
       }
 
+      // Sidebar footer: every keyed account's quota at a glance (renders
+      // nothing until an enabled account has a management key).
+      ctx.slots.inject("sidebar.footer.action", () =>
+        registerListEntry(
+          ctx.slots,
+          {
+            name: "sidebar.footer.action",
+            id: `${NS}:quota-sidebar`,
+            order: 100,
+            label: () => t("qSideLabel"),
+            locale: NS,
+          },
+          (props = {}) => h(SidebarQuota, { t, wide: props.wide !== false, store: sharedQuota })
+        )
+      );
+
       // Generation-model button, left of the quota badge. It only needs the
       // session id; like the badge, the hero copy steps aside while the
       // composer copy of the same session is mounted.

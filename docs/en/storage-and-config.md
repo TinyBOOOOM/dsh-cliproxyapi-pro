@@ -10,6 +10,7 @@
     "refreshIntervalSeconds": 300,
     "probeTimeoutMs": 5000,
     "onlineModelInfo": true,
+    "sidebarQuota": true,
     "accounts": [
       {
         "id": "default", "enabled": true, "provider": "cli-proxy", "displayName": "CLI Proxy API",
@@ -21,7 +22,7 @@
   }
   ```
 
-  `onlineModelInfo` is the all-account **Online Model Info** switch; a file without it reads as on (see [Recommendations and suggestions](accounts-and-models.md#recommendations-and-suggestions)). The file is re-read on every access; after a manual edit, click **Probe & Refresh** in the account's **⋯** menu. A single-account file from 1.3.x and earlier migrates automatically into account `default` with the same routes, key and selection, and the original is kept as `state.v1.json`.
+  `onlineModelInfo` is the all-account **Online Model Info** switch; a file without it reads as on (see [Recommendations and suggestions](accounts-and-models.md#recommendations-and-suggestions)); `sidebarQuota` is the all-account **Show quota in the sidebar** switch, likewise on when absent (see [Channel quota](quota.md)). The file is re-read on every access; after a manual edit, click **Probe & Refresh** in the account's **⋯** menu. A single-account file from 1.3.x and earlier migrates automatically into account `default` with the same routes, key and selection, and the original is kept as `state.v1.json`.
 
 - **Update settings**: stored separately at `<profile dir>/.dsh-cliproxyapi/update-settings.json`. They neither extend nor rewrite the account `state.json` v2 file, nor access credentials. When this file does not yet exist, defaults are:
 

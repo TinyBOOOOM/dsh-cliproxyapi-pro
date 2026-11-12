@@ -94,6 +94,7 @@
           run("patch", async () => {
             setData(await postJson(API.save, { ...patch, accountId }));
             if (okText) setNotice({ tone: "ok", text: okText });
+            return true;
           }),
         test: (accountId, draft) =>
           run("test", async () => (await postJson(API.testAccount, { ...(accountId ? { accountId } : {}), ...draft })).test),

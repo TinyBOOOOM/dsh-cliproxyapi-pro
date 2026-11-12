@@ -215,6 +215,11 @@
       // A global: saved at once without touching the drafts.
       const toggleOnlineInfo = (next) =>
         void actions.patch(account.id, { onlineModelInfo: next }, next ? t("onlineInfoOnToast") : t("onlineInfoOffToast"));
+      // Also a global; the sidebar entry on this page follows at once.
+      const toggleSidebarQuota = (next) =>
+        void Promise.resolve(actions.patch(account.id, { sidebarQuota: next }, next ? t("qSideOnToast") : t("qSideOffToast"))).then((ok) => {
+          if (ok === true) announceSidebarQuota(next);
+        });
 
       const updateOverride = useCallback((model, patch) => {
         setModelOverrides((prev) => {

@@ -95,6 +95,33 @@
     }
 
     /**
+     * Close an open peek on a press outside `wrapRef` (the peek renders inside
+     * it) or on Escape, which returns focus to `buttonRef`.
+     */
+    function useDismissPeek(open, wrapRef, buttonRef, close) {
+      const closeRef = useRef(close);
+      closeRef.current = close;
+      useEffect(() => {
+        if (!open || typeof document === "undefined") return undefined;
+        const onDown = (e) => {
+          if (wrapRef.current && !wrapRef.current.contains(e.target)) closeRef.current();
+        };
+        const onKey = (e) => {
+          if (e.key === "Escape") {
+            closeRef.current();
+            buttonRef.current?.focus?.();
+          }
+        };
+        document.addEventListener("mousedown", onDown, true);
+        document.addEventListener("keydown", onKey, true);
+        return () => {
+          document.removeEventListener("mousedown", onDown, true);
+          document.removeEventListener("keydown", onKey, true);
+        };
+      }, [open]);
+    }
+
+    /**
      * Style for a fixed peek anchored above `anchorRef`, rendered with
      * `ref: popRef` inside the same component. Tracks the anchor every frame
      * while open (state changes only when the placement moves) and stays

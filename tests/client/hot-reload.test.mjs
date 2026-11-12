@@ -37,7 +37,9 @@ describe("hot reload", () => {
     const disposeNew = activation(); // overlaps: the old entries still hold the stable ids
     disposeOld();
     const names = [...live.values()].map((e) => e.meta.name).sort();
-    assert.deepEqual(names, ["conversation.chat.commandview", "conversation.chat.commandview", "conversation.chat.commandview", "conversation.chat.commandview", "conversation.composer.dock", "conversation.hero.options", "conversation.hero.options", "conversation.input.right", "conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section", "tool.call.toolview"]);
+    assert.deepEqual(names, ["conversation.chat.commandview", "conversation.chat.commandview", "conversation.chat.commandview", "conversation.chat.commandview", "conversation.composer.dock", "conversation.hero.options", "conversation.hero.options", "conversation.input.right", "conversation.input.right", "plugins.bundle.config", "settings.plugins.tab", "settings.section", "sidebar.footer.action", "tool.call.toolview"]);
+    const side = [...live.values()].find((e) => e.meta.id === "dsh-cliproxyapi-pro:quota-sidebar");
+    assert.equal(side.meta.priority, 1, "the sidebar entry also shadows one priority lower");
     const chip = [...live.values()].find((e) => e.meta.id === "dsh-cliproxyapi-pro:media");
     assert.equal(chip.meta.priority, 1, "the generation button also shadows one priority lower");
     const badge = [...live.values()].find((e) => e.meta.id === "dsh-cliproxyapi-pro:quota");

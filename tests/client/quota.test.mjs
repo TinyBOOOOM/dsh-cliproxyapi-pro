@@ -5,6 +5,9 @@ import { readFileSync } from "node:fs";
 import { clientHarness, nodes, content, flushClient, html } from "../helpers/client-harness.mjs";
 import { update, reply, button, SCHEMA, capabilities, operation, json, runTimers, quotaData } from "../helpers/client-fixtures.mjs";
 
+// SidebarQuota's first two hooks are plain state; neutral harness seeds.
+const sideHarness = () => clientHarness({ loading: false });
+
 describe("quota client", () => {
   it("maps a selection to its own account and channel only", () => {
     const h = clientHarness();
@@ -119,6 +122,134 @@ describe("quota client", () => {
     assert.deepEqual({ ...pop.props.style }, { ...h.PEEK_HIDDEN });
     const source = readFileSync(new URL("../../lib/client.js", import.meta.url), "utf8");
     assert.ok(!/createPortal|react-dom|document\.body\.append/.test(source), "no portal, nothing appended to document.body");
+  });
+
+  it("summarizes every keyed account in the sidebar footer and opens a per-account peek", () => {
+    const h = sideHarness();
+    const t = (key) => h.zh[key] ?? key;
+    const refreshed = [];
+    const storeOf = (data) => ({ getSnapshot: () => ({ data, loading: false, error: null, busy: null }), subscribe: () => () => {}, refresh: async (id) => { refreshed.push(id); return { ok: true }; } });
+    const store = storeOf(quotaData);
+    const summary = h.sidebarQuotaSummary([quotaData.accounts[0]]);
+    assert.deepEqual({ healthy: summary.stats.healthy, usable: summary.usable, level: summary.level, loading: summary.loading }, { healthy: 2, usable: 4, level: "ok", loading: false });
+
+    const wide = h.rerender("SidebarQuota", { t, wide: true, store });
+    assert.equal(wide.props["data-wide"], "true");
+    assert.ok(content(wide).includes("CPA 额度") && content(wide).includes("2/4 充足"), "label and healthy count while wide");
+    const button = nodes(wide, (n) => n.type === "button")[0];
+    assert.equal(button.props["aria-label"], "CPA 额度：4 个可用凭证中 2 个充足");
+    assert.equal(button.props["aria-expanded"], false);
+
+    button.props.onClick();
+    const opened = h.rerender("SidebarQuota", { t, wide: true, store });
+    const pop = nodes(opened, (n) => n.props?.role === "dialog")[0];
+    assert.ok(pop, "peek renders inside the footer entry");
+    // Account sections are hook-free components: render them in place.
+    const sections = nodes(pop, (n) => typeof n.type === "function" && n.props?.account).map((n) => n.type(n.props));
+    assert.deepEqual(sections.map((s) => s.props["aria-label"]), ["BCPA"], "accounts without a management key stay out");
+    assert.equal(nodes(sections[0], (n) => n.props?.className === "dcpa-q-pop-cred").length, 5);
+    nodes(sections[0], (n) => n.type === "button" && n.props.className === "dcpa-q-btn")[0].props.onClick();
+    assert.deepEqual(refreshed, ["default"], "refresh targets that account only");
+
+    const rail = sideHarness().rerender("SidebarQuota", { t, wide: false, store });
+    assert.equal(rail.props["data-wide"], "false");
+    assert.ok(!content(rail).includes("CPA 额度"), "collapsed sidebar: bars only, name in aria-label / title");
+
+    const noKey = structuredClone(quotaData);
+    noKey.accounts[0].keyConfigured = false;
+    assert.equal(sideHarness().rerender("SidebarQuota", { t, store: storeOf(noKey) }), null, "nothing without a keyed account");
+    const disabled = structuredClone(quotaData);
+    disabled.accounts[0].enabled = false;
+    assert.equal(sideHarness().rerender("SidebarQuota", { t, store: storeOf(disabled) }), null, "disabled accounts are skipped");
+    assert.equal(sideHarness().rerender("SidebarQuota", { t, store: storeOf(null) }), null, "nothing before the first snapshot");
+  });
+
+  it("re-renders a quota subscriber whose data landed between its render and its subscription", () => {
+    const t = (key) => key;
+    // The sidebar and the composer badge mount together: the first one's load
+    // can finish before the second one subscribes, without notifying it.
+    const run = (landsEarly) => {
+      const h = sideHarness();
+      let snap = { data: null, loading: true, error: null, busy: null };
+      const store = { getSnapshot: () => snap, subscribe: () => () => {}, refresh: async () => ({ ok: true }) };
+      assert.equal(h.rerender("SidebarQuota", { t, store }), null);
+      if (landsEarly) snap = { data: quotaData, loading: false, error: null, busy: null };
+      const before = h.writes;
+      h.flushEffects();
+      return { writes: h.writes - before, after: h.rerender("SidebarQuota", { t, store }) };
+    };
+    const early = run(true), plain = run(false);
+    assert.equal(early.writes, plain.writes + 1, "exactly one extra re-render when the snapshot moved");
+    assert.notEqual(early.after, null);
+  });
+
+  it("follows the global sidebar switch and stops reading quota status while it is off", () => {
+    const h = sideHarness();
+    const t = (key) => h.zh[key] ?? key;
+    let snap = { data: { ...quotaData, sidebar: false }, loading: false, error: null, busy: null };
+    const log = [];
+    const store = {
+      getSnapshot: () => snap,
+      subscribe: () => (log.push("sub"), () => log.push("unsub")),
+      load: async () => log.push("load"),
+      refresh: async () => ({ ok: true }),
+    };
+    assert.equal(h.rerender("SidebarQuota", { t, store }), null, "switched off in the snapshot: hidden");
+    h.flushEffects();
+    assert.deepEqual(log, ["sub"]);
+    assert.equal(h.rerender("SidebarQuota", { t, store }), null);
+    h.flushEffects();
+    assert.deepEqual(log, ["sub", "unsub"], "off: no subscription, so no status polling for the sidebar");
+    assert.equal(h.rerender("SidebarQuota", { t, store }), null);
+
+    // Switched on in the Quota tab of this page: shown at once, status read again.
+    h.announceSidebarQuota(true);
+    assert.deepEqual(log.slice(2), ["load"]);
+    const shown = h.rerender("SidebarQuota", { t, store });
+    assert.ok(content(shown).includes("CPA 额度"), "an in-page switch wins over the stale snapshot");
+    h.flushEffects();
+    assert.deepEqual(log.slice(3), ["sub"]);
+
+    // And off again.
+    h.announceSidebarQuota(false);
+    assert.equal(h.rerender("SidebarQuota", { t, store }), null);
+    h.flushEffects();
+    assert.deepEqual(log.slice(4), ["unsub"]);
+  });
+
+  it("puts the global sidebar switch on the account's Quota tab", () => {
+    const h = clientHarness();
+    const t = (key) => h.zh[key] ?? key;
+    const store = { getSnapshot: () => ({ data: quotaData, loading: false, error: null, busy: null }), subscribe: () => () => {}, refresh: async () => ({ ok: true }) };
+    const toggles = [];
+    const tree = h.rerender("QuotaPanel", { t, store, accountId: "default", sidebar: true, onToggleSidebar: (on) => toggles.push(on), settingsBusy: null });
+    const row = nodes(tree, (n) => typeof n.type === "function" && n.props?.onToggle)[0];
+    const rendered = row.type(row.props);
+    const sw = nodes(rendered, (n) => n.props?.role === "switch")[0];
+    assert.equal(sw.props["aria-label"], "在侧边栏显示额度");
+    assert.equal(sw.props["aria-checked"], true);
+    assert.equal(sw.props.disabled, false);
+    sw.props.onClick();
+    assert.deepEqual(toggles, [false]);
+    const none = h.rerender("QuotaPanel", { t, store, accountId: "default" });
+    assert.equal(nodes(none, (n) => typeof n.type === "function" && n.props?.onToggle).length, 0, "no switch without a settings owner");
+  });
+
+  it("registers the sidebar footer entry", () => {
+    const h = clientHarness();
+    const registrations = [];
+    const ctx = {
+      effect(fn) { fn(); },
+      locale: { register: () => () => {}, bind: () => (key) => h.zh[key] ?? key },
+      slots: { inject(_n, fn) { fn(); }, register(meta, render) { registrations.push({ meta, render }); return () => {}; } },
+    };
+    h.apply(ctx);
+    const entry = registrations.find((r) => r.meta.name === "sidebar.footer.action");
+    assert.ok(entry, "sidebar.footer.action entry registered");
+    assert.equal(entry.meta.id, "dsh-cliproxyapi-pro:quota-sidebar");
+    assert.equal(entry.render({ wide: false }).props.wide, false);
+    assert.equal(entry.render({ wide: true }).props.wide, true);
+    assert.equal(entry.render().props.wide, true);
   });
 
   it("recovers when the session's model directory appears after the first render", () => {

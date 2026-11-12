@@ -38,6 +38,10 @@
   - Its registration `inject(sessionId)` passes a resolver for `modelDirectories.directoryFor(sessionId).store` from ui-model-selection (resolved at render, see below); the badge reads `pending ?? current` `{ provider, model }` and calls `summarizeModelQuota()`, which looks only inside the account whose `routes` contain that provider and only at `modelIndex[model]`.
   - It renders nothing for other routes or when the account has no management key.
   - Its peek is `position: fixed` inside the component (no portal, nothing appended to `document.body`). DSH's active composer seat is sticky with `will-change: transform`, so it, not the viewport, is the containing block of fixed descendants; `useAnchoredPeek()` (shared with `MediaChip`'s menu) renders the peek hidden at `left: 0; bottom: 0`, derives that box's left/bottom edges from where the peek landed, converts the viewport anchor position into it, keeps the peek inside the viewport and the clipping ancestors of that box (the chat scroller), and follows the anchor every animation frame while open (state changes only when the placement moves).
+- `sidebar.footer.action` (root scope, owner props `{ wide }`) holds `${NS}:quota-sidebar` → `SidebarQuota`, built like DSH's native footer buttons (42 px row with label and trailing count while wide, a 36 px round button in the collapsed rail).
+  - It summarizes the credentials of every account with `keyConfigured && enabled !== false` (`sidebarQuotaSummary()`: healthy / usable, where usable leaves out disabled or failing credentials) and renders nothing until such an account exists; its peek (same `useAnchoredPeek()` / `useDismissPeek()`, inside the component) lists each such account with `QuotaSummary`, its credentials (`CredentialWindows`) and an account-scoped refresh.
+  - Global switch `sidebarQuota` (default on): the quota snapshot carries it as `sidebar`; once it reads `false` the entry renders nothing and passes `null` to `useQuota()` (no subscription, no polling for it). The Quota tab's `SidebarQuotaSwitch` (`QuotaPanel` props `sidebar` / `onToggleSidebar` / `settingsBusy`) saves it through `actions.patch` (which resolves `true` on success) and then `announceSidebarQuota(on)` (`core/presence.js`), whose in-page answer overrides the last snapshot. Hooks 0/1 are that override and the sticky "seen off" state (tests use `clientHarness({ loading: false })`).
+  - While on, it shares `sharedQuota`, so the store polls whenever the page is open. `useQuota()` re-checks the snapshot right after subscribing: the sidebar and the composer badge mount together, and the first one's load can land between the second one's render and its subscription.
 - DSH renders `conversation.input.right` only when the session's input state exists (a bound session), but the New Session hero already shows the model selector.
   - A second entry `${NS}:quota-hero` in `conversation.hero.options` renders `QuotaBadge` with `placement: "hero"`; `useBadgePlacement()` hides it while a composer badge for the same `sessionId` is mounted (in-memory `composerBadges` presence counts), so exactly one badge shows.
   - Both entries share `injectDirectory` (`{ resolveDirectory, sessionId }`).
@@ -86,9 +90,9 @@ To change the client: edit `src/client/**`, run `npm run build:client`, then `np
 | `settings/account-panel*.part.js` | `AccountPanel` (Connection / Models / Generation / Quota tabs) |
 | `settings/page.js` | `CpaSectionPage` |
 | `media/helpers.js`, `media/panel.js` | `MediaPanel` and its helpers |
-| `quota/helpers.js`, `quota/store.js`, `quota/panel.js`, `quota/badge.js` | `summarizeModelQuota()`, `createQuotaStore()`, `QuotaPanel`, `QuotaBadge` |
+| `quota/helpers.js`, `quota/store.js`, `quota/panel.js`, `quota/badge.js`, `quota/sidebar.js` | `summarizeModelQuota()`, `createQuotaStore()`, `QuotaPanel`, `QuotaBadge`, `SidebarQuota` |
 | `core/presence.js` | Composer/hero presence, `useDirectory()`, clock hooks |
-| `core/peek.js` | `useAnchoredPeek()`, `placePeek()`: composer peek placement inside a transformed containing block |
+| `core/peek.js` | `useAnchoredPeek()`, `placePeek()`, `useDismissPeek()`: peek placement inside a transformed containing block and dismissal |
 | `media/chip.js` | `MediaChip` |
 | `media/confirmation-dock.js` | `MediaConfirmationDock` |
 | `chat/tool-id.js`, `chat/tool-row.js` | `toolRunId()`, `mediaConversationDefinition`, `MediaToolRow` / `MediaCommandRow` |

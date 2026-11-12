@@ -47,6 +47,16 @@
         } catch {}
       }
     };
+    // The Quota tab's sidebar switch tells the sidebar entry on this page
+    // (which stops reading quota status while switched off).
+    const sidebarQuotaListeners = new Set();
+    const announceSidebarQuota = (on) => {
+      for (const fn of [...sidebarQuotaListeners]) {
+        try {
+          fn(on === true);
+        } catch {}
+      }
+    };
 
     /**
      * Composer placement announces itself for its session; hero placement
