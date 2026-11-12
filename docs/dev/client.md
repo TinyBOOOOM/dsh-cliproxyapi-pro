@@ -37,7 +37,7 @@
 - `conversation.input.right` (order 10000; the composer renders this list immediately before the model selector) renders `QuotaBadge`.
   - Its registration `inject(sessionId)` passes a resolver for `modelDirectories.directoryFor(sessionId).store` from ui-model-selection (resolved at render, see below); the badge reads `pending ?? current` `{ provider, model }` and calls `summarizeModelQuota()`, which looks only inside the account whose `routes` contain that provider and only at `modelIndex[model]`.
   - It renders nothing for other routes or when the account has no management key.
-  - Its peek is `position: fixed` inside the component (no portal, nothing appended to `document.body`).
+  - Its peek is `position: fixed` inside the component (no portal, nothing appended to `document.body`). DSH's active composer seat is sticky with `will-change: transform`, so it, not the viewport, is the containing block of fixed descendants; `useAnchoredPeek()` (shared with `MediaChip`'s menu) renders the peek hidden at `left: 0; bottom: 0`, derives that box's left/bottom edges from where the peek landed, converts the viewport anchor position into it, keeps the peek inside the viewport and the clipping ancestors of that box (the chat scroller), and follows the anchor every animation frame while open (state changes only when the placement moves).
 - DSH renders `conversation.input.right` only when the session's input state exists (a bound session), but the New Session hero already shows the model selector.
   - A second entry `${NS}:quota-hero` in `conversation.hero.options` renders `QuotaBadge` with `placement: "hero"`; `useBadgePlacement()` hides it while a composer badge for the same `sessionId` is mounted (in-memory `composerBadges` presence counts), so exactly one badge shows.
   - Both entries share `injectDirectory` (`{ resolveDirectory, sessionId }`).
@@ -88,6 +88,7 @@ To change the client: edit `src/client/**`, run `npm run build:client`, then `np
 | `media/helpers.js`, `media/panel.js` | `MediaPanel` and its helpers |
 | `quota/helpers.js`, `quota/store.js`, `quota/panel.js`, `quota/badge.js` | `summarizeModelQuota()`, `createQuotaStore()`, `QuotaPanel`, `QuotaBadge` |
 | `core/presence.js` | Composer/hero presence, `useDirectory()`, clock hooks |
+| `core/peek.js` | `useAnchoredPeek()`, `placePeek()`: composer peek placement inside a transformed containing block |
 | `media/chip.js` | `MediaChip` |
 | `media/confirmation-dock.js` | `MediaConfirmationDock` |
 | `chat/tool-id.js`, `chat/tool-row.js` | `toolRunId()`, `mediaConversationDefinition`, `MediaToolRow` / `MediaCommandRow` |

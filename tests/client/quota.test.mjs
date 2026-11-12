@@ -91,6 +91,36 @@ describe("quota client", () => {
     );
   });
 
+  it("places the composer peek inside a transformed containing block, not on document.body", () => {
+    const h = clientHarness();
+    const viewport = { left: 0, top: 0, right: 1280, bottom: 800 };
+    const anchor = { left: 900, top: 700, right: 960, bottom: 728, width: 60, height: 28 };
+    // Containing block = viewport: hidden at 0/0 the peek's box sits at the viewport edges.
+    const plain = h.placePeek({ anchor, box: { left: 0, bottom: 800 }, applied: { left: 0, bottom: 0 }, bounds: viewport });
+    assert.deepEqual({ ...plain }, { left: 900, bottom: 106, width: 340, maxHeight: 440 }, "same as plain viewport placement");
+    // DSH's sticky composer seat (will-change: transform) at x 200, bottom edge 780.
+    const seat = h.placePeek({ anchor, box: { left: 200, bottom: 780 }, applied: { left: 0, bottom: 0 }, bounds: viewport });
+    assert.deepEqual({ ...seat }, { left: 700, bottom: 86, width: 340, maxHeight: 440 }, "offsets counted from the seat");
+    // A later measurement with those offsets applied is stable.
+    const again = h.placePeek({ anchor, box: { left: 900, bottom: 694 }, applied: { left: 700, bottom: 86 }, bounds: viewport });
+    assert.deepEqual({ ...again }, { ...seat });
+    // The chat scroller clips the seat's fixed descendants: stay inside it and below its top.
+    const clipped = h.placePeek({ anchor: { ...anchor, left: 1000, top: 300 }, box: { left: 200, bottom: 780 }, applied: { left: 0, bottom: 0 }, bounds: { left: 240, top: 60, right: 1100, bottom: 800 } });
+    assert.equal(clipped.left + 200 + clipped.width, 1100 - 16, "right edge kept inside the scroller");
+    assert.equal(clipped.maxHeight, 300 - 6 - 60 - 16, "height limited to the room above the anchor");
+    // Rendering never portals: the peek stays in the badge's own tree, hidden until measured.
+    const store = { getSnapshot: () => ({ data: quotaData, loading: false, error: null, busy: null }), subscribe: () => () => {}, refresh: async () => ({ ok: true }) };
+    const directory = { subscribe: () => () => {}, getSnapshot: () => ({ current: { provider: "cli-proxy-messages", model: "claude-opus-5-5" }, pending: null }) };
+    const t = (key) => h.zh[key] ?? key;
+    nodes(h.rerender("QuotaBadge", { t, directory, store }), (n) => n.type === "button")[0].props.onClick();
+    const tree = h.rerender("QuotaBadge", { t, directory, store });
+    const pop = nodes(tree, (n) => n.props?.className === "dcpa-q-pop")[0];
+    assert.ok(pop, "peek rendered inside the badge wrapper");
+    assert.deepEqual({ ...pop.props.style }, { ...h.PEEK_HIDDEN });
+    const source = readFileSync(new URL("../../lib/client.js", import.meta.url), "utf8");
+    assert.ok(!/createPortal|react-dom|document\.body\.append/.test(source), "no portal, nothing appended to document.body");
+  });
+
   it("recovers when the session's model directory appears after the first render", () => {
     const h = clientHarness();
     const store = { getSnapshot: () => ({ data: quotaData, loading: false, error: null, busy: null }), subscribe: () => () => {}, refresh: async () => ({ ok: true }) };

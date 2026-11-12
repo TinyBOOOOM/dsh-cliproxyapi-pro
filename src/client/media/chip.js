@@ -54,7 +54,6 @@
       const [loading, setLoading] = useState(true);
       // Which kind's model menu is open (image / video), or null.
       const [openKind, setOpenKind] = useState(null);
-      const [pos, setPos] = useState(null);
       const [busy, setBusy] = useState(false);
       const [error, setError] = useState(null);
       // Bumped to reload while no image model is known yet.
@@ -64,6 +63,10 @@
       const wrapRef = useRef(null);
       const buttonRef = useRef(null);
       const mounted = useRef(true);
+      const popRef = useRef(null);
+      // Anchor the menu to the whole two-button group; it sits left of the
+      // model selector either way.
+      const popStyle = useAnchoredPeek(openKind !== null, wrapRef, popRef);
       const shadowed = useBadgePlacement(placement, sessionId, presence);
       // Icon-only buttons while the composer row is narrow (names move to aria-label).
       const [compact, setCompact] = useState(false);
@@ -144,16 +147,6 @@
 
       useEffect(() => {
         if (openKind === null) return undefined;
-        const place = () => {
-          // Anchor the menu to the whole two-button group; it sits left of the
-          // model selector either way.
-          const rect = wrapRef.current?.getBoundingClientRect?.();
-          if (!rect || typeof window === "undefined") return;
-          const width = Math.min(340, window.innerWidth - 32);
-          const left = Math.max(16, Math.min(rect.left, window.innerWidth - width - 16));
-          setPos({ left, bottom: Math.max(16, window.innerHeight - rect.top + 6), width });
-        };
-        place();
         const onDown = (e) => {
           if (wrapRef.current && !wrapRef.current.contains(e.target)) closeMenu();
         };
@@ -165,11 +158,9 @@
         };
         document.addEventListener("mousedown", onDown, true);
         document.addEventListener("keydown", onKey, true);
-        window.addEventListener("resize", place);
         return () => {
           document.removeEventListener("mousedown", onDown, true);
           document.removeEventListener("keydown", onKey, true);
-          window.removeEventListener("resize", place);
         };
       }, [openKind]);
 
@@ -357,7 +348,8 @@
                 className: "dcpa-q-pop dcpa-m-pop",
                 role: "dialog",
                 "aria-label": showingAgent ? t("mediaAgentSection") : t(activeKind.kind === "image" ? "mediaImageGroup" : "mediaVideoGroup"),
-                style: pos ? { left: `${pos.left}px`, bottom: `${pos.bottom}px`, width: `${pos.width}px` } : { visibility: "hidden" },
+                ref: popRef,
+                style: popStyle,
               },
               head,
               ...(showingAgent ? [agentSettings] : [optionGroups(activeKind), agentAvailable ? h("div", { className: "dcpa-m-foot" }, agentButton) : null]),

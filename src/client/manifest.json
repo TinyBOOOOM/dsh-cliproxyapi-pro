@@ -53,6 +53,7 @@
   "quota/helpers.js",
   "quota/store.js",
   "core/presence.js",
+  "core/peek.js",
   "quota/panel.js",
   "settings/page.js",
   "quota/badge.js",
