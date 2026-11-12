@@ -4,6 +4,11 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixed
+- **The composer quota peek no longer drifts.** Clicking the quota badge next to the model selector now portals the detail into `document.body` and keeps it anchored to the button with viewport coordinates. The peek used `position: fixed` inside the composer slot; DSH composer ancestors carry `transform`, `filter` or `contain`, so fixed positioning was relative to that box, viewport coordinates placed the panel somewhere else, and it moved with the composer. Without `react-dom` it still renders inline.
+
 ## 1.10.0 — 2026-11-11
 
 ### Added
