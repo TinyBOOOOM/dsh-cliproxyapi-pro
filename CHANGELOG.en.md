@@ -4,6 +4,11 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.10.1 — 2026-11-12
+
+### Fixed
+- **The composer quota peek and generation-model menu no longer drift.** Newer DSH builds make the composer seat sticky with `will-change: transform`, so a `position: fixed` peek is placed relative to that seat instead of the viewport: the viewport coordinates put it somewhere else (often clipped on the right) and it moved with the composer. The peek still renders inside the component (nothing is appended to `document.body`); it is measured hidden at the seat's origin, the button's viewport position is converted into that box, the peek stays inside the viewport and the chat scroller, its height fits the room above the button, and it follows the button while open. Reported by [@CDeZT](https://github.com/CDeZT) in #4 / #5.
+
 ## 1.10.0 — 2026-11-11
 
 ### Added
