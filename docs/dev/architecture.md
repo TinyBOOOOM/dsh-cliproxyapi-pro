@@ -34,7 +34,10 @@ The Host entry `lib/index.js` only re-exports; behavior lives in these modules (
 | `lib/host/accounts.js` | `normalizeState()` migration, `mergeHostConfig()`, conflicts, `newAccountDefaults()`, `patchAccount()` |
 | `lib/host/state-store.js` | State path resolution and atomic `state.json` writes |
 | `lib/host/discovery.js` | `discoveryCandidates()`, `discoverCpa()`, `parseCatalog()`, plain-listing merge |
-| `lib/host/models.js` | Filtering, families, version ordering, `recommendModels()` |
+| `lib/host/models.js` | Filtering, families (`KNOWN_FAMILY`, `modelFamily()`), version ordering |
+| `lib/host/model-names.js` | Id tokenization: line words, versions, variants, `modelLine()`, `matchKeys()` for online matching |
+| `lib/host/recommend.js` | `analyzeModels()` (lines, families, staleness, line scores), `planRecommendations()` / `recommendModels()` (flagships, `FLAGSHIP_RATIO`, one own model per channel via `modelChannel()`), `selectionSuggestions()` |
+| `lib/host/model-info.js` | Online model info: models.dev / OpenRouter parsing, compact `model-info.json` cache, `createModelInfo()` service, `withOnlineLimits()` |
 | `lib/host/routes.js` | `nativeProtocol()`, overrides, `buildPiAiRoutes()`, `managedRouteKeys()` |
 | `lib/host/runtime.js` | `CpaRuntime`: discover → build → diff-write → follow default model |
 | `lib/host/controller.js` | `createCpaController()`, `serializeSettings()` |
@@ -44,7 +47,7 @@ The Host entry `lib/index.js` only re-exports; behavior lives in these modules (
 | `lib/host/apply-utils.js` | `outsideHmrTransaction()`, `accountPatchFromInput()` |
 | `lib/host/apply/index.js` | `applyImpl`: builds the activation context and wires the factories below in the original order |
 | `lib/host/apply/state.js` | State migration on activation, route seeding, fresh reads |
-| `lib/host/apply/controller.js` | Credentials, media preferences, account controller, refresh scheduling |
+| `lib/host/apply/controller.js` | Credentials, media preferences, online model info, account controller, refresh scheduling |
 | `lib/host/apply/updates.js` | Update preferences, `createPluginUpdater()` wiring, startup / 6-hour schedule |
 | `lib/host/apply/quota-service.js` | `createQuotaController()` wiring |
 | `lib/host/apply/media-service.js` | Media status/save, generation choices, `sessionView()`, session picks, `byteRange()` |
@@ -59,7 +62,7 @@ The Host entry `lib/index.js` only re-exports; behavior lives in these modules (
 | `lib/host/apply/agent-tool.js` | `executeGenerateMedia()`, consent (`askNativeConfirm()` / fallback), budgets, `syncAgentTool()` |
 | `lib/host/apply/commands.js` | Slash-command registration and disposal order |
 | `lib/host/apply/http-routes.js` | Account / update / quota / media HTTP routes and `media/file` serving |
-| `lib/host/apply/lifecycle.js` | Startup refresh, video resume, credential listener, disposal |
+| `lib/host/apply/lifecycle.js` | Startup refresh, online model info schedule (~5 s, then hourly due checks), video resume, credential listener, disposal |
 
 ## Host responsibilities
 
@@ -68,6 +71,7 @@ The Host entry `lib/index.js` only re-exports; behavior lives in these modules (
 3. **Persistent State Store** — `<profileDir>/.dsh-cliproxyapi/state.json`, atomic write via temp file + rename.
 4. **Discovery & Catalog Parsing** — `discoveryCandidates()`, `discoverCpa()` (`/v1/models?client_version=pi` enriched catalog fetched in parallel with the plain `/v1/models` listing for `owned_by` and listing-only media models; the listing has its own deadline and one retry, and `listingOk: false` makes `CpaRuntime` re-read the catalog ~4 s later twice before falling back to the periodic refresh), `parseCatalog()`.
 5. **Profile & Model Builder** — filtering, family/version sorting, `nativeProtocol()`, `buildPiAiRoutes()` (one route per protocol), `managedRouteKeys()`.
+   Recommendations group chat models into product lines (`recommend.js`), optionally informed by online model info (`model-info.js`: release dates, line names, retirement, capability scores; limits only fill catalog gaps from exact matches).
 6. **Runtime Synchronizer** — `CpaRuntime` (one per account: discover → build → diff-write routes → follow default model), `serializeSettings()`, `createCpaController()` (owns account runtimes and state; all account UI/command/HTTP operations go through it).
 7. **HTTP Gate** — `admitRequest()` enforces host connection policy, loopback/trusted host, same-origin for POST. `admitUpdateRequest()` additionally requires a Host and, when an `Origin` is present, the same authority under the Origin's own `http(s)` scheme (the host connection fence's rule).
 A missing `Origin` is allowed: the DSH desktop shell (`forwardWebRequest` in the desktop main process) strips `origin`, `host` and `sec-fetch-site` before forwarding page requests with its session cookie, so requiring it rejects every desktop update POST (the 1.5.1 "check fails" bug; dshmarket hit the same, its #648).

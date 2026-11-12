@@ -21,9 +21,9 @@ Used by the settings panel. Requires the DSH Web session's authentication; POST 
 
 | Method | Path | Body | Meaning |
 |---|---|---|---|
-| GET | `/api/dsh-cliproxyapi/status` | — | `{ ok, global, accounts[] }` |
+| GET | `/api/dsh-cliproxyapi/status` | — | `{ ok, global, accounts[] }`. `global` includes `onlineModelInfo` and the online-info status `modelInfo` (`state`: `off` / `idle` / `loading` / `ready` / `partial` / `error`, plus each source's model count, download time and error); every account includes `recommendedModels`, `recommendations[]` with reasons (`id`, `line`, `family`, `released?`, `source`: `online` / `catalog` / `name`) and `suggestions` about the saved selection (`upgrades[]`, `missing[]`, `retired[]`). Never starts an online-info download |
 | POST | `/api/dsh-cliproxyapi/refresh` | `{ accountId? }` | Refresh one or all accounts |
-| POST | `/api/dsh-cliproxyapi/save` | `{ accountId?, …account fields, apiKey?, clearApiKey?, refreshIntervalSeconds?, probeTimeoutMs? }` | Save an account (the first by default); a body with only global fields saves just the globals |
+| POST | `/api/dsh-cliproxyapi/save` | `{ accountId?, …account fields, apiKey?, clearApiKey?, refreshIntervalSeconds?, probeTimeoutMs?, onlineModelInfo? }` | Save an account (the first by default); a body with only global fields saves just the globals. Changing `onlineModelInfo` starts (or stops using) online model info at once and re-syncs every account |
 | POST | `/api/dsh-cliproxyapi/accounts/add` | Optional account fields | Create a disabled account; returns `createdId` |
 | POST | `/api/dsh-cliproxyapi/accounts/remove` | `{ accountId }` | Delete an account and its routes |
 | POST | `/api/dsh-cliproxyapi/accounts/test` | `{ accountId?, baseURL?, apiKey? }` | Test unsaved connection values without saving or writing routes; a blank `apiKey` uses the account's stored key; never returns the key |

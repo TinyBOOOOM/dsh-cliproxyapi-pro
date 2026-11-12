@@ -12,7 +12,7 @@ Repository: <https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro>, default branch 
 | Path | Owns |
 |---|---|
 | `lib/index.js` | Cordis entry (`name`, `inject`, `apply`) and the public re-export barrel; keep every existing export |
-| `lib/host/` | Account config, state, discovery, model/route building, `CpaRuntime`, `createCpaController`, HTTP gate, mount guard |
+| `lib/host/` | Account config, state, discovery, model/route building, recommendations and online model info, `CpaRuntime`, `createCpaController`, HTTP gate, mount guard |
 | `lib/host/apply/` | `applyImpl` as factories over one explicit activation context: state, updates, quota, media service, image/video jobs, agent tool, commands, HTTP routes, lifecycle |
 | `lib/media/` | Media engine (barrel `index.js`): classification, preferences, stores, parsers, image/video requests, interpretation, codecs, tool schema |
 | `lib/quota/` | Quota engine (barrel `index.js`): management API, parsers, matching, `probes/`, controller |
@@ -39,7 +39,8 @@ User docs are `README.md` / `README.en.md` and `docs/zh/` / `docs/en/`; develope
 
 - Each account owns only `managedRouteKeys(provider)`: base, `-responses` and `-messages`. Never touch `config.reservedKeys`; conflicts own nothing. Base routes retain Chat models and `followDefaultModel()` follows protocol relocations.
 - Disabled accounts keep settings but lose routes; periodic refresh skips them, manual probing may inspect them. Explicit `baseURL` never falls back to another server. Account ids remain stable; removal keeps credentials.
-- Unchanged sync performs zero writes (`sameJson`); preserve user route fields outside `MANAGED_ROUTE_FIELDS`. Missing `selectedModels` seeds catalog-derived recommendations once; `[]` explicitly means all. Never hard-code default model ids.
+- Unchanged sync performs zero writes (`sameJson`); preserve user route fields outside `MANAGED_ROUTE_FIELDS`. Missing `selectedModels` seeds catalog-derived recommendations (flagship product lines, newest model each) once; `[]` explicitly means all. Never hard-code default model ids. Selection suggestions are display-only.
+- Online model info (global `onlineModelInfo`, default on) is download-only: plain GETs of models.dev / OpenRouter without credentials, accounts, addresses or model lists; daily, bounded, compact cache; when off, no download and no lookup. Catalog limits always win; online limits fill gaps from exact matches only. Test mounts keep it off.
 - State is re-read on access and normalized to `version: 2`. Format changes require lossless v1 migration in `normalizeState()` and tests. Update/media preferences remain outside account state and `GLOBAL_FIELDS`.
 - Generation has a master switch (`media-settings.json` `enabled`, off for new profiles): while off, no generation commands, composer chips or agent tool exist; submitted videos still finish.
 - At most one tool, `generate_media`, off by default and registered only with enabled generation models. No account/quota/update tools. Its compact static schema never lists models; prompts stay verbatim with no invented scene details.

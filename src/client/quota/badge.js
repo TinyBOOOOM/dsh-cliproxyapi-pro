@@ -31,23 +31,16 @@
       const snap = useQuota(selection ? store : null);
       const now = useNow(60 * 1000);
       const [open, setOpen] = useState(false);
-      const [pos, setPos] = useState(null);
       const wrapRef = useRef(null);
       const buttonRef = useRef(null);
+      const popRef = useRef(null);
+      const popStyle = useAnchoredPeek(open, buttonRef, popRef);
 
       const summary = selection ? summarizeModelQuota(snap.data, selection.provider, selection.model) : null;
       const visible = !shadowed && summary !== null && summary.account.keyConfigured === true;
 
       useEffect(() => {
         if (!open) return undefined;
-        const place = () => {
-          const rect = buttonRef.current?.getBoundingClientRect?.();
-          if (!rect || typeof window === "undefined") return;
-          const width = Math.min(340, window.innerWidth - 32);
-          const left = Math.max(16, Math.min(rect.left, window.innerWidth - width - 16));
-          setPos({ left, bottom: Math.max(16, window.innerHeight - rect.top + 6), width });
-        };
-        place();
         const onDown = (e) => {
           if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
         };
@@ -59,11 +52,9 @@
         };
         document.addEventListener("mousedown", onDown, true);
         document.addEventListener("keydown", onKey, true);
-        window.addEventListener("resize", place);
         return () => {
           document.removeEventListener("mousedown", onDown, true);
           document.removeEventListener("keydown", onKey, true);
-          window.removeEventListener("resize", place);
         };
       }, [open]);
 
@@ -83,10 +74,11 @@
         ? h(
             "div",
             {
+              ref: popRef,
               className: "dcpa-q-pop",
               role: "dialog",
               "aria-label": label,
-              style: pos ? { left: `${pos.left}px`, bottom: `${pos.bottom}px`, width: `${pos.width}px` } : { visibility: "hidden" },
+              style: popStyle,
             },
             h(
               "div",

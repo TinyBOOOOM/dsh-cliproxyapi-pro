@@ -8,6 +8,12 @@ Check that the **Enabled** switch next to the account title is on and at least o
 **"none of the selected models matched"?**
 None of the checked models exists on this server (typical after switching servers). The panel still lists the server's models — check new ones, or click **Reset to Recommended**, then save.
 
+**Do recommendations go online? What is sent?**
+With **Online Model Info** on (the default), the plugin downloads public model data from models.dev and openrouter.ai once a day (hourly retries after a failure), using plain GET requests that carry no account, key, server address or model list; matching happens locally. To stay offline, turn it off at the top of the **Models** tab; recommendations then use the CPA catalog only. When the network is down, the last downloaded cache stays in use.
+
+**A suggestion says a newer model exists. Is it swapped in automatically?**
+No. Suggestions only point things out; after **Add / Replace / Use**, **Save & Apply** still makes the change, and sessions or the default model using the older model are unaffected.
+
 **Connection failed / "no usable CPA service found"?**
 Make sure the base URL is reachable from the machine running DSH and the API key is correct. An account with a URL never tries another address; the error lists every address tried and why it failed.
 

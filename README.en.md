@@ -36,7 +36,7 @@ The plugin is published on npm as [`dsh-cliproxyapi-pro`](https://www.npmjs.com/
    dsh-cliproxyapi-pro
    ```
 
-   To pin a version, write `dsh-cliproxyapi-pro@1.9.1`.
+   To pin a version, write `dsh-cliproxyapi-pro@1.10.1`.
 4. Click **Install**. When it finishes, the dialog offers to enable the plugin right away — accept it.
 
 > If downloads are slow in mainland China, open **Registry** next to the input and choose **the mainland China mirror**.
@@ -65,7 +65,7 @@ In **Add plugin**, or as the `plugin_manager` `target`, you can also enter:
 
 | Source | What to enter |
 |---|---|
-| A released version | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v1.9.1` |
+| A released version | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#v1.10.1` |
 | Latest development version | `git+https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro.git#main` |
 | Offline package | Download [`dsh-cliproxyapi-pro.tgz`](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/releases/latest/download/dsh-cliproxyapi-pro.tgz) (always the latest release) and enter its absolute local path |
 | Local source (development) | Absolute path of a cloned repository; installed as a link, so code changes go live when the plugin reloads |
@@ -76,7 +76,7 @@ All versions are listed under [Releases](https://github.com/TinyBOOOOM/dsh-clipr
 
 1. **Open the settings panel**: **Settings** → the **CLIProxyAPI** page in the left navigation (accounts, models and protocols live there). The plugin's own updates are on sidebar **Plugins** → **CLIProxyAPI** and on **Settings** → **Built-in plugins** → the **CLIProxyAPI** tab; those two places contain only update features.
 2. **Add an account**: click **+ Add Account**, enter an account name, the **Base URL** (e.g. `http://127.0.0.1:8317`, without `/v1`) and the **API Key** (leave it empty for a local CPA without authentication), then click **Connect**. A successful connection creates and enables the account; on failure the reason is shown so you can fix it, or choose **Add Anyway (Disabled)**.
-3. **Choose models**: the account's **Models** tab lists every model on the server, with the newest model of each family already checked. Adjust the selection and click **Save & Apply** at the bottom.
+3. **Choose models**: the account's **Models** tab lists every model on the server, with the recommended models already checked by product line (the newest Claude Opus, Sonnet, Fable, …, informed by [online model info](https://github.com/TinyBOOOOM/dsh-cliproxyapi-pro/blob/main/docs/en/accounts-and-models.md#recommendations-and-suggestions), on by default and download only). Adjust the selection and click **Save & Apply** at the bottom.
 4. **Use them**: open the model picker in a conversation; the models appear in a group named after the account.
 
 If CPA runs on this machine on the default port `8317` without a key, there is nothing to fill in: the plugin finds it automatically.

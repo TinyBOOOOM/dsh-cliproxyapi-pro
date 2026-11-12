@@ -202,11 +202,19 @@
         });
       }, [visibleModels]);
 
-      // Computed by the Host from this account's own catalog: newest per family.
+      // Computed by the Host from this account's catalog (and online model info):
+      // the newest model of each product line, with a reason per model.
       const recommended = Array.isArray(account.recommendedModels) ? account.recommendedModels : [];
       const resetRecommended = useCallback(() => {
         setSelectedIds(new Set(recommended));
       }, [recommended]);
+      const recommendedById = useMemo(() => {
+        const details = Array.isArray(account.recommendations) ? account.recommendations : [];
+        return new Map(recommended.map((id) => [id, details.find((d) => d.id === id) ?? { id }]));
+      }, [recommended, account.recommendations]);
+      // A global: saved at once without touching the drafts.
+      const toggleOnlineInfo = (next) =>
+        void actions.patch(account.id, { onlineModelInfo: next }, next ? t("onlineInfoOnToast") : t("onlineInfoOffToast"));
 
       const updateOverride = useCallback((model, patch) => {
         setModelOverrides((prev) => {

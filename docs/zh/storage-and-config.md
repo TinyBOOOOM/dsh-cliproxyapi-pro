@@ -9,6 +9,7 @@
     "version": 2,
     "refreshIntervalSeconds": 300,
     "probeTimeoutMs": 5000,
+    "onlineModelInfo": true,
     "accounts": [
       {
         "id": "default", "enabled": true, "provider": "cli-proxy", "displayName": "CLI Proxy API",
@@ -20,7 +21,7 @@
   }
   ```
 
-  文件每次读取都会重新加载，手动修改后在账号「⋯」菜单里点「立即探测刷新」即可生效。旧版（1.3.x 及以前）的单账号文件会自动迁移为 id 为 `default` 的账号，路由、密钥和勾选保持不变，原文件备份为 `state.v1.json`。
+  `onlineModelInfo` 是所有账号共用的「在线模型资料」开关，缺省视为开启（见 [推荐与选择建议](accounts-and-models.md#推荐与选择建议)）。文件每次读取都会重新加载，手动修改后在账号「⋯」菜单里点「立即探测刷新」即可生效。旧版（1.3.x 及以前）的单账号文件会自动迁移为 id 为 `default` 的账号，路由、密钥和勾选保持不变，原文件备份为 `state.v1.json`。
 
 - **更新设置**：独立保存在 `<Profile 目录>/.dsh-cliproxyapi/update-settings.json`，不扩展或改写账号的 `state.json` v2，也不接触凭证。首次没有此文件时采用下列默认值：
 
@@ -58,6 +59,7 @@
 
 - **会话生成记录**：`<Profile 目录>/.dsh-cliproxyapi/media-sessions.json` 保存每个会话选择的生成模型、最近 48 次生成的记录（状态、模型、提示词、选项、起止时间、保存目录显示名、错误摘要），以及最近生成的最多 48 个文件路径和生成它们的命令 id（供对话里的命令行显示图片），只保留最近更新的 500 个会话。删除它只会清空这些选择和记录，不会删除已生成的文件。文件损坏时按空记录处理，下次写入前另存为 `media-sessions.corrupt-<时间>.json`。
 - **视频任务**：`<Profile 目录>/.dsh-cliproxyapi/media-jobs.json` 保存已提交的视频任务（CPA 请求 id、账号、模型、会话和命令 id、工作目录与保存位置、提示词、时长、提交时间、状态），用于重载或重启后继续等待；最多 200 个，已结束的保留 7 天。不含 Key 和视频地址。文件损坏时按空处理，下次写入前另存为 `media-jobs.corrupt-<时间>.json`。
+- **在线模型资料缓存**：`<Profile 目录>/.dsh-cliproxyapi/model-info.json` 保存从 models.dev 和 OpenRouter 下载的精简模型资料（型号 id、产品线、发布日期、状态、上限、价格、能力评分）以及各来源的下载时间、ETag 和最近一次错误；不含任何账号信息。删除它只会让插件在下一次检查时重新下载；关闭「在线模型资料」后不再使用也不再更新它。
 - **管理密钥失败次数**：`<Profile 目录>/.dsh-cliproxyapi/quota-state.json` 记录每个账号连续被 CPA 管理接口拒绝（401/403）的次数、最后的错误码和时间，用来在 3 次后停止自动查询；不含密钥。删除它只会清零计数。
 - **密钥**：通过 DSH 的 `credentials` 服务按引用名存取；凭证服务里没有时，回退读取同名环境变量。
 - **环境变量**：`CLIPROXYAPI_BASE_URL` 只用于服务地址留空的账号的自动发现。

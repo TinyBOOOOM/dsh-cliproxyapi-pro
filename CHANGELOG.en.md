@@ -4,6 +4,19 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.10.1 — 2026-11-12
+
+### Fixed
+- **The composer quota peek and generation-model menu no longer drift.** Newer DSH builds make the composer seat sticky with `will-change: transform`, so a `position: fixed` peek is placed relative to that seat instead of the viewport: the viewport coordinates put it somewhere else (often clipped on the right) and it moved with the composer. The peek still renders inside the component (nothing is appended to `document.body`); it is measured hidden at the seat's origin, the button's viewport position is converted into that box, the peek stays inside the viewport and the chat scroller, its height fits the room above the button, and it follows the button while open. Reported by [@CDeZT](https://github.com/CDeZT) in #4 / #5.
+
+## 1.10.0 — 2026-11-11
+
+### Added
+- **Recommendations by product line.** **Reset to Recommended** and the first-run selection of a new account no longer take only the highest version of each family. Claude Opus / Sonnet / Haiku / Fable, GPT sol / terra / luna / astra, Gemini / Gemini Flash and so on are separate product lines: each line is represented by its newest model (by release date when known, which fixes `grok-4.20` reading as newer than `grok-4.7`), preferring models without `-thinking` / `-fast` / `-1m` suffixes and `devin/` prefixes; lines more than 180 days older than their family's newest model and models deprecated upstream are not recommended. Only flagships are recommended: lines whose online capability score reaches 80% of this server's strongest line, at most 12, so light lines and unscored niche models stay out; without scores, the non-light lines of well-known vendors. In addition, every channel the account connects (by prefix or `owned_by`) gets at least its own best model, such as `devin/swe-2` for the Devin channel and the best Grok for a Grok channel. Opaque ids (such as `model_private_12`) are judged by their display name. Recommended models carry a **Recommended** tag whose ⓘ tip gives the reason.
+- **Online model info (on by default).** Public model data (product lines, release dates, deprecation and end dates, context and output limits, prices, capability scores) is downloaded daily from models.dev and OpenRouter to rank recommendations; download only, no account, key, address or model list is sent. It is cached in `.dsh-cliproxyapi/model-info.json`; after a failure the old cache stays in use and the download is retried an hour later. It can be turned off at the top of the **Models** tab (shared by all accounts, stored in the new global `state.json` field `onlineModelInfo`, which reads as on when absent). When the CPA catalog gives no context window or max output, the value of an exact online match (max output capped at 128K) replaces the fixed 262144 / 64000.
+- **Suggestions.** The **Models** tab points out newer models of checked lines (for example Fable 5.2 while 5.1 is checked: **Add** or **Replace**), checked models no longer in the server's catalog (switch to a same-named prefixed model when there is one) and checked models deprecated upstream. They only edit the draft; **Save & Apply** still applies them.
+- The `created` date of the CPA plain model listing is read to tell newer models from older ones.
+
 ## 1.9.1 — 2026-10-27
 
 ### Fixed
