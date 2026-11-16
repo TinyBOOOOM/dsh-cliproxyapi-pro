@@ -64,6 +64,8 @@ describe("quota controller", () => {
     assert.equal(claude.windows[0].resetAt, "2026-10-21T08:00:00.000Z");
 
     const ag = credentialById(account, "ag.json");
+    const agSummaryCall = h.calls.find((call) => call.body?.url === "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary");
+    assert.equal(agSummaryCall.body.header["User-Agent"], "antigravity/hub/2.23.0 darwin/arm64");
     assert.equal(ag.quotaState, "ok");
     assert.equal(ag.plan, "Ultra");
     assert.deepEqual(ag.windows.map((w) => [w.kind, w.group, w.remainingPercent]), [
