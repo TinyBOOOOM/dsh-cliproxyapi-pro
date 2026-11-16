@@ -64,9 +64,20 @@
       return `${text} ${fmt(t, account.authPaused ? "qAuthPaused" : "qAuthRetrying", { n, max })}`;
     }
 
+    function shortGroupName(group) {
+      if (!group) return "";
+      const s = String(group).toLowerCase();
+      if (s.includes("argon")) return "Argon";
+      if (s.includes("claude") || s.includes("gpt") || s.includes("3p")) return "Claude";
+      if (s.includes("gemini")) return "Gemini";
+      return group;
+    }
+
     function windowLabel(t, w) {
       const base = WINDOW_KEYS[w.kind] !== undefined ? t(WINDOW_KEYS[w.kind]) : w.label || t("qWinOther");
-      return w.group ? `${w.group} · ${base}` : base;
+      if (!w.group) return base;
+      const g = shortGroupName(w.group);
+      return `${base} · ${g}`;
     }
 
     function durationText(t, ms) {
@@ -119,6 +130,14 @@
       if (!modelId) return true;
       const full = String(modelId).toLowerCase();
       const bare = bareModel(modelId);
+      const isArgonModel = bare.includes("argon");
+
+      // Argon models must match Argon windows/IDs
+      if (isArgonModel) {
+        return (Array.isArray(w.modelPrefixes) && w.modelPrefixes.some((p) => String(p).toLowerCase().includes("argon"))) ||
+               (Array.isArray(w.modelIds) && w.modelIds.some((m) => String(m).toLowerCase().includes("argon")));
+      }
+
       if (Array.isArray(w.modelIds) && w.modelIds.length > 0) {
         return w.modelIds.some((m) => {
           const x = String(m).toLowerCase();

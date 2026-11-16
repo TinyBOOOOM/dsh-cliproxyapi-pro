@@ -64,7 +64,12 @@ describe("quota controller", () => {
     assert.equal(claude.windows[0].resetAt, "2026-10-21T08:00:00.000Z");
 
     const ag = credentialById(account, "ag.json");
-    const agSummaryCall = h.calls.find((call) => call.body?.url === "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary");
+    const agSummaryUrls = h.calls.map((call) => call.body?.url).filter((url) => typeof url === "string" && url.includes(":retrieveUserQuotaSummary"));
+    assert.deepEqual(agSummaryUrls, [
+      "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+      "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+    ]);
+    const agSummaryCall = h.calls.find((call) => call.body?.url === "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary");
     assert.equal(agSummaryCall.body.header["User-Agent"], "antigravity/hub/2.23.0 darwin/arm64");
     assert.equal(ag.quotaState, "ok");
     assert.equal(ag.plan, "Ultra");
@@ -165,6 +170,43 @@ describe("quota controller", () => {
     };
     assert.deepEqual(matchCredentials(account, "swe-2"), { credentialIds: ["devin.json"], matchedBy: "family" });
     assert.deepEqual(matchCredentials(account, "claude-opus-5-5"), { credentialIds: ["claude.json"], matchedBy: "model-list" });
+  });
+
+  it("keeps disabled Antigravity out of unrelated GPT and Claude models while showing it on Gemini and Argon", () => {
+    const account = {
+      credentials: [
+        {
+          id: "ag-off.json",
+          provider: "antigravity",
+          status: "disabled",
+          models: null,
+          windows: [
+            { id: "ag:c", kind: "5h", group: "Claude and GPT models", modelPrefixes: ["claude", "gpt"] },
+            { id: "ag:g", kind: "5h", group: "Gemini Models", modelPrefixes: ["gemini", "gemma"] },
+            { id: "ag:a", kind: "7d", group: "Gemini 4 Argon", modelPrefixes: ["argon", "gemini-4-argon"] },
+          ],
+        },
+        {
+          id: "ag-on.json",
+          provider: "antigravity",
+          status: "active",
+          models: ["claude-opus-5-5", "gpt-oss-120b-medium", "gemini-4-hydrogen-xhigh", "gemini-4-argon-high"],
+          windows: [],
+        },
+        {
+          id: "codex.json",
+          provider: "codex",
+          status: "active",
+          models: ["gpt-6.1-sol"],
+          windows: [],
+        },
+      ],
+    };
+    assert.deepEqual(matchCredentials(account, "gpt-6.1-sol"), { credentialIds: ["codex.json"], matchedBy: "model-list" });
+    assert.deepEqual(matchCredentials(account, "claude-haiku-4-5"), { credentialIds: [], matchedBy: "none" });
+    assert.deepEqual(matchCredentials(account, "gemini-4-hydrogen-xhigh"), { credentialIds: ["ag-on.json", "ag-off.json"], matchedBy: "model-list" });
+    assert.deepEqual(matchCredentials(account, "gemini-4-argon-high"), { credentialIds: ["ag-on.json", "ag-off.json"], matchedBy: "model-list" });
+    assert.deepEqual(matchCredentials(account, "gpt-oss-120b-medium"), { credentialIds: ["ag-on.json"], matchedBy: "model-list" });
   });
 
   it("maps 403 to forbidden", async () => {
