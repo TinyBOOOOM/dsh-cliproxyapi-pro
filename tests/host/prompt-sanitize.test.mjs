@@ -129,7 +129,8 @@ describe("prompt sanitize", () => {
       ],
     });
     const routes = controller.sanitizePromptRoutes();
-    assert.equal(routes.size, 6);
+    assert.equal(routes.size, 8);
+    assert.equal(routes.get("cli-proxy-gemini"), DEFAULT_SANITIZE_REPLACEMENT);
     assert.equal(routes.get("cli-proxy"), DEFAULT_SANITIZE_REPLACEMENT);
     assert.equal(routes.get("cli-proxy-responses"), DEFAULT_SANITIZE_REPLACEMENT);
     assert.equal(routes.get("cli-proxy-2-messages"), "Codex");

@@ -32,7 +32,7 @@
 
 ## 多账号
 
-- 每个账号写入自己的一组路由：第一个账号为 `cli-proxy` / `cli-proxy-responses` / `cli-proxy-messages`，之后依次为 `cli-proxy-2*`、`cli-proxy-3*`……；密钥引用名依次为 `CLI_PROXY_API_KEY`、`CLI_PROXY_API_KEY_2`……。模型选择器按账号名称分组。
+- 每个账号写入自己的一组路由：第一个账号为 `cli-proxy` / `cli-proxy-responses` / `cli-proxy-messages` / `cli-proxy-gemini`，之后依次为 `cli-proxy-2*`、`cli-proxy-3*`……；密钥引用名依次为 `CLI_PROXY_API_KEY`、`CLI_PROXY_API_KEY_2`……。模型选择器按账号名称分组。
 - **停用**账号：保留全部配置，但移除它的路由，模型从选择器中消失；其他账号不受影响。
 - **新增**账号：「+ 添加账号」先用填写的地址和密钥测试连接，成功才创建并启用；也可以选择「仍然添加（不启用）」。
 - 每个账号的页面分 **连接 / 模型 / 生成 / 额度** 四个标签，顶部账号栏对所有标签共用。账号标题旁的「启用」开关立即生效；「⋯」菜单里是「立即探测刷新」和「删除此账号」。
@@ -45,7 +45,7 @@
 ## 提示词净化（兼容性）
 
 - 部分上游网关会拒绝包含精确短语 **DeepSeek Harness**（不区分大小写）的系统提示词，返回不带原因的 429；CPA 还会据此给整个账号增加冷却时间。已确认 Antigravity 的 Gemini 账号存在此行为，且与模型无关、与额度无关（同样的提示词换成别的不含该短语的文本都正常返回）。
-- 连接页「高级路由与规则过滤」里的 **提示词净化（兼容性）** 开关（默认开启）把该账号三条路由请求的系统提示词中**每一个**该短语整体替换为下方「替换文本」。
+- 连接页「高级路由与规则过滤」里的 **提示词净化（兼容性）** 开关（默认开启）把该账号各条路由请求的系统提示词中**每一个**该短语整体替换为下方「替换文本」。
 - 「替换文本」留空时使用默认值 `Custom Harness`，开场白变成 “You are an AI agent powered by Custom Harness.”，其他位置如 “the Custom Harness Web GUI” 也保持通顺；填入自定义文本后每个该短语都替换为它（例如 `Codex`）。该短语在提示词中按专有名词使用，自定义文本建议同样用不带冠词的名称。
 - 只改名称还不够：Google 是按内容综合判断，而不是简单的关键词过滤。DSH Web GUI 说明里的 “The browser provides no implicit DOM, route, or screenshot context.” 单独发送不会被拦，与前后文（“…they mean this GUI. … The client-plugin…”）连在一起就会 429。开关打开时这一句也会被删除（删除后前后文之间只留一个空格），删掉后完整提示词正常返回。代价只是模型少了“浏览器不提供隐式页面上下文”这条提示。
 - 改写在提示词组装的最后阶段（`system-prompt/assemble`）发生，覆盖提示词分节、运行时上下文分节和插值变量；**只在发往该账号的请求时生效**，其他账号和原生提供商不受影响。
@@ -53,16 +53,20 @@
 
 ## 协议路由
 
-CPA 对每个模型同时提供 OpenAI Chat、OpenAI Responses、Anthropic Messages 三种入口，入口协议和上游不一致时需要转换。默认的自动模式让每个模型直接使用上游协议：
+CPA 对每个模型同时提供 OpenAI Chat、OpenAI Responses、Anthropic Messages、Gemini `generateContent` 四种入口，入口协议和上游不一致时需要转换。默认的自动模式让每个模型直接使用上游协议：
 
 | 模型家族（依据 `owned_by` 与模型 id） | 协议 | 路由（以 `cli-proxy` 为例） |
 |---|---|---|
 | Claude（含 `devin/claude-*`、Antigravity Claude） | Anthropic Messages `/v1/messages` | `cli-proxy-messages` |
 | OpenAI / Codex / GPT、xAI Grok | OpenAI Responses `/v1/responses` | `cli-proxy-responses` |
-| Gemini、DeepSeek、Kimi、GLM、SWE、gpt-oss 等 | OpenAI Chat `/v1/chat/completions` | `cli-proxy` |
+| Gemini（不带前缀的 `gemini-*`） | Gemini `/v1beta/models/…:streamGenerateContent` | `cli-proxy-gemini` |
+| DeepSeek、Kimi、GLM、SWE、gpt-oss、带前缀的 Gemini（如 `devin/gemini-*`）等 | OpenAI Chat `/v1/chat/completions` | `cli-proxy` |
 
-- DSH 自定义路由不支持 Gemini 原生 `generateContent`，所以 Gemini 走 OpenAI Chat。
-- DSH 每条路由只能有一种协议，模型按协议分到三条路由；没有模型的路由会自动移除。默认模型因此换了路由时，`agent-default-model` 会自动跟随。
+- Gemini 原生协议必须配置 API Key（DSH 不发送没有密钥的 Gemini 请求）；未配置密钥的账号，Gemini 模型仍走 OpenAI Chat。
+- Gemini 路由只提供 `minimal` / `low` / `medium` / `high` 思考档位，`xhigh` / `max` 不显示；目录未声明 `off` 时也不提供关闭思考。反重力等用后缀区分档位的模型 ID（如 `gemini-4-hydrogen-xhigh`），档位以后缀为准。
+- 带前缀的 Gemini（如 `devin/gemini-*`）留在 OpenAI Chat：DSH 的 Gemini 适配器按 `gemini-` 开头的 ID 处理工具调用 ID 等细节。
+- 升级后 Gemini 模型从 `cli-proxy` 移到 `cli-proxy-gemini`，已经在用 Gemini 的旧会话需要在模型选择器里重新选一次。
+- DSH 每条路由只能有一种协议，模型按协议分到各条路由；没有模型的路由会自动移除。默认模型因此换了路由时，`agent-default-model` 会自动跟随。
 - Claude 4.6+ / 5.x / Fable 使用自适应思考（`effort`），更早的 Claude 使用 token 预算。
 - 可以改为「统一使用」某一种协议，或在单个模型的「编辑参数」里指定。
 - 你在路由上手动加的其他字段（如 `retryPolicy`）会被保留。

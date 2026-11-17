@@ -87,7 +87,9 @@ describe("dsh-cliproxyapi unit tests", () => {
       [{ id: "grok-4.7", ownedBy: "xai" }, "openai-responses"],
       [{ id: "gpt-oss-120b-medium", ownedBy: "antigravity" }, "openai-completions"],
       [{ id: "devin/gemini-4-argon", ownedBy: "google" }, "openai-completions"],
-      [{ id: "gemini-3-flash", ownedBy: "antigravity" }, "openai-completions"],
+      [{ id: "gemini-3-flash", ownedBy: "antigravity" }, "google-generative-ai"],
+      [{ id: "gemini-4-hydrogen-xhigh", ownedBy: "google" }, "google-generative-ai"],
+      [{ id: "gemma-4-27b", ownedBy: "google" }, "openai-completions"],
       [{ id: "devin/swe-2", ownedBy: "cognition" }, "openai-completions"],
       [{ id: "devin/kimi-k3", ownedBy: "moonshot" }, "openai-completions"],
     ];
@@ -121,7 +123,7 @@ describe("dsh-cliproxyapi unit tests", () => {
         resolveConfig({
           provider: "cli-proxy",
           baseURL: "http://127.0.0.1:8317",
-          selectedModels: ["claude-opus-5-5", "gpt-6.1-sol", "gemini-3-flash"],
+          selectedModels: ["claude-opus-5-5", "gpt-6.1-sol", "gemini-3-flash", "gpt-oss-120b-medium"],
         }),
       resolveApiKey: async () => "sk-test",
       readExistingPiAiRoute: (key) => providers[key],
@@ -139,7 +141,13 @@ describe("dsh-cliproxyapi unit tests", () => {
           owned_by: "openai",
           supported_reasoning_levels: [{ effort: "low" }, { effort: "high" }, { effort: "ultra" }],
         },
-        { slug: "gemini-3-flash", owned_by: "antigravity", supported_reasoning_levels: [{ effort: "low" }] },
+        {
+          slug: "gemini-3-flash",
+          owned_by: "antigravity",
+          input_modalities: ["text", "image"],
+          supported_reasoning_levels: [{ effort: "low" }, { effort: "high" }, { effort: "xhigh" }],
+        },
+        { slug: "gpt-oss-120b-medium", owned_by: "antigravity", supported_reasoning_levels: [{ effort: "low" }] },
         { slug: "unselected", owned_by: "openai" },
       ]),
     });
@@ -147,16 +155,28 @@ describe("dsh-cliproxyapi unit tests", () => {
     await runtime.refresh();
     const st = runtime.status();
     assert.equal(st.state, "connected", st.error);
-    assert.equal(st.modelCount, 3);
-    assert.equal(st.totalDiscovered, 4);
-    assert.deepEqual(st.routes, ["cli-proxy", "cli-proxy-responses", "cli-proxy-messages"]);
+    assert.equal(st.modelCount, 4);
+    assert.equal(st.totalDiscovered, 5);
+    assert.deepEqual(st.routes, ["cli-proxy", "cli-proxy-responses", "cli-proxy-messages", "cli-proxy-gemini"]);
 
     const chat = providers["cli-proxy"];
     assert.equal(chat.api, "openai-completions");
     assert.equal(chat.baseURL, "http://127.0.0.1:8317/v1");
-    assert.deepEqual(chat.models.map((m) => m.id), ["gemini-3-flash"]);
+    assert.deepEqual(chat.models.map((m) => m.id), ["gpt-oss-120b-medium"]);
     assert.deepEqual(chat.models[0].compat, { supportsReasoningEffort: true, thinkingFormat: "openai" });
     assert.deepEqual(chat.retryPolicy, { mode: "normal", maxRetries: 2 });
+
+    const gemini = providers["cli-proxy-gemini"];
+    assert.equal(gemini.api, "google-generative-ai");
+    assert.equal(gemini.baseURL, "http://127.0.0.1:8317/v1beta");
+    assert.equal(gemini.apiKeyEnv, "CLI_PROXY_API_KEY");
+    assert.equal(gemini.headers, undefined);
+    assert.deepEqual(gemini.models.map((m) => m.id), ["gemini-3-flash"]);
+    // pi-ai's Gemini adapter sends only minimal/low/medium/high.
+    assert.deepEqual(gemini.models[0].reasoningEfforts, { low: "low", high: "high" });
+    assert.equal(gemini.models[0].compat, undefined);
+    assert.deepEqual(gemini.models[0].input, ["text", "image"]);
+    assert.equal(st.models.find((m) => m.id === "gemini-3-flash").route, "cli-proxy-gemini");
 
     const responses = providers["cli-proxy-responses"];
     assert.equal(responses.api, "openai-responses");
@@ -222,6 +242,42 @@ describe("dsh-cliproxyapi unit tests", () => {
     assert.deepEqual(providers["cli-proxy"].models.map((m) => m.id), ["claude-opus-5-5"]);
     assert.deepEqual(providers["cli-proxy-responses"].models.map((m) => m.id), ["gpt-6.1-sol"]);
     assert.equal(providers["cli-proxy-messages"], undefined);
+  });
+
+  it("keeps Gemini on Chat without a key and narrows Gemini thinking levels", () => {
+    const discovery = {
+      rootURL: "http://cpa.test",
+      models: parseCatalog({
+        data: [
+          { id: "gemini-4-argon-high", owned_by: "google", reasoning_levels: ["low", "medium", "high"] },
+          { id: "gemini-4-hydrogen-xhigh", owned_by: "google", reasoning_levels: ["xhigh", "max"] },
+          { id: "gemini-2.5-flash", owned_by: "google", reasoning_levels: ["off", "low", "high"] },
+          { id: "gemini-3-pro", owned_by: "google", reasoning: true },
+        ],
+      }),
+    };
+    const config = resolveConfig({ provider: "p", baseURL: "http://cpa.test" });
+
+    const keyless = buildPiAiRoutes(config, discovery, false);
+    assert.deepEqual(Object.keys(keyless.routes), ["p"]);
+    assert.equal(keyless.routes.p.models.length, 4);
+    assert.ok(keyless.orderedModels.every((m) => m.protocol === "openai-completions" && m.route === "p"));
+
+    const keyed = buildPiAiRoutes(config, discovery, true);
+    assert.deepEqual(Object.keys(keyed.routes), ["p-gemini"]);
+    const route = keyed.routes["p-gemini"];
+    assert.equal(route.displayName, `${config.displayName} (Gemini)`);
+    assert.equal(route.baseURL, "http://cpa.test/v1beta");
+    const efforts = Object.fromEntries(route.models.map((m) => [m.id, m.reasoningEfforts]));
+    assert.deepEqual(efforts["gemini-4-argon-high"], { low: "low", medium: "medium", high: "high" });
+    // Only levels above high were declared: keep one sendable level.
+    assert.deepEqual(efforts["gemini-4-hydrogen-xhigh"], { high: "high" });
+    // A declared off is kept; an undeclared one is not offered.
+    assert.deepEqual(efforts["gemini-2.5-flash"], { off: null, low: "low", high: "high" });
+    assert.deepEqual(efforts["gemini-3-pro"], { minimal: "minimal", low: "low", medium: "medium", high: "high" });
+
+    const fixed = buildPiAiRoutes(resolveConfig({ ...config, protocolMode: "fixed", protocol: "google-generative-ai" }), discovery, true);
+    assert.deepEqual(Object.keys(fixed.routes), ["p-gemini"]);
   });
 
   it("applies per-model parameter overrides over discovered values", () => {

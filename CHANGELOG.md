@@ -4,6 +4,11 @@
 
 本插件的所有重要变更。版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## Unreleased
+
+### 变更
+- **Gemini 改走原生协议。** DSH 的 `llm-pi-ai` 自定义路由支持 Gemini `generateContent`（`google-generative-ai`），自动模式下不带前缀的 `gemini-*` 模型不再走 OpenAI Chat，而是写入新的 `<路由>-gemini` 路由（地址为 `<CPA>/v1beta`），省去 CPA 的 Chat ↔ Gemini 转换，思考签名和工具调用按原生格式往返。该路由必须配置 API Key，未配置密钥的账号 Gemini 仍走 Chat；思考档位只提供 Gemini 适配器能发送的 `minimal` / `low` / `medium` / `high`。`devin/gemini-*` 等带前缀的 ID 仍走 Chat。「统一使用」和单模型协议也可以选 **Gemini**。已经在 `cli-proxy` 上使用 Gemini 的会话需要重新选一次模型。
+
 ## 1.12.0 — 2026-11-18
 
 ### 新增

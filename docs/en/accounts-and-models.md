@@ -32,7 +32,7 @@
 
 ## Multiple accounts
 
-- Each account writes its own set of routes: the first account uses `cli-proxy` / `cli-proxy-responses` / `cli-proxy-messages`, later ones `cli-proxy-2*`, `cli-proxy-3*`, …; credential refs are `CLI_PROXY_API_KEY`, `CLI_PROXY_API_KEY_2`, …. The model picker groups models by account name.
+- Each account writes its own set of routes: the first account uses `cli-proxy` / `cli-proxy-responses` / `cli-proxy-messages` / `cli-proxy-gemini`, later ones `cli-proxy-2*`, `cli-proxy-3*`, …; credential refs are `CLI_PROXY_API_KEY`, `CLI_PROXY_API_KEY_2`, …. The model picker groups models by account name.
 - **Disabling** an account keeps its settings but removes its routes, so its models leave the picker; other accounts are unaffected.
 - **New** accounts: **+ Add Account** first tests the entered URL and key and creates an enabled account only when that works; **Add Anyway (Disabled)** is also offered.
 - Each account page has **Connection / Models / Generation / Quota** tabs under one shared account bar. The **Enabled** switch next to the account title applies at once; the **⋯** menu holds **Probe & Refresh** and **Delete Account**.
@@ -53,16 +53,20 @@
 
 ## Protocol routing
 
-CPA serves every model on OpenAI Chat, OpenAI Responses and Anthropic Messages, translating when the entry protocol differs from the upstream one. The default auto mode sends each model over its upstream's own protocol:
+CPA serves every model on OpenAI Chat, OpenAI Responses, Anthropic Messages and Gemini `generateContent`, translating when the entry protocol differs from the upstream one. The default auto mode sends each model over its upstream's own protocol:
 
 | Model family (from `owned_by` and the model id) | Protocol | Route (for `cli-proxy`) |
 |---|---|---|
 | Claude (including `devin/claude-*`, Antigravity Claude) | Anthropic Messages `/v1/messages` | `cli-proxy-messages` |
 | OpenAI / Codex / GPT, xAI Grok | OpenAI Responses `/v1/responses` | `cli-proxy-responses` |
-| Gemini, DeepSeek, Kimi, GLM, SWE, gpt-oss, … | OpenAI Chat `/v1/chat/completions` | `cli-proxy` |
+| Gemini (unprefixed `gemini-*`) | Gemini `/v1beta/models/…:streamGenerateContent` | `cli-proxy-gemini` |
+| DeepSeek, Kimi, GLM, SWE, gpt-oss, prefixed Gemini (such as `devin/gemini-*`), … | OpenAI Chat `/v1/chat/completions` | `cli-proxy` |
 
-- DSH custom routes cannot speak Gemini's native `generateContent`, so Gemini uses OpenAI Chat.
-- A DSH route has a single protocol, so models are split across the three routes; a route left without models is removed. When the default model moves to another route, `agent-default-model` follows it.
+- The Gemini protocol requires an API key (DSH sends no keyless Gemini request); on an account without a key, Gemini models stay on OpenAI Chat.
+- The Gemini route offers only the `minimal` / `low` / `medium` / `high` thinking levels; `xhigh` / `max` are hidden, and turning thinking off is offered only when the catalog declares `off`. For ids that fix the level with a suffix (Antigravity's `gemini-4-hydrogen-xhigh`, for example) the suffix decides.
+- Prefixed Gemini ids (such as `devin/gemini-*`) stay on OpenAI Chat: DSH's Gemini adapter applies details such as tool-call ids by an id starting with `gemini-`.
+- After the upgrade Gemini models move from `cli-proxy` to `cli-proxy-gemini`; existing conversations that use Gemini need the model picked again once.
+- A DSH route has a single protocol, so models are split across the routes; a route left without models is removed. When the default model moves to another route, `agent-default-model` follows it.
 - Claude 4.6+ / 5.x / Fable use adaptive thinking (`effort`); older Claude models use a token budget.
 - Switch to one protocol for every model, or set a protocol per model under **Edit Parameters**.
 - Other fields you add to a managed route by hand (such as `retryPolicy`) are kept.

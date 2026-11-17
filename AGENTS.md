@@ -37,7 +37,7 @@ User docs are `README.md` / `README.en.md` and `docs/zh/` / `docs/en/`; develope
 
 ## Most important invariants
 
-- Each account owns only `managedRouteKeys(provider)`: base, `-responses` and `-messages`. Never touch `config.reservedKeys`; conflicts own nothing. Base routes retain Chat models and `followDefaultModel()` follows protocol relocations.
+- Each account owns only `managedRouteKeys(provider)`: base, `-responses`, `-messages` and `-gemini`. Never touch `config.reservedKeys`; conflicts own nothing. Base routes retain Chat models and `followDefaultModel()` follows protocol relocations.
 - Disabled accounts keep settings but lose routes; periodic refresh skips them, manual probing may inspect them. Explicit `baseURL` never falls back to another server. Account ids remain stable; removal keeps credentials.
 - Unchanged sync performs zero writes (`sameJson`); preserve user route fields outside `MANAGED_ROUTE_FIELDS`. Missing `selectedModels` seeds catalog-derived recommendations (flagship product lines, newest model each) once; `[]` explicitly means all. Never hard-code default model ids. Selection suggestions are display-only.
 - Online model info (global `onlineModelInfo`, default on) is download-only: plain GETs of models.dev / OpenRouter without credentials, accounts, addresses or model lists; daily, bounded, compact cache; when off, no download and no lookup. Catalog limits always win; online limits fill gaps from exact matches only. Test mounts keep it off.

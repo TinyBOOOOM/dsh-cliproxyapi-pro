@@ -4,6 +4,7 @@
       "openai-completions": "protocolNameCompletions",
       "openai-responses": "protocolNameResponses",
       "anthropic-messages": "protocolNameMessages",
+      "google-generative-ai": "protocolNameGemini",
     };
     const PROTOCOLS = Object.keys(PROTOCOL_NAME_KEYS);
 

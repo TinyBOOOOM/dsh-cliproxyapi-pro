@@ -2,7 +2,8 @@
 
 # Full invariant list
 
-- An account owns exactly `managedRouteKeys(provider)` = `provider`, `provider-responses`, `provider-messages` under `llm-pi-ai.providers`.
+- An account owns exactly `managedRouteKeys(provider)` = `provider`, `provider-responses`, `provider-messages`, `provider-gemini` under `llm-pi-ai.providers`.
+  - `provider-gemini` speaks `google-generative-ai` at `<root>/v1beta` and carries unprefixed `gemini-*` ids. pi-ai's Gemini adapter refuses keyless requests, so keyless accounts keep Gemini on Chat. Its `reasoningEfforts` only map to `minimal`/`low`/`medium`/`high` (the adapter throws on other wire values); `off` only when the catalog declares it.
   - It never writes or unsets keys in `config.reservedKeys` (other accounts' keys).
   - An account in conflict owns nothing and only reports an error.
 - The base key (`provider`) always carries OpenAI Chat models so existing sessions and `agent-default-model` keep resolving; `followDefaultModel()` moves the default when protocol routing relocates its model.

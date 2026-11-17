@@ -94,15 +94,17 @@ describe("multi-account", () => {
     // Enable it.
     payload = await h.controller.updateAccount(second.id, { enabled: true });
     assert.equal(payload.accounts[1].status.state, "connected", payload.accounts[1].status.error);
-    assert.deepEqual(h.providers["cli-proxy-2"].models.map((m) => m.id), ["gemini-4-argon"]);
+    assert.deepEqual(h.providers["cli-proxy-2-gemini"].models.map((m) => m.id), ["gemini-4-argon"]);
     assert.deepEqual(h.providers["cli-proxy-2-responses"].models.map((m) => m.id), ["gpt-6-astra"]);
-    assert.equal(h.providers["cli-proxy-2"].apiKeyEnv, "CLI_PROXY_API_KEY_2");
-    assert.equal(h.providers["cli-proxy-2"].baseURL, "http://b.test/v1");
+    assert.equal(h.providers["cli-proxy-2"], undefined);
+    assert.equal(h.providers["cli-proxy-2-gemini"].apiKeyEnv, "CLI_PROXY_API_KEY_2");
+    assert.equal(h.providers["cli-proxy-2-gemini"].baseURL, "http://b.test/v1beta");
+    assert.equal(h.providers["cli-proxy-2-responses"].baseURL, "http://b.test/v1");
     assert.equal(h.providers["cli-proxy-messages"].baseURL, "http://a.test");
 
     // Disable the first one: only its routes go away.
     await h.controller.updateAccount("default", { enabled: false });
-    assert.deepEqual(Object.keys(h.providers).sort(), ["cli-proxy-2", "cli-proxy-2-responses"]);
+    assert.deepEqual(Object.keys(h.providers).sort(), ["cli-proxy-2-gemini", "cli-proxy-2-responses"]);
     assert.equal(h.state().accounts[0].enabled, false);
 
     // Re-enable it via its provider id.
@@ -191,7 +193,7 @@ describe("multi-account", () => {
     const [account] = payload.accounts;
     assert.equal(account.status.state, "connected", account.status.error);
     assert.deepEqual(h.state().accounts[0].selectedModels, ["gemini-4-argon", "gpt-6-astra"]);
-    assert.deepEqual(h.providers["cli-proxy"].models.map((x) => x.id), ["gemini-4-argon"]);
+    assert.deepEqual(h.providers["cli-proxy-gemini"].models.map((x) => x.id), ["gemini-4-argon"]);
     assert.deepEqual(h.providers["cli-proxy-responses"].models.map((x) => x.id), ["gpt-6-astra"]);
     assert.deepEqual(account.recommendedModels, ["gemini-4-argon", "gpt-6-astra"]);
 
@@ -199,7 +201,7 @@ describe("multi-account", () => {
     await h.controller.updateAccount("default", { selectedModels: [] });
     await h.controller.refreshAll();
     assert.deepEqual(h.state().accounts[0].selectedModels, []);
-    assert.equal(h.providers["cli-proxy"].models.length, 2);
+    assert.equal(h.providers["cli-proxy-gemini"].models.length, 2);
 
     // A saved selection the server does not offer reports a clear error but keeps the catalog visible.
     await h.controller.updateAccount("default", { selectedModels: ["not-on-this-server"] });
