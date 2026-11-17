@@ -4,7 +4,7 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 1.12.1 — 2026-11-18
 
 ### Changed
 - **Gemini uses its native protocol.** DSH's `llm-pi-ai` speaks Gemini `generateContent` (`google-generative-ai`) on custom routes, so auto mode now sends unprefixed `gemini-*` models to a new `<route>-gemini` route at `<CPA>/v1beta` instead of OpenAI Chat, skipping CPA's Chat ↔ Gemini translation (thought signatures and tool calls travel natively). The route requires an API key; keyless accounts keep Gemini on Chat. It offers only the `minimal` / `low` / `medium` / `high` thinking levels the Gemini adapter can send. Prefixed ids such as `devin/gemini-*` stay on Chat. **Gemini** is also selectable as a fixed or per-model protocol. Conversations already using a Gemini model on `cli-proxy` need it picked again once.
