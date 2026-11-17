@@ -56,6 +56,7 @@ export const quotaData = {
           windows: [{ id: "x", kind: "7d", label: "", remainingPercent: 0, resetAt: null }] },
         { id: "ag.json", label: "g@x.dev", provider: "antigravity", status: "active", models: ["gemini-4-argon", "claude-opus-5-5"], quotaState: "ok",
           windows: [{ id: "g1", kind: "5h", label: "Gemini", remainingPercent: 10, resetAt: null, modelPrefixes: ["gemini"] },
+            { id: "g3", kind: "5h", label: "Argon", remainingPercent: 50, resetAt: null, modelPrefixes: ["argon"] },
             { id: "g2", kind: "5h", label: "Claude", remainingPercent: 55, resetAt: null, modelPrefixes: ["claude", "gpt"] }] },
       ],
       modelIndex: {

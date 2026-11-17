@@ -280,4 +280,56 @@ describe("quota controller", () => {
     const snap = await h.controller.refresh("default");
     assert.equal(snap.accounts[0].errorCode, "invalid-response");
   });
+
+  it("isolates Gemini 4 Argon quota windows and ignores internal Antigravity model ids", async () => {
+    const h = harness({
+      handler: scenarioHandler({
+        authFiles: () => json(200, { files: [{ name: "ag.json", type: "antigravity", auth_index: "4", project_id: "proj-1" }] }),
+        models: () => json(200, { models: [{ id: "gemini-4-argon-high" }, { id: "gemini-3-flash" }] }),
+        apiCall: (body) => {
+          if (body.url === "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary") {
+            return apiOk({
+              groups: [
+                { displayName: "Gemini Models", buckets: [{ displayName: "Five Hour Limit Remaining", window: "5h", remainingFraction: 0.77, resetTime: "2026-10-21T10:00:00Z" }] },
+                { displayName: "Gemini 4 Argon", buckets: [{ displayName: "Gemini 4 Argon Weekly Limit", remainingFraction: 0.01, resetTime: "2026-10-27T00:00:00Z" }] },
+              ],
+            });
+          }
+          return undefined;
+        },
+      }),
+    });
+    const snap = await h.controller.refresh("default");
+    const ag = credentialById(snap.accounts[0], "ag.json");
+    assert.equal(ag.quotaState, "ok");
+    const argon = ag.windows.find((w) => w.group === "Gemini 4 Argon");
+    assert.equal(argon.kind, "7d");
+    assert.equal(argon.remainingPercent, 1);
+    assert.deepEqual(argon.modelPrefixes, ["argon", "gemini-4-argon"]);
+
+    const hFallback = harness({
+      handler: scenarioHandler({
+        authFiles: () => json(200, { files: [{ name: "ag2.json", type: "antigravity", auth_index: "4", project_id: "proj-1" }] }),
+        models: () => json(200, { models: [{ id: "gemini-4-argon-high" }] }),
+        apiCall: (body) => {
+          if (body.url.includes(":retrieveUserQuotaSummary")) return json(200, { status_code: 404, body: "{}" });
+          if (body.url === "https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels") {
+            return apiOk({
+              models: {
+                chat_20706: { quotaInfo: { remainingFraction: 0.5, resetTime: "2026-10-21T10:00:00Z" } },
+                tab_flash_lite_preview: { quotaInfo: { remainingFraction: 0.5, resetTime: "2026-10-21T10:00:00Z" } },
+                "gemini-4-argon-high": { quotaInfo: { remainingFraction: 0.01, resetTime: "2026-10-27T00:00:00Z" } },
+              },
+            });
+          }
+          return undefined;
+        },
+      }),
+    });
+    const snap2 = await hFallback.controller.refresh("default");
+    const ag2 = credentialById(snap2.accounts[0], "ag2.json");
+    assert.deepEqual(ag2.windows.map((w) => [w.id, w.group]), [["ag-model:gemini-4-argon-high", "Gemini 4 Argon"]]);
+    h.controller.dispose();
+    hFallback.controller.dispose();
+  });
 });
