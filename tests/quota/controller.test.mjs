@@ -67,6 +67,7 @@ describe("quota controller", () => {
     const agSummaryUrls = h.calls.map((call) => call.body?.url).filter((url) => typeof url === "string" && url.includes(":retrieveUserQuotaSummary"));
     assert.deepEqual(agSummaryUrls, [
       "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+      "https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:retrieveUserQuotaSummary",
       "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
     ]);
     const agSummaryCall = h.calls.find((call) => call.body?.url === "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary");
@@ -206,7 +207,12 @@ describe("quota controller", () => {
     assert.deepEqual(matchCredentials(account, "claude-haiku-4-5"), { credentialIds: [], matchedBy: "none" });
     assert.deepEqual(matchCredentials(account, "gemini-4-hydrogen-xhigh"), { credentialIds: ["ag-on.json", "ag-off.json"], matchedBy: "model-list" });
     assert.deepEqual(matchCredentials(account, "gemini-4-argon-high"), { credentialIds: ["ag-on.json", "ag-off.json"], matchedBy: "model-list" });
-    assert.deepEqual(matchCredentials(account, "gpt-oss-120b-medium"), { credentialIds: ["ag-on.json"], matchedBy: "model-list" });
+        // A disabled credential serves what its active siblings list (it ranks last).
+    assert.deepEqual(matchCredentials(account, "gpt-oss-120b-medium"), { credentialIds: ["ag-on.json", "ag-off.json"], matchedBy: "model-list" });
+    // Without siblings, a disabled credential's "Claude and GPT models" group claims no Claude/GPT ids.
+    const lone = { credentials: account.credentials.filter((c) => c.id !== "ag-on.json") };
+    assert.deepEqual(matchCredentials(lone, "claude-opus-5-5"), { credentialIds: [], matchedBy: "none" });
+    assert.deepEqual(matchCredentials(lone, "gemini-4-argon-high"), { credentialIds: ["ag-off.json"], matchedBy: "family" });
   });
 
   it("maps 403 to forbidden", async () => {

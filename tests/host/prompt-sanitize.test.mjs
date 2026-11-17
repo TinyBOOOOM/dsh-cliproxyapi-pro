@@ -8,6 +8,7 @@ import {
   sanitizePromptText,
   sanitizeAssembly,
   patchAccount,
+  resolveConfig,
 } from "../../lib/index.js";
 import { accountPatchFromInput } from "../../lib/host/apply-utils.js";
 import { harness } from "../helpers/host-harness.mjs";
@@ -147,5 +148,15 @@ describe("prompt sanitize", () => {
     assert.equal(input.sanitizePrompt, true);
     assert.equal(input.sanitizePromptReplacement, "Codex");
     assert.equal(accountPatchFromInput({ sanitizePromptReplacement: 7 }).sanitizePromptReplacement, undefined);
+  });
+
+  it("is on by default and stays off once an account switches it off", () => {
+    assert.equal(resolveConfig({}).sanitizePrompt, true);
+    assert.equal(resolveConfig({ sanitizePrompt: false }).sanitizePrompt, false);
+    assert.equal(patchAccount({ id: "default", provider: "cli-proxy" }, {}).sanitizePrompt, true);
+    const { controller } = harness({ accounts: [{ id: "a", provider: "cli-proxy" }, { id: "b", provider: "cli-proxy-2", sanitizePrompt: false }] });
+    const routes = controller.sanitizePromptRoutes();
+    assert.equal(routes.get("cli-proxy"), DEFAULT_SANITIZE_REPLACEMENT);
+    assert.equal(routes.has("cli-proxy-2"), false);
   });
 });

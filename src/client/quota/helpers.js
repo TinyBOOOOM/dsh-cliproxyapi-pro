@@ -64,20 +64,29 @@
       return `${text} ${fmt(t, account.authPaused ? "qAuthPaused" : "qAuthRetrying", { n, max })}`;
     }
 
-    function shortGroupName(group) {
-      if (!group) return "";
-      const s = String(group).toLowerCase();
-      if (s.includes("argon")) return "Argon";
-      if (s.includes("claude") || s.includes("gpt") || s.includes("3p")) return "Claude";
-      if (s.includes("gemini")) return "Gemini";
-      return group;
+    /** Whether a window covers only Gemini Argon models (Antigravity plans with a separate Argon quota). */
+    function isArgonWindow(w) {
+      const has = (list) => Array.isArray(list) && list.some((x) => String(x).toLowerCase().includes("argon"));
+      return has(w.modelPrefixes) || has(w.modelIds);
+    }
+
+    /**
+     * Short names for Antigravity's quota pools ("Claude and GPT models",
+     * "Gemini models", Argon limits), so rows in narrow popups stay on one
+     * line; any other group name is shown as is.
+     */
+    function windowGroupName(w) {
+      if (isArgonWindow(w)) return "Argon";
+      const s = String(w.group ?? "").trim().toLowerCase();
+      if (s === "claude and gpt models") return "Claude/GPT";
+      if (s === "gemini models") return "Gemini";
+      return String(w.group ?? "");
     }
 
     function windowLabel(t, w) {
       const base = WINDOW_KEYS[w.kind] !== undefined ? t(WINDOW_KEYS[w.kind]) : w.label || t("qWinOther");
-      if (!w.group) return base;
-      const g = shortGroupName(w.group);
-      return `${base} · ${g}`;
+      const group = w.group ? windowGroupName(w) : "";
+      return group ? `${group} · ${base}` : base;
     }
 
     function durationText(t, ms) {
@@ -130,14 +139,6 @@
       if (!modelId) return true;
       const full = String(modelId).toLowerCase();
       const bare = bareModel(modelId);
-      const isArgonModel = bare.includes("argon");
-
-      // Argon models must match Argon windows/IDs
-      if (isArgonModel) {
-        return (Array.isArray(w.modelPrefixes) && w.modelPrefixes.some((p) => String(p).toLowerCase().includes("argon"))) ||
-               (Array.isArray(w.modelIds) && w.modelIds.some((m) => String(m).toLowerCase().includes("argon")));
-      }
-
       if (Array.isArray(w.modelIds) && w.modelIds.length > 0) {
         return w.modelIds.some((m) => {
           const x = String(m).toLowerCase();
@@ -150,9 +151,17 @@
       return true;
     }
 
+    /**
+     * Windows of one credential that apply to `modelId`. When a Gemini Argon
+     * model has windows of its own, the general Gemini pool ("gemini" prefix)
+     * does not limit it; without them it shares that pool.
+     */
     function credentialWindows(cred, modelId) {
       const windows = Array.isArray(cred?.windows) ? cred.windows : [];
-      return modelId ? windows.filter((w) => windowAppliesTo(w, modelId)) : windows;
+      if (!modelId) return windows;
+      const applying = windows.filter((w) => windowAppliesTo(w, modelId));
+      if (!bareModel(modelId).includes("argon") || !applying.some(isArgonWindow)) return applying;
+      return applying.filter((w) => isArgonWindow(w) || !(Array.isArray(w.modelPrefixes) && w.modelPrefixes.length > 0));
     }
 
     /** The tightest remaining percentage of the windows that apply, or null. */

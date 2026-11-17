@@ -37,12 +37,20 @@ describe("quota client", () => {
     const agSplit = {
       id: "ag-split.json", provider: "antigravity", status: "active", quotaState: "ok",
       windows: [
-        { id: "g1", kind: "5h", group: "Gemini Models", remainingPercent: 100, resetAt: null, modelPrefixes: ["gemini", "gemma"] },
-        { id: "a1", kind: "7d", group: "Gemini 4 Argon", remainingPercent: 1, resetAt: null, modelPrefixes: ["argon", "gemini-4-argon"] },
+        { id: "g1", kind: "5h", group: "Gemini Models", remainingPercent: 5, resetAt: null, modelPrefixes: ["gemini", "gemma"] },
+        { id: "a1", kind: "7d", group: "Gemini Models", label: "Gemini 4 Argon Weekly Limit", remainingPercent: 80, resetAt: null, modelPrefixes: ["argon", "gemini-4-argon"] },
+        { id: "c1", kind: "5h", group: "Claude and GPT models", remainingPercent: 60, resetAt: null, modelPrefixes: ["claude", "gpt"] },
       ],
     };
-    assert.equal(h.credentialHeadroom(agSplit, "gemini-4-argon-high"), 1);
-    assert.equal(h.credentialHeadroom(agSplit, "gemini-3-flash"), 100);
+    assert.equal(h.credentialHeadroom(agSplit, "gemini-4-argon-high"), 80, "an Argon pool of its own replaces the Gemini pool");
+    assert.equal(h.credentialHeadroom(agSplit, "gemini-3-flash"), 5, "Argon limits never cap other Gemini models");
+    const agShared = { ...agSplit, windows: agSplit.windows.filter((w) => w.id !== "a1") };
+    assert.equal(h.credentialHeadroom(agShared, "gemini-4-argon-high"), 5, "without an Argon pool, Argon shares the Gemini pool");
+    const zh = (key) => h.zh[key] ?? key;
+    assert.deepEqual(agSplit.windows.map((w) => h.windowLabel(zh, w)), [
+      `Gemini · ${h.zh.qWin5h}`, `Argon · ${h.zh.qWin7d}`, `Claude/GPT · ${h.zh.qWin5h}`,
+    ]);
+    assert.equal(h.windowLabel(zh, { kind: "7d", group: "opus" }), `opus · ${h.zh.qWin7d}`, "other groups keep their names");
     assert.equal(h.quotaLevel(0), "empty");
     assert.equal(h.quotaLevel(12), "low");
     assert.equal(h.quotaLevel(null), "unknown");

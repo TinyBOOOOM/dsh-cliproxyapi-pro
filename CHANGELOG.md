@@ -7,11 +7,14 @@
 ## Unreleased
 
 ### 新增
-- **提示词净化（兼容性）。** 每个账号的连接页「高级路由与规则过滤」新增开关（默认关闭）与「替换文本」输入框：开启后，发往该账号三条路由的请求的系统提示词中，每个精确短语 “DeepSeek Harness”（不区分大小写）都整体替换为指定文本（默认 `Custom Harness`，开场白变为 “You are an AI agent powered by Custom Harness.”），并删除在上下文中同样会触发拦截的 “The browser provides no implicit DOM, route, or screenshot context.” 一句（Google 按内容综合判断，单独发送不拦、连同前后文才拦），规避部分上游网关（已确认 Antigravity 的 Gemini 账号）因此返回的无原因 429 以及 CPA 连带的全账号冷却。改写发生在提示词组装的最后阶段（`system-prompt/assemble` 瀑布），覆盖提示词分节与插值变量，只影响该账号自己的路由，已保存在会话中的提示词不变。
+- **提示词净化（兼容性）。** 每个账号的连接页「高级路由与规则过滤」新增开关（默认开启）与「替换文本」输入框：开启后，发往该账号三条路由的请求的系统提示词中，每个精确短语 “DeepSeek Harness”（不区分大小写）都整体替换为指定文本（默认 `Custom Harness`，开场白变为 “You are an AI agent powered by Custom Harness.”），并删除在上下文中同样会触发拦截的 “The browser provides no implicit DOM, route, or screenshot context.” 一句（Google 按内容综合判断，单独发送不拦、连同前后文才拦），规避部分上游网关（已确认 Antigravity 的 Gemini 账号）因此返回的无原因 429 以及 CPA 连带的全账号冷却。改写发生在提示词组装的最后阶段（`system-prompt/assemble` 瀑布），覆盖提示词分节与插值变量，只影响该账号自己的路由，已保存在会话中的提示词不变。升级前已有的账号同样默认开启，可在该开关处关闭。
 
 ### 修复
 - **Antigravity 和 Gemini CLI 的套餐升级 / 降级后会及时更新。** 凭证已带项目 ID 时，原先只要显示过一次套餐就不再查询，比如从 Pro 升级到 Ultra 后仍一直显示 Pro。现在每轮额度刷新都会通过 `loadCodeAssist` 重新读取套餐，并以新读到的结果为准；这次读取失败时沿用上一次的套餐。代价是这两类凭证每轮刷新多一次很轻的 `loadCodeAssist` 请求。
-- **Antigravity 的 Gemini 模型（如 `gemini-4-argon-high`）重新显示额度。** 额度汇总接口现在只返回「Claude and GPT models」一组，原先的补充查询只认 Gemini CLI 列出的模型，而且读的是生产主机（显示 100%，不随用量变化），所以这些模型一直显示「上游未返回额度窗口」。现在 Gemini 额度改从 CPA 实际走的 daily 主机的逐模型列表读取：同一族模型共用同一份额度时合成一个「Gemini models」窗口，按前缀匹配，列表里没有的 Gemini 型号也能对上；各模型额度不同时仍按模型分别显示。逐模型列表改用公开模型 ID（原先误用内部占位 ID，永远匹配不上），并跳过内部补全模型。
+- **Antigravity 的 Gemini 模型（如 `gemini-4-argon-high`）重新显示额度。** 额度汇总接口现在只返回「Claude and GPT models」一组，原先的补充查询只认 Gemini CLI 列出的模型，而且读的是生产主机（显示 100%，不随用量变化），所以这些模型一直显示「上游未返回额度窗口」。现在 Gemini 额度改从 CPA 实际走的 daily 主机的逐模型列表读取：同一族模型共用同一份额度时合成一个「Gemini models」窗口，按前缀匹配，列表里没有的 Gemini 型号也能对上；各模型额度不同时仍按模型分别显示。逐模型列表改用公开模型 ID（原先误用内部占位 ID，永远匹配不上），并跳过内部补全模型（`chat_*`、`tab_*`）。
+- **Antigravity 额度读取与 CPA 自己一致。** 所有 Antigravity 额度请求改用 CPA 及其管理面板使用的 Antigravity Hub 标识（`antigravity/hub/2.23.0 darwin/arm64`；旧标识下汇总常缺「Gemini Models」组、也看不到较新的模型）；汇总主机按管理面板的顺序 daily → daily sandbox → 生产依次尝试（生产主机的 Gemini 组常显示 100% 假额度），每类额度取最先给出它的主机，不再因为某一轮回退到生产主机就一直优先用它。来自 [@Six6stRINgs](https://github.com/Six6stRINgs) 的修复（#6）。
+- **Gemini Argon 单独计额度时不再与其他 Gemini 模型混算。** Google AI Pro 等套餐的 Argon 额度独立于其他 Gemini 模型，原先 Argon 窗口按 `gemini` 前缀被一并算进常规 Gemini，对话框额度显示错误。现在 Argon 分组 / Argon 额度桶 / 逐模型列表里的 Argon 型号单独成窗口，Argon 模型只看自己的额度；套餐没有独立 Argon 额度时仍与 Gemini 共用。弹层里的分组名缩写为 Claude/GPT、Gemini、Argon，避免折行挤断百分比。来自 [@Six6stRINgs](https://github.com/Six6stRINgs) 的修复（#6）。
+- **停用的 Antigravity 凭证不再挂到无关的 GPT / Claude 模型下。** 凭证停用后 CPA 不再报告它的模型列表，原先按「Claude and GPT models」分组名推断，结果所有 GPT / Claude 模型（如 `gpt-6-luna`）都显示了这个凭证。现在它只匹配同一账号里其他 Antigravity 凭证列出的模型；没有可参照的凭证时只匹配 Gemini 模型。来自 [@Six6stRINgs](https://github.com/Six6stRINgs) 的报告（#6）。
 
 ### 修复（界面优化）
 - **设置页的 ⓘ 说明不再被对话框截断。** 说明气泡原先渲染在设置对话框的滚动区域内，靠近底部的行（如「提示词净化」）展开时下半截被裁掉。现在气泡通过浏览器的 Popover API 显示在顶层，可以超出对话框范围；按整个窗口定位，下方放不下时改到上方，左右超出窗口时自动收回，只有窗口都放不下时才限制高度并在气泡内滚动；滚动设置页时跟随按钮移动。气泡元素仍在插件自己的插槽内，不写入页面其他位置。

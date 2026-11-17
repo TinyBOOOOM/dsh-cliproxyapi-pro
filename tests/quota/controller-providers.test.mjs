@@ -328,7 +328,7 @@ describe("quota controller", () => {
     });
     const snap2 = await hFallback.controller.refresh("default");
     const ag2 = credentialById(snap2.accounts[0], "ag2.json");
-    assert.deepEqual(ag2.windows.map((w) => [w.id, w.group]), [["ag-model:gemini-4-argon-high", "Gemini 4 Argon"]]);
+    assert.deepEqual(ag2.windows.map((w) => [w.id, w.group]), [["ag-model:gemini-argon-models", "Gemini Argon models"]]);
     h.controller.dispose();
     hFallback.controller.dispose();
   });
