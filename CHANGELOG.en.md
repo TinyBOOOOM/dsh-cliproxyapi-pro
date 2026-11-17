@@ -4,7 +4,7 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 1.12.0 — 2026-11-18
 
 ### Added
 - **Prompt sanitizing (compatibility).** Each account's **Advanced Routing & Keyword Rules** section on the Connection tab gains a switch (on by default) and a **Replacement Text** field: when on, every exact phrase “DeepSeek Harness” (any letter case) in the system prompt of requests on that account's three routes is replaced as a whole with the configured text (default `Custom Harness`, so the opener reads “You are an AI agent powered by Custom Harness.”), and the sentence “The browser provides no implicit DOM, route, or screenshot context.” is removed because it triggers the same block in context (Google judges content as a whole: alone it passes, with its neighbours it 429s), working around the unexplained 429 some upstream gateways (confirmed on Antigravity Gemini accounts) return for it and the account-wide cooldown CPA applies in turn. The rewrite runs at the last prompt-assembly stage (the `system-prompt/assemble` waterfall), covers prompt sections and interpolation variables, affects only this account's own routes, and leaves prompts already saved in a conversation untouched. Accounts that existed before the upgrade are switched on as well; turn the switch off to opt out.

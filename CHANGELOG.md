@@ -4,7 +4,7 @@
 
 本插件的所有重要变更。版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
-## Unreleased
+## 1.12.0 — 2026-11-18
 
 ### 新增
 - **提示词净化（兼容性）。** 每个账号的连接页「高级路由与规则过滤」新增开关（默认开启）与「替换文本」输入框：开启后，发往该账号三条路由的请求的系统提示词中，每个精确短语 “DeepSeek Harness”（不区分大小写）都整体替换为指定文本（默认 `Custom Harness`，开场白变为 “You are an AI agent powered by Custom Harness.”），并删除在上下文中同样会触发拦截的 “The browser provides no implicit DOM, route, or screenshot context.” 一句（Google 按内容综合判断，单独发送不拦、连同前后文才拦），规避部分上游网关（已确认 Antigravity 的 Gemini 账号）因此返回的无原因 429 以及 CPA 连带的全账号冷却。改写发生在提示词组装的最后阶段（`system-prompt/assemble` 瀑布），覆盖提示词分节与插值变量，只影响该账号自己的路由，已保存在会话中的提示词不变。升级前已有的账号同样默认开启，可在该开关处关闭。
