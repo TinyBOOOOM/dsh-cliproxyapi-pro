@@ -144,6 +144,65 @@ describe("quota controller", () => {
     assert.equal(h.calls.filter((c) => c.url.includes("/quota/fetch")).length, 1);
   });
 
+  it("re-reads the Antigravity tier every round so an upgrade replaces the cached plan", async () => {
+    let tier = { paidTier: { id: "g1-pro-tier", name: "Google AI Pro" } };
+    const h = harness({
+      handler: scenarioHandler({
+        apiCall: (body) => {
+          if (!body.url.endsWith(":loadCodeAssist")) return undefined;
+          return tier === null ? json(200, { status_code: 500, body: "{}" }) : apiOk(tier);
+        },
+      }),
+    });
+    const loads = () => h.calls.filter((c) => c.body?.auth_index === "4" && c.body.url.endsWith(":loadCodeAssist")).length;
+    let snap = await h.controller.refresh("default");
+    assert.equal(credentialById(snap.accounts[0], "ag.json").plan, "Pro");
+    assert.equal(loads(), 1);
+
+    tier = { paidTier: { id: "g1-ultra-tier", name: "Google AI Ultra" } };
+    snap = await h.controller.refresh("default");
+    const ag = credentialById(snap.accounts[0], "ag.json");
+    assert.equal(ag.quotaState, "ok");
+    assert.equal(ag.plan, "Ultra", "the fresh tier wins over the previous round's plan");
+    assert.equal(loads(), 2, "the tier is queried even though a plan is already known");
+
+    // A failed tier read keeps the last known plan.
+    tier = null;
+    snap = await h.controller.refresh("default");
+    assert.equal(credentialById(snap.accounts[0], "ag.json").plan, "Ultra");
+    assert.equal(loads(), 3);
+  });
+
+  it("re-reads the Gemini CLI tier when the credential already has a project", async () => {
+    const files = { files: [{ name: "gc.json", type: "gemini-cli", auth_index: "7", project_id: "proj-2" }] };
+    let tier = { paidTier: { id: "g1-pro-tier", name: "Google AI Pro" } };
+    const h = harness({
+      handler: scenarioHandler({
+        authFiles: () => json(200, files),
+        models: () => json(200, { models: [{ id: "gemini-4-pro" }] }),
+        apiCall: (body) => {
+          if (body.url.endsWith(":loadCodeAssist")) return apiOk(tier);
+          if (body.url.endsWith(":retrieveUserQuota")) {
+            assert.equal(JSON.parse(body.data).project, "proj-2");
+            return apiOk({ buckets: [{ modelId: "gemini-4-pro", remainingFraction: 0.5, resetTime: "2026-10-22T06:00:00Z" }] });
+          }
+          return undefined;
+        },
+      }),
+    });
+    let snap = await h.controller.refresh("default");
+    let gc = credentialById(snap.accounts[0], "gc.json");
+    assert.equal(gc.quotaState, "ok");
+    assert.equal(gc.plan, "Pro");
+    assert.deepEqual(gc.windows.map((w) => w.remainingPercent), [50]);
+
+    tier = { paidTier: { id: "g1-ultra-tier", name: "Google AI Ultra" } };
+    snap = await h.controller.refresh("default");
+    gc = credentialById(snap.accounts[0], "gc.json");
+    assert.equal(gc.plan, "Ultra");
+    assert.equal(h.calls.filter((c) => c.body?.url?.endsWith(":loadCodeAssist")).length, 2);
+  });
+
   it("rejects oversized responses", async () => {
     const big = "x".repeat(4 * 1024 * 1024 + 10);
     const h = harness({ handler: () => new Response(big, { status: 200 }) });

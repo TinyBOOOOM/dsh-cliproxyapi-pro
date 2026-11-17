@@ -4,6 +4,11 @@
 
 本插件的所有重要变更。版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## Unreleased
+
+### 修复
+- **Antigravity 和 Gemini CLI 的套餐升级 / 降级后会及时更新。** 凭证已带项目 ID 时，原先只要显示过一次套餐就不再查询，比如从 Pro 升级到 Ultra 后仍一直显示 Pro。现在每轮额度刷新都会通过 `loadCodeAssist` 重新读取套餐，并以新读到的结果为准；这次读取失败时沿用上一次的套餐。代价是这两类凭证每轮刷新多一次很轻的 `loadCodeAssist` 请求。
+
 ## 1.11.0 — 2026-11-12
 
 ### 新增

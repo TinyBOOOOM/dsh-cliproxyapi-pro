@@ -4,6 +4,11 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixed
+- **Antigravity and Gemini CLI plans follow upgrades and downgrades.** For credentials that already carry a project ID, the plan was never queried again once one had been shown, so an account upgraded from Pro to Ultra kept showing Pro. Every quota refresh now re-reads the tier through `loadCodeAssist` and the fresh result wins; if that read fails, the previous plan is kept. The cost is one extra lightweight `loadCodeAssist` request per such credential per refresh.
+
 ## 1.11.0 — 2026-11-12
 
 ### Added
