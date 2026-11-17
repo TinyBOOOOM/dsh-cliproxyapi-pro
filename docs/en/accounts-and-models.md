@@ -42,6 +42,15 @@
 - Provider route IDs of different accounts must not overlap; conflicting changes are rejected.
 - **Deleting** an account removes its routes but keeps its key in the credentials service.
 
+## Prompt sanitizing (compatibility)
+
+- Some upstream gateways reject system prompts containing the exact phrase **DeepSeek Harness** (any letter case) with an unexplained 429, and CPA then cools the whole account down. Antigravity Gemini accounts show this behavior regardless of model or remaining quota — the same prompt without that phrase returns normally.
+- The **Prompt Sanitizing (compat)** switch under **Advanced Routing & Keyword Rules** on the Connection tab (off by default) replaces **every** occurrence of that phrase, as a whole, with the **Replacement Text** below it.
+- Blank **Replacement Text** uses the default `Custom Harness`, so the opener reads “You are an AI agent powered by Custom Harness.” and other places such as “the Custom Harness Web GUI” stay grammatical; a custom value replaces each phrase verbatim (for example `Codex`). The phrase is used as a proper noun throughout the prompt, so a custom value should be an article-free name too.
+- Renaming alone is not enough: Google judges content as a whole rather than filtering keywords. The DSH Web GUI sentence “The browser provides no implicit DOM, route, or screenshot context.” passes on its own but 429s together with its neighbours (“…they mean this GUI. … The client-plugin…”). With the switch on, that sentence is removed too (its neighbours keep a single space between them), after which the full prompt returns normally. The only cost is that the model loses the hint that the browser supplies no implicit page context.
+- The rewrite runs at the last prompt-assembly stage (`system-prompt/assemble`) and covers prompt sections, runtime-context sections and interpolation variables; it applies only while a request is routed to this account — other accounts and native providers are untouched.
+- Prompts already saved in a conversation are not changed: the sanitized form only applies to newly written prompt versions, so start a fresh session if an old one must be replaced entirely.
+
 ## Protocol routing
 
 CPA serves every model on OpenAI Chat, OpenAI Responses and Anthropic Messages, translating when the entry protocol differs from the upstream one. The default auto mode sends each model over its upstream's own protocol:

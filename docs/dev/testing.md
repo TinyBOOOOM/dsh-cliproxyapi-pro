@@ -26,6 +26,6 @@ Tests live under `tests/<area>/*.test.mjs`: `host`, `media`, `quota`, `updater`,
 | `tests/media/` | Media engine units (`tests/helpers/media-images.mjs`) |
 | `tests/quota/` | Quota helpers and controller (`tests/helpers/quota-harness.mjs`) |
 | `tests/updater/` | Updater preferences, SemVer, registries, package verification, downloads, update HTTP routes (`tests/helpers/updater-*.mjs`) |
-| `tests/client/` | Client rendering through the VM/Hook harness `tests/helpers/client-harness.mjs` (fixtures in `client-fixtures.mjs`), always against the generated `lib/client.js` |
+| `tests/client/` | Client rendering through the VM/Hook harness `tests/helpers/client-harness.mjs` (fixtures in `client-fixtures.mjs`), always against the generated `lib/client.js`; its `view` option injects window layout facts (`innerWidth` / `innerHeight`, `getComputedStyle`, listeners) for placement tests such as `info-tip.test.mjs` |
 
 Keep test files at about 600 lines or fewer; when a suite grows, add another file with the same `describe` title rather than growing one file.

@@ -23,7 +23,7 @@
 |---|---|---|---|
 | GET | `/api/dsh-cliproxyapi/status` | — | `{ ok, global, accounts[] }`。`global` 含 `onlineModelInfo`、`sidebarQuota` 和在线资料状态 `modelInfo`（`state`：`off` / `idle` / `loading` / `ready` / `partial` / `error`，以及各来源的型号数、下载时间和错误）；每个账号含 `recommendedModels`、带理由的 `recommendations[]`（`id`、`line`、`family`、`released?`、`source`：`online` / `catalog` / `name`）和针对已保存勾选的 `suggestions`（`upgrades[]`、`missing[]`、`retired[]`）。不触发在线资料下载 |
 | POST | `/api/dsh-cliproxyapi/refresh` | `{ accountId? }` | 刷新一个或全部账号 |
-| POST | `/api/dsh-cliproxyapi/save` | `{ accountId?, …账号字段, apiKey?, clearApiKey?, refreshIntervalSeconds?, probeTimeoutMs?, onlineModelInfo?, sidebarQuota? }` | 保存账号（缺省为第一个）；只有全局字段时只保存全局设置。`onlineModelInfo` 改变时立即开始（或停止使用）在线模型资料并重新同步所有账号；`sidebarQuota` 只控制侧边栏额度入口 |
+| POST | `/api/dsh-cliproxyapi/save` | `{ accountId?, …账号字段, apiKey?, clearApiKey?, refreshIntervalSeconds?, probeTimeoutMs?, onlineModelInfo?, sidebarQuota? }` | 保存账号（缺省为第一个）；只有全局字段时只保存全局设置。账号字段包括布尔 `sanitizePrompt` 与字符串 `sanitizePromptReplacement`（提示词净化及其替换文本，见 [功能详解](accounts-and-models.md#提示词净化兼容性)）。`onlineModelInfo` 改变时立即开始（或停止使用）在线模型资料并重新同步所有账号；`sidebarQuota` 只控制侧边栏额度入口 |
 | POST | `/api/dsh-cliproxyapi/accounts/add` | 账号字段（可选） | 新增账号，默认停用；返回 `createdId` |
 | POST | `/api/dsh-cliproxyapi/accounts/remove` | `{ accountId }` | 删除账号及其路由 |
 | POST | `/api/dsh-cliproxyapi/accounts/test` | `{ accountId?, baseURL?, apiKey? }` | 用未保存的地址和密钥测试连接，不保存、不写路由；`apiKey` 留空时用该账号已保存的密钥；不返回密钥 |

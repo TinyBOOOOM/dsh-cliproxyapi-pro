@@ -40,14 +40,15 @@ The Host entry `lib/index.js` only re-exports; behavior lives in these modules (
 | `lib/host/model-info.js` | Online model info: models.dev / OpenRouter parsing, compact `model-info.json` cache, `createModelInfo()` service, `withOnlineLimits()` |
 | `lib/host/routes.js` | `nativeProtocol()`, overrides, `buildPiAiRoutes()`, `managedRouteKeys()` |
 | `lib/host/runtime.js` | `CpaRuntime`: discover → build → diff-write → follow default model |
-| `lib/host/controller.js` | `createCpaController()`, `serializeSettings()` |
+| `lib/host/controller.js` | `createCpaController()`, `serializeSettings()`, `sanitizePromptRoutes()` |
+| `lib/host/prompt-sanitize.js` | `PROMPT_PHRASE_PATTERN` upstream-rejected phrase, `PROMPT_SENTENCE_REMOVALS` context-triggered sentences, `DEFAULT_SANITIZE_REPLACEMENT`, `sanitizeReplacement()`, `sanitizePromptText()`, `sanitizeAssembly()` (sections / contexts / variables copy-on-write) |
 | `lib/host/http-gate.js` | `ROUTES`, `admitRequest()` / `admitUpdateRequest()`, bounded JSON bodies |
 | `lib/host/mount-guard.js` | Mount-once guard across HMR generations |
 | `lib/host/status-text.js` | `/cpa-status` account and quota text |
 | `lib/host/apply-utils.js` | `outsideHmrTransaction()`, `accountPatchFromInput()` |
 | `lib/host/apply/index.js` | `applyImpl`: builds the activation context and wires the factories below in the original order |
 | `lib/host/apply/state.js` | State migration on activation, route seeding, fresh reads |
-| `lib/host/apply/controller.js` | Credentials, media preferences, online model info, account controller, refresh scheduling |
+| `lib/host/apply/controller.js` | Credentials, media preferences, online model info, account controller, refresh scheduling, `system-prompt/assemble` prompt-sanitizing waterfall |
 | `lib/host/apply/updates.js` | Update preferences, `createPluginUpdater()` wiring, startup / 6-hour schedule |
 | `lib/host/apply/quota-service.js` | `createQuotaController()` wiring |
 | `lib/host/apply/media-service.js` | Media status/save, generation choices, `sessionView()`, session picks, `byteRange()` |

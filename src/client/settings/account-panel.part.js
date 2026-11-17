@@ -28,6 +28,8 @@
       const [apiKeyEnv, setApiKeyEnv] = useState("CLI_PROXY_API_KEY");
       const [includePrefix, setIncludePrefix] = useState("");
       const [excludePrefix, setExcludePrefix] = useState("");
+      const [sanitizePrompt, setSanitizePrompt] = useState(false);
+      const [sanitizePromptReplacement, setSanitizePromptReplacement] = useState("");
       const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState("300");
       const [probeTimeoutMs, setProbeTimeoutMs] = useState("5000");
 
@@ -39,6 +41,8 @@
         apiKeyEnv: c.effectiveApiKeyEnv ?? c.apiKeyEnv ?? "CLI_PROXY_API_KEY",
         includePrefix: c.includePrefix ?? "",
         excludePrefix: c.excludePrefix ?? "",
+        sanitizePrompt: c.sanitizePrompt === true,
+        sanitizePromptReplacement: c.sanitizePromptReplacement ?? "",
         refreshIntervalSeconds: String(global?.refreshIntervalSeconds ?? 300),
       });
 
@@ -53,6 +57,8 @@
         setApiKeyEnv(saved.apiKeyEnv);
         setIncludePrefix(saved.includePrefix);
         setExcludePrefix(saved.excludePrefix);
+        setSanitizePrompt(saved.sanitizePrompt);
+        setSanitizePromptReplacement(saved.sanitizePromptReplacement);
         setRefreshIntervalSeconds(saved.refreshIntervalSeconds);
         setProbeTimeoutMs(String(global?.probeTimeoutMs ?? 5000));
         setApiKeyDraft("");
@@ -97,6 +103,8 @@
         apiKeyEnv: apiKeyEnv.trim() || account.config?.apiKeyEnv || "CLI_PROXY_API_KEY",
         includePrefix: includePrefix.trim(),
         excludePrefix: excludePrefix.trim(),
+        sanitizePrompt,
+        sanitizePromptReplacement,
         // Before the first catalog is seen, an empty draft is not a choice:
         // leave the selection unset so the first probe can recommend one.
         ...(selectedIds.size > 0 || (account.status?.allModels?.length ?? 0) > 0
@@ -165,6 +173,8 @@
         apiKeyEnv,
         includePrefix,
         excludePrefix,
+        sanitizePrompt,
+        sanitizePromptReplacement,
         refreshIntervalSeconds,
       };
       const dirty =
@@ -420,6 +430,35 @@
               onChange: (e) => setExcludePrefix(e.target.value),
             })
           )
+        ),
+        h(
+          FieldRow,
+          { t, label: t("sanitizePromptLabel"), help: t("sanitizePromptHint"), htmlFor: `dcpa-sanitize-${account.id}` },
+          h(
+            "button",
+            {
+              id: `dcpa-sanitize-${account.id}`,
+              type: "button",
+              role: "switch",
+              className: "dcpa-switch",
+              "aria-checked": sanitizePrompt,
+              "aria-label": t("sanitizePromptLabel"),
+              onClick: () => setSanitizePrompt((v) => !v),
+            },
+            h("span", { className: "dcpa-switch-thumb" })
+          )
+        ),
+        h(
+          FieldRow,
+          { t, label: t("sanitizePromptReplacementLabel"), help: t("sanitizePromptReplacementHint"), htmlFor: `dcpa-sanitize-repl-${account.id}` },
+          h("input", {
+            id: `dcpa-sanitize-repl-${account.id}`,
+            className: "dcpa-q-input",
+            value: sanitizePromptReplacement,
+            placeholder: "Custom Harness",
+            disabled: !sanitizePrompt,
+            onChange: (e) => setSanitizePromptReplacement(e.target.value),
+          })
         ),
         h(
           FieldRow,

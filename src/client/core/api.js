@@ -1,7 +1,7 @@
 // @client-source React bindings, client identity and API paths.
     const React = require("react");
     const h = React.createElement;
-    const { useState, useEffect, useCallback, useMemo, useRef } = React;
+    const { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } = React;
 
     const PACKAGE_NAME = "dsh-cliproxyapi-pro";
     const MODULE_ID = "dsh-cliproxyapi-pro";

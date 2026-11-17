@@ -3,7 +3,7 @@
 import vm from "node:vm";
 import { readFileSync } from "node:fs";
 
-export function clientHarness({ update = null, loading = true, withMarket = false, fetch = async () => { throw new Error("fake fetch required"); } } = {}) {
+export function clientHarness({ update = null, loading = true, withMarket = false, view = {}, fetch = async () => { throw new Error("fake fetch required"); } } = {}) {
   const slots = [], effects = [], timers = new Map();
   let cursor = 0, active = true, afterUnmountWrites = 0, writes = 0, nextTimer = 0;
   const sameDeps = (a, b) => a && b && a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
@@ -34,10 +34,13 @@ export function clientHarness({ update = null, loading = true, withMarket = fals
         effects.push(() => { slots[i].cleanup = fn(); });
       }
     },
+    // No paint here, so layout effects queue and flush like plain effects.
+    useLayoutEffect(fn, deps) { return React.useEffect(fn, deps); },
   };
   let exports;
   const context = {
-    window: { __ModuleLoader__: { load({ factory }) { exports = factory((name) => { if (name !== "react") throw new Error(`unexpected require ${name}`); return React; }); } } },
+    // `view` adds layout facts (innerWidth/innerHeight, getComputedStyle) for placement tests.
+    window: { ...view, __ModuleLoader__: { load({ factory }) { exports = factory((name) => { if (name !== "react") throw new Error(`unexpected require ${name}`); return React; }); } } },
     AbortController, Date, console, fetch,
     setTimeout(fn, ms) { const id = ++nextTimer; timers.set(id, { fn, ms }); return id; },
     clearTimeout(id) { timers.delete(id); },
@@ -45,7 +48,7 @@ export function clientHarness({ update = null, loading = true, withMarket = fals
     setInterval() { return ++nextTimer; },
     clearInterval() {},
   };
-  const source = readFileSync(new URL("../../lib/client.js", import.meta.url), "utf8").replace("return module.exports;", "exports.__test = {API, PluginUpdatePanel, PluginUpdatePage, CpaSettingsPanel, CpaSectionPage, ModelAdvice, recommendationReason, QuotaPanel, QuotaBadge, MediaPanel, MediaChip, ImageCommandCard, MediaToolRow, MediaCommandRow, MediaConfirmationDock, mediaConversationDefinition, MEDIA_NODE_KIND, hasMediaNode, toolRunId, apply, CSS, zh, en, createMarketUpdater, startAutoInstall, compareVersions, createQuotaStore, summarizeModelQuota, windowAppliesTo, credentialHeadroom, quotaLevel, quotaStats, quotaErrorText, placePeek, PEEK_HIDDEN, SidebarQuota, SidebarQuotaSwitch, sidebarQuotaSummary, announceSidebarQuota, sidebarQuotaListeners}; return module.exports;");
+  const source = readFileSync(new URL("../../lib/client.js", import.meta.url), "utf8").replace("return module.exports;", "exports.__test = {API, InfoTip, placeTip, PluginUpdatePanel, PluginUpdatePage, CpaSettingsPanel, CpaSectionPage, ModelAdvice, recommendationReason, QuotaPanel, QuotaBadge, MediaPanel, MediaChip, ImageCommandCard, MediaToolRow, MediaCommandRow, MediaConfirmationDock, mediaConversationDefinition, MEDIA_NODE_KIND, hasMediaNode, toolRunId, apply, CSS, zh, en, createMarketUpdater, startAutoInstall, compareVersions, createQuotaStore, summarizeModelQuota, windowAppliesTo, credentialHeadroom, quotaLevel, quotaStats, quotaErrorText, placePeek, PEEK_HIDDEN, SidebarQuota, SidebarQuotaSwitch, sidebarQuotaSummary, announceSidebarQuota, sidebarQuotaListeners}; return module.exports;");
   vm.runInNewContext(source, context, { filename: "client.js" });
   // One shared market client per harness, using the fake fetch and timers.
   const market = withMarket ? exports.__test.createMarketUpdater() : null;

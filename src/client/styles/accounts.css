@@ -65,7 +65,7 @@ select.dcpa-q-input { appearance: auto; padding-right: 8px; }
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
   box-shadow: var(--dsw-elevation-prominent, 0 8px 24px var(--dsw-alias-border-l2));
 }
-.dcpa-menu-pop::before, .dcpa-info-pop::before {
+.dcpa-menu-pop::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -120,6 +120,11 @@ select.dcpa-q-input { appearance: auto; padding-right: 8px; }
   max-width: 280px;
   padding: 8px 10px;
   border-radius: var(--dsw-radius-md, 10px);
+  /* Painted on the bubble itself, not a ::before layer, so a capped bubble
+     that scrolls its own text keeps its background (same fix as the quota
+     popover). */
+  background: var(--dsw-menu-surface-fill, var(--dsw-alias-bg-layer-1));
+  backdrop-filter: var(--dsw-menu-backdrop-filter, none);
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
   box-shadow: var(--dsw-elevation-prominent, 0 8px 24px var(--dsw-alias-border-l2));
   color: var(--dsw-alias-label-primary);
@@ -128,8 +133,21 @@ select.dcpa-q-input { appearance: auto; padding-right: 8px; }
   font-weight: 400;
   white-space: normal;
   text-align: left;
+  overscroll-behavior: contain;
 }
-.dcpa-info-pop[data-align="end"] { left: auto; right: -8px; }
+/* Top layer (Popover API): free of the Settings dialog's clipping; InfoTip
+   writes fixed viewport top / left. Reset the UA popover box (centered,
+   inset 0, auto margin, border). */
+.dcpa-info-pop[popover] {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  border: 0;
+  overflow: visible;
+}
+/* In-place fallback without the Popover API. */
+.dcpa-info-pop[data-layer="inline"][data-align="end"] { left: auto; right: -8px; }
+.dcpa-info-pop[data-layer="inline"][data-place="above"] { top: auto; bottom: calc(100% + 6px); }
 .dcpa-savebar {
   position: sticky;
   bottom: 0;

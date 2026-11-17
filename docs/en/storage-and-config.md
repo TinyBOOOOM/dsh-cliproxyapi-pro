@@ -16,7 +16,7 @@
         "id": "default", "enabled": true, "provider": "cli-proxy", "displayName": "CLI Proxy API",
         "baseURL": "https://cpa.example.com", "apiKeyEnv": "CLI_PROXY_API_KEY",
         "protocol": "openai-completions", "protocolMode": "auto",
-        "includePrefix": "", "excludePrefix": "", "selectedModels": ["gpt-6.1-sol"], "modelOverrides": {}
+        "includePrefix": "", "excludePrefix": "", "sanitizePrompt": false, "sanitizePromptReplacement": "Codex", "selectedModels": ["gpt-6.1-sol"], "modelOverrides": {}
       }
     ]
   }
