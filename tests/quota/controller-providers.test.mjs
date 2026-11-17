@@ -173,6 +173,77 @@ describe("quota controller", () => {
     assert.equal(loads(), 3);
   });
 
+  it("takes Antigravity Gemini quota from the daily per-model list when the summary only covers Claude/GPT", async () => {
+    const SUMMARY = "v1internal:retrieveUserQuotaSummary";
+    const claudeOnly = { groups: [{ displayName: "Claude and GPT models", buckets: [
+      { bucketId: "3p-5h", window: "5h", remainingFraction: 0.75, resetTime: "2026-10-21T10:00:00Z" },
+      { bucketId: "3p-weekly", window: "weekly", remainingFraction: 0.5, resetTime: "2026-10-27T00:00:00Z" },
+    ] }] };
+    const gemini = (fraction) => ({ remainingFraction: fraction, resetTime: "2026-10-21T09:30:00Z" });
+    const dailyModels = { models: {
+      // `modelId` is an internal placeholder; the key is the public id.
+      "gemini-3-flash": { displayName: "Gemini 3 Flash", modelId: "MODEL_PLACEHOLDER_M18", quotaInfo: gemini(0.4) },
+      "gemini-3.1-flash-lite": { displayName: "Gemini 3.1 Flash Lite", modelId: "MODEL_PLACEHOLDER_M50", quotaInfo: gemini(0.4) },
+      "claude-sonnet-4-6": { displayName: "Claude Sonnet 4.6", modelId: "MODEL_PLACEHOLDER_M35", quotaInfo: { remainingFraction: 1, resetTime: "2026-10-21T11:00:00Z" } },
+      tab_flash_lite_preview: { modelId: "MODEL_PLACEHOLDER_M19", quotaInfo: { remainingFraction: 1 } },
+      chat_20706: { displayName: "Internal", isInternal: true, quotaInfo: { remainingFraction: 1 } },
+    } };
+    const h = harness({
+      handler: scenarioHandler({
+        models: (name) => json(200, { models: name === "ag.json" ? [{ id: "gemini-4-argon-high" }, { id: "claude-sonnet-4-6" }] : [] }),
+        apiCall: (body) => {
+          if (body.url.endsWith(SUMMARY)) return apiOk(claudeOnly);
+          if (body.url === "https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels") return apiOk(dailyModels);
+          // Production still reads 100% while the daily host serves the traffic.
+          if (body.url.endsWith(":fetchAvailableModels")) return apiOk({ models: { "gemini-3-flash": { quotaInfo: gemini(1) } } });
+          if (body.url.endsWith(":retrieveUserQuota")) return apiOk({ buckets: [{ modelId: "gemini-3-flash", remainingFraction: 1 }] });
+          return undefined;
+        },
+      }),
+    });
+    const snap = await h.controller.refresh("default");
+    const ag = credentialById(snap.accounts[0], "ag.json");
+    assert.equal(ag.quotaState, "ok");
+    assert.deepEqual(ag.windows.map((w) => [w.group, w.kind, w.remainingPercent, w.modelPrefixes, w.modelIds]), [
+      ["Claude and GPT models", "5h", 75, ["claude", "gpt"], undefined],
+      ["Gemini models", "5h", 40, ["gemini", "gemma"], undefined],
+      ["Claude and GPT models", "7d", 50, ["claude", "gpt"], undefined],
+    ], "one shared Gemini pool, matched by prefix so unlisted Gemini ids find it");
+    const agCalls = () => h.calls.filter((c) => c.body?.auth_index === "4").map((c) => c.body.url);
+    assert.equal(agCalls().some((u) => u.endsWith(":retrieveUserQuota")), false);
+    assert.equal(agCalls().some((u) => u === "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels"), false);
+
+    // The daily host stays preferred on the next round.
+    h.calls.length = 0;
+    await h.controller.refresh("default");
+    assert.deepEqual(agCalls().filter((u) => u.endsWith(":fetchAvailableModels")), ["https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels"]);
+  });
+
+  it("keeps per-model Antigravity windows when a family's models report different quotas", async () => {
+    const h = harness({
+      handler: scenarioHandler({
+        apiCall: (body) => {
+          if (body.url.endsWith(":retrieveUserQuotaSummary")) return json(200, { status_code: 404, body: "{}" });
+          if (body.url.endsWith(":fetchAvailableModels")) {
+            return apiOk({ models: {
+              "gemini-3-flash": { displayName: "Gemini 3 Flash", quotaInfo: { remainingFraction: 0.9, resetTime: "2026-10-21T09:00:00Z" } },
+              "gemini-3.1-pro": { displayName: "Gemini 3.1 Pro", quotaInfo: { remainingFraction: 0, resetTime: "2026-10-21T09:00:00Z" } },
+              "claude-sonnet-4-6": { displayName: "Claude Sonnet 4.6", quotaInfo: { remainingFraction: 0.6, resetTime: "2026-10-21T09:00:00Z" } },
+            } });
+          }
+          return undefined;
+        },
+      }),
+    });
+    const snap = await h.controller.refresh("default");
+    const ag = credentialById(snap.accounts[0], "ag.json");
+    assert.deepEqual(ag.windows.map((w) => [w.group, w.remainingPercent, w.modelIds ?? w.modelPrefixes]), [
+      ["Gemini models", 90, ["gemini-3-flash"]],
+      ["Gemini models", 0, ["gemini-3.1-pro"]],
+      ["Claude and GPT models", 60, ["claude", "gpt"]],
+    ]);
+  });
+
   it("re-reads the Gemini CLI tier when the credential already has a project", async () => {
     const files = { files: [{ name: "gc.json", type: "gemini-cli", auth_index: "7", project_id: "proj-2" }] };
     let tier = { paidTier: { id: "g1-pro-tier", name: "Google AI Pro" } };
